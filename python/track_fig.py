@@ -28,11 +28,28 @@ import matplotlib.ticker as mticker
 import matplotlib.dates as mdates
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
+from collections import namedtuple
 
-from itbd import Track
+
+def nolog():
+    """
+    Create a logger instance that doesn't do anything.
+
+    Used to allow logging or not in the code below
+
+    Returns
+    -------
+    NoOpLogger
+        A named tuple that mimics a log instance.
+
+    """
+    NoOpLogger = namedtuple(
+        "NoOpLogger", ["debug", "info", "warning", "error", "critical"]
+    )
+    return NoOpLogger(*([lambda *args, **kwargs: None] * 5))
 
 
-def plot_map(track, path_output=".", dpi=300):
+def plot_map(track, path_output=".", dpi=300, interactive=False, log=None):
     """
     Create a map of the iceberg track.
 
@@ -47,11 +64,22 @@ def plot_map(track, path_output=".", dpi=300):
     dpi : int, optional
         Resolution of the graph in dots per inch. The default is 300.
 
+
     Returns
     -------
     None.
 
     """
+    # set up the logger to output nowhere if None
+    if log == None:
+        log = nolog()
+
+    # quiet these loggers a bit..
+    logging.getLogger("PIL").setLevel(logging.WARNING)
+    logging.getLogger("matplotlib").setLevel(logging.WARNING)
+
+    log.info("Plotting map")
+
     # Add Natural Earth coastline
     coast = cfeature.NaturalEarthFeature(
         "physical", "land", "10m", edgecolor="black", facecolor="lightgray", lw=0.5
@@ -91,13 +119,14 @@ def plot_map(track, path_output=".", dpi=300):
     )
 
     # plot the very start of the track
-    plt.plot(
+    ax.plot(
         track.data.longitude.iloc[0],
         track.data.latitude.iloc[0],
         marker="*",
         ms=20,
         mfc="r",
         mec="k",
+        transform=ccrs.PlateCarree(),
     )
 
     fig.suptitle(
@@ -107,27 +136,30 @@ def plot_map(track, path_output=".", dpi=300):
     ax.text(
         0,
         -0.09,
-        f"Start (*): {track.data_start} UTC, End: {track.data_end} UTC\n  \
-        Duration: {track.duration:.2f} days, Distance: {track.distance:,.2f} km, \
-                Observations: {track.observations:,}",
+        f"Start (*): {track.data_start:%Y-%m-%d %H:%M:%S} UTC, End: {track.data_end:%Y-%m-%d %H:%M:%S} UTC\n  \
+        Duration: {track.duration:.2f} days, Distance: {track.distance:,.2f} km, Observations: {track.observations:,}",
         transform=ax.transAxes,
         color="black",
         fontsize=12,
         fontweight="regular",
     )
 
-    # plt.show()
+    if interactive:
+        plt.show()
 
-    plt.savefig(
-        os.path.join(path_output, f"{track.beacon_id}_map.png"),
-        dpi=dpi,
-        transparent=False,
-        bbox_inches="tight",
-    )
-    plt.close()
+    else:
+        plt.savefig(
+            os.path.join(path_output, f"{track.beacon_id}_map.png"),
+            dpi=dpi,
+            transparent=False,
+            bbox_inches="tight",
+        )
+        plt.close()
+
+    log.info("Plotting map complete")
 
 
-def plot_temp(track, path_output=".", dpi=300):
+def plot_temp(track, path_output=".", dpi=300, interactive=False, log=None):
     """
     Create a graph of the beacon temperature.
 
@@ -155,6 +187,16 @@ def plot_temp(track, path_output=".", dpi=300):
     None.
 
     """
+    # set up the logger to output nowhere if None
+    if log == None:
+        log = nolog()
+
+    # quiet these loggers a bit..
+    logging.getLogger("PIL").setLevel(logging.WARNING)
+    logging.getLogger("matplotlib").setLevel(logging.WARNING)
+
+    log.info("Plotting temp")
+
     # get the temperature
     track.data["temperature"] = track.data["temperature_air"]
     temp_type = "Air"
@@ -176,8 +218,8 @@ def plot_temp(track, path_output=".", dpi=300):
     ).temperature.std()
 
     # plotting  - t temp, m mean, s std
-    fig, (t, m, s) = plt.subplots(
-        3, 1, figsize=(10, 8), sharex=True, constrained_layout=True
+    fig, (t, m, s, v) = plt.subplots(
+        4, 1, figsize=(10, 8), sharex=True, constrained_layout=True
     )
 
     # Temperature plot
@@ -205,7 +247,24 @@ def plot_temp(track, path_output=".", dpi=300):
         ax=s, x="datetime_data", y="Tstd", data=track.data, errorbar=None, color="k"
     )
     s.set(xlabel=None, ylabel="Temp. rolling std (°C)")
+
+    v.grid(ls="dotted")
+    sns.lineplot(
+        ax=s, x="datetime_data", y="voltage", data=track.data, errorbar=None, color="k"
+    )
+    v.set(xlabel=None, ylabel="Battery (V)")
     plt.xticks(rotation=45, horizontalalignment="center")
+
+    # plot the track trimming points so it can be verified before trimming.
+    if not track.trimmed:
+        if not pd.isnull(track.track_start):
+            t.axvline(track.track_start, linestyle="dashdot", color="g")
+            m.axvline(track.track_start, linestyle="dashdot", color="g")
+            s.axvline(track.track_start, linestyle="dashdot", color="g")
+        if not pd.isnull(track.track_end):
+            t.axvline(track.track_end, linestyle="dashdot", color="g")
+            m.axvline(track.track_end, linestyle="dashdot", color="g")
+            s.axvline(track.track_end, linestyle="dashdot", color="g")
 
     if temp_type == "NA":
         fig.suptitle(
@@ -223,9 +282,8 @@ def plot_temp(track, path_output=".", dpi=300):
     s.text(
         0,
         -0.61,
-        f"Start (*): {track.data_start} UTC, End: {track.data_end} UTC\n  \
-       Duration: {track.duration:.2f} days, Distance: {track.distance:,.2f} km, \
-               Observations: {track.observations:,}",
+        f"Start (*): {track.data_start:%Y-%m-%d %H:%M:%S} UTC, End: {track.data_end:%Y-%m-%d %H:%M:%S} UTC\n  \
+        Duration: {track.duration:.2f} days, Distance: {track.distance:,.2f} km, Observations: {track.observations:,}",
         transform=s.transAxes,
         color="black",
         fontsize=12,
@@ -233,18 +291,23 @@ def plot_temp(track, path_output=".", dpi=300):
     )
 
     fig.align_ylabels()
-    # plt.show()
 
-    plt.savefig(
-        os.path.join(path_output, f"{track.beacon_id}_temp.png"),
-        dpi=dpi,
-        transparent=False,
-        bbox_inches="tight",
-    )
-    plt.close()
+    if interactive:
+        plt.show()
+
+    else:
+        plt.savefig(
+            os.path.join(path_output, f"{track.beacon_id}_temp.png"),
+            dpi=dpi,
+            transparent=False,
+            bbox_inches="tight",
+        )
+        plt.close()
+
+        log.info("Plotting temp complete")
 
 
-def plot_dist(track, path_output=".", dpi=300):
+def plot_dist(track, path_output=".", dpi=300, interactive=False, log=None):
     """
     Create a graph of the track's statistical distributions.
 
@@ -262,6 +325,16 @@ def plot_dist(track, path_output=".", dpi=300):
     None.
 
     """
+    # set up the logger to output nowhere if None
+    if log == None:
+        log = nolog()
+
+    # quiet these loggers a bit..
+    logging.getLogger("PIL").setLevel(logging.WARNING)
+    logging.getLogger("matplotlib").setLevel(logging.WARNING)
+
+    log.info("Plotting dist")
+
     fig = plt.figure(figsize=(10, 5))  # , constrained_layout=True)
     h = plt.subplot(121)
     p = plt.subplot(122, projection="polar")
@@ -341,9 +414,8 @@ def plot_dist(track, path_output=".", dpi=300):
     h.text(
         0.0,
         -0.275,
-        f"Start (*): {track.data_start} UTC, End: {track.data_end} UTC\n  \
-       Duration: {track.duration:.2f} days, Distance: {track.distance:,.2f} km, \
-               Observations: {track.observations:,}",
+        f"Start (*): {track.data_start:%Y-%m-%d %H:%M:%S} UTC, End: {track.data_end:%Y-%m-%d %H:%M:%S} UTC\n  \
+        Duration: {track.duration:.2f} days, Distance: {track.distance:,.2f} km, Observations: {track.observations:,}",
         transform=h.transAxes,
         color="black",
         fontsize=12,
@@ -351,19 +423,24 @@ def plot_dist(track, path_output=".", dpi=300):
     )
 
     plt.subplots_adjust(wspace=0.3)
-    # plt.show()
 
-    plt.savefig(
-        os.path.join(path_output, f"{track.beacon_id}_dist.png"),
-        dpi=dpi,
-        transparent=False,
-        bbox_inches="tight",
-    )
+    if interactive:
+        plt.show()
 
-    plt.close()
+    else:
+        plt.savefig(
+            os.path.join(path_output, f"{track.beacon_id}_dist.png"),
+            dpi=dpi,
+            transparent=False,
+            bbox_inches="tight",
+        )
+
+        plt.close()
+
+    log.info("Plotting dist complete")
 
 
-def plot_time(track, path_output=".", dpi=300):
+def plot_time(track, path_output=".", dpi=300, interactive=False, log=None):
     """
     Create a graph of variables with respect to time.
 
@@ -388,6 +465,17 @@ def plot_time(track, path_output=".", dpi=300):
     None.
 
     """
+
+    # set up the logger to output nowhere if None
+    if log == None:
+        log = nolog()
+
+    # quiet these loggers a bit..
+    logging.getLogger("PIL").setLevel(logging.WARNING)
+    logging.getLogger("matplotlib").setLevel(logging.WARNING)
+
+    log.info("Plotting timeseries")
+
     # get the temperature
     track.data["temperature"] = track.data["temperature_air"]
     temp_type = "Air"
@@ -440,28 +528,32 @@ def plot_time(track, path_output=".", dpi=300):
     q.text(
         0,
         -0.61,
-        f"Start (*): {track.data_start} UTC, End: {track.data_end} UTC\n  \
-        Duration: {track.duration:.2f} days, Distance: {track.distance:,.2f} km, \
-        Observations: {track.observations:,}",
+        f"Start (*): {track.data_start:%Y-%m-%d %H:%M:%S} UTC, End: {track.data_end:%Y-%m-%d %H:%M:%S} UTC\n  \
+        Duration: {track.duration:.2f} days, Distance: {track.distance:,.2f} km, Observations: {track.observations:,}",
         transform=q.transAxes,
         color="black",
         fontsize=12,
         fontweight="regular",
     )
 
-    # plt.show()
+    if interactive:
+        plt.show()
 
-    plt.savefig(
-        os.path.join(path_output, f"{track.beacon_id}_time.png"),
-        dpi=dpi,
-        transparent=False,
-        bbox_inches="tight",
-    )
-    plt.close()
+    else:
+        plt.savefig(
+            os.path.join(path_output, f"{track.beacon_id}_time.png"),
+            dpi=dpi,
+            transparent=False,
+            bbox_inches="tight",
+        )
+        plt.close()
+
+    log.info("Plotting timeseries complete")
 
 
+"""
 def main():
-    """Work from command line."""
+    '''Work from command line.'''
     # get parameters from command line:
     parser = argparse.ArgumentParser(description="Beacon track visualization functions")
     parser.add_argument("std_file", help="enter full path to the standard data file")
@@ -518,9 +610,28 @@ def main():
         plot_dist(trk, path_output=path_output)
         plot_time(trk, path_output=path_output)
 
+"""
 
+"""
+# TODO Add more tracks to plots 
+# here is some pseudocode:
+def plot(track, *other_tracks):
+    fig, ax = plt.subplots()
+    ax.plot(track.data, label=track.beacon_id)
+    
+    for track in other_tracks:
+        ax.plot(track.data, label=track.beacon_id)
+
+this will use matplotlibs colours to plot each one as a different colour
+need to deal with the title and text.
+"""
+
+
+"""
 if __name__ == "__main__":
     main()
+"""
+
 
 # std_file = "/home/dmueller/Desktop/cis_iceberg_beacon_database_0.3/standardized_data/2010/300034012592660/2010_300034012592660.csv"
 

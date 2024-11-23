@@ -6,7 +6,7 @@ itbd.py
 Main module for the Iceberg Tracking Beacon Database (ITDB).
 
 Defines the class 'Track' containing an individual iceberg track along with methods and properties.
-Defines the class 'Specs' containing beacon model specifications, used for cleaning
+Defines the class 'Models' containing beacon model specifications, used for cleaning
 Defines the class 'Meta' containing the database metadata
 
 Includes a workflow for cleaning a beacon track using these classes
@@ -24,10 +24,12 @@ from shapely.geometry import LineString
 import numpy as np
 import pyproj
 from collections import namedtuple
+import json
+import copy
 
+# this functionality is in other modules.  Import
 import track_readers
-
-# import openpyxl  # for Meta?
+from track_fig import plot_temp, plot_map, plot_dist, plot_time
 
 
 def nolog():
@@ -48,9 +50,9 @@ def nolog():
     return NoOpLogger(*([lambda *args, **kwargs: None] * 5))
 
 
-class Specs:
+class Models:
     """
-    Class that holds info/specifications for a specific beacon model.
+    Class that holds info/specifications for all beacon models.
 
     Currently that is the valid range (min, max) of various sensors but this could be
     expanded to hold any data related to the model
@@ -58,33 +60,112 @@ class Specs:
 
     """
 
-    def __init__(self, spec_file, logger=None):
+    def __init__(self, model_file, logger=None):
         """
         Read spec file and create a dataframe.
 
         Parameters
         ----------
-        spec_file : str
-            Full path to the spec_file.
+        model_file : str
+            Full path to the model_file (*.ods or *.xls or *.xlsx).
 
         Returns
         -------
-        spec_df : pandas dataframe
-            Specs for all beacon models.
+        model_df : pandas dataframe
+            Specifications for all beacon models.
         logger: instance of logger class
             Pass a logger here if you want
 
         """
-        self.spec_file = spec_file
-        try:
-            df = pd.read_csv(spec_file)
-        except:
-            pass
-        self.df = df
         if logger is None:
             logger = nolog()
         self.log = logger
-        self.log.info(f"Specifications file {self.spec_file} read")
+
+        self.model_file = model_file
+        try:
+            df = pd.read_excel(model_file)
+        except:
+            pass
+            self.log.error(f"Model specifications file {self.model_file} read error")
+        self.df = df
+        self.log.info(f"Model specifications file {self.model_file} read")
+
+
+class Specs:
+    """Class that holds info/specifications for a specific beacon model."""
+
+    def __init__(self, logger=None):
+        """
+        Initialize class, don't load data until ready.
+
+        Parameters
+        ----------
+        logger: instance of logger class
+            Pass a logger here if you want
+
+        """
+        if logger is None:
+            logger = nolog()
+        self.log = logger
+
+    def load_model_specs(self, model, Models):
+        """
+        Read the model spec record for this beacon and write track properties.
+
+        Parameters
+        ----------
+        model : str
+            The exact name of the beacon model
+        Models : Models object
+            An instance of the class Models representing a dataframe of all the model specs.
+
+        """
+        self.log.info("Reading model specifications")
+
+        default_specs = Models.df.loc[Models.df.model == "Default"]
+        beacon_specs = Models.df.loc[Models.df.model == model]
+
+        if len(default_specs) != 1:
+            self.log.error(
+                f"Unkown model {model}, check spelling -or- duplicate model retrieved"
+            )
+            raise Exception(
+                f"Unkown model {model}, check spelling -or- duplicate model retrieved"
+            )
+        if len(beacon_specs) != 1:
+            self.log.error(
+                f"Unkown model {model}, check spelling -or- duplicate model retrieved"
+            )
+            raise Exception(
+                f"Unkown model {model}, check spelling -or- duplicate model retrieved"
+            )
+
+        # find which specs are undefined (=?) and replace with default
+        beacon_specs_ind = beacon_specs.loc[:].values == "?"
+        beacon_specs_ind = np.argwhere(beacon_specs_ind.flatten()).tolist()
+        beacon_specs_ind = [i for row in beacon_specs_ind for i in row]
+        beacon_specs.iloc[0, beacon_specs_ind] = default_specs.iloc[0, beacon_specs_ind]
+
+        # remove a few columns that are not needed
+        beacon_specs = beacon_specs.drop(columns=["notes", "model"])
+
+        for column in beacon_specs.columns:
+            setattr(self, column, beacon_specs[column].iloc[0])
+
+        # now coerce the data to floats, satellites and loc_accuracy are really integers, so try, but skip if NA
+        specs = beacon_specs.filter(regex="_max|_min")
+        specs = specs.astype(float)
+        try:
+            specs = specs.astype({"satellites_max": int, "satellites_min": int})
+        except:
+            pass
+        try:
+            specs = specs.astype({"loc_accuracy_max": int, "loc_accuracy_min": int})
+        except:
+            pass
+        # overwrite the properties above but with proper data types
+        for column in specs.columns:
+            setattr(self, column, specs[column].iloc[0])
 
 
 class Meta:
@@ -99,7 +180,7 @@ class Meta:
         Parameters
         ----------
         meta_file : str
-            Full path to the beacon metadata file.
+            Full path to the beacon metadata file. (*.xls, *.xlsx, *.ods)
         logger: instance of logger class
             Pass a logger here if you want
 
@@ -108,16 +189,18 @@ class Meta:
             None.
 
         """
-        self.meta_file = meta_file
-        try:
-            df = pd.read_csv(meta_file)
-        except:
-            logger.error(f"Failed to read {self.meta_file}, exiting... ")
-            sys.exit(1)
-        self.df = df
         if logger is None:
             logger = nolog()
         self.log = logger
+
+        self.meta_file = meta_file
+
+        try:
+            df = pd.read_excel(meta_file)
+        except:
+            self.log.error(f"Failed to read {self.meta_file}, exiting... ")
+            raise Exception(f"Failed to read {self.meta_file}")
+        self.df = df
         self.log.info(f"Specifications file {self.meta_file} read")
 
 
@@ -168,11 +251,12 @@ class Track:
 
         if logger == None:
             logger = nolog()
-
         self.log = logger  # a log instance is now part of the class
 
         self.datafile = data_file
         self.beacon_id = Path(self.datafile).stem
+
+        self.log.info(f"~Starting to process beacon {self.beacon_id}......")
 
         # if metadata is not given then set properties
         if metadata == None:
@@ -202,15 +286,20 @@ class Track:
             try:
                 self.track_start = pd.to_datetime(self.track_start, utc=True)
             except:
-                print("Unrecognized track start format")  # TODO Logger and raise
+                self.log.error("Unrecognized track start format")
+                raise Exception("Check track start value")
         if self.track_end:
             try:
                 self.track_end = pd.to_datetime(self.track_end, utc=True)
             except:
-                print("Unrecognized track end format")  # TODO Logger and raise
+                self.log.error("Unrecognized track end format")
+                raise Exception("Check track end value")
+        # This captures the data file start and end - it does not necessarily relate to the track.
+        self.data_start = self.data.datetime_data.min()
+        self.data_end = self.data.datetime_data.max()
 
         self.trackpoints = None
-        self.tracklines = None
+        self.trackline = None
 
         # These properties track what has been done to the track.
         self.cleaned = False
@@ -231,6 +320,9 @@ class Track:
         # generate stats
         self.stats()
 
+        # make room for beacon specs that could be associated with this track later
+        self.specs = Specs(logger=self.log)
+
         self.log.info(
             f"Raw data read-in with {self.observations} rows of valid data from {self.data_start} to {self.data_end}"
         )
@@ -246,16 +338,19 @@ class Track:
         None.
 
         """
+
         # populate some simple properties that all tracks have
         self.beacon_id = self.data.beacon_id.iloc[0]
         self.year, self.id = self.beacon_id.split("_")
-        self.data_start = self.data.datetime_data.min()
-        self.data_end = self.data.datetime_data.max()
-        duration = self.data_end - self.data_start
+        if self.trimmed:
+            duration = self.track_end - self.track_start
+        else:
+            duration = self.data_end - self.data_start
         self.duration = round(duration.days + duration.seconds / (24 * 60 * 60), 2)
         self.observations = len(self.data.index)
 
         # this only works after some processing or if the data are standard
+        # note this will change when trimmed too...
         if self.sorted:
             self.latitude_start = self.data.latitude.iloc[0]
             self.longitude_start = self.data.longitude.iloc[-1]
@@ -271,6 +366,26 @@ class Track:
             self.distance = round(self.data["distance"].sum() / 1000, 2)
         else:
             self.distance = None
+
+    def load_model_specs(self, Models):
+        """
+        Load the model specs into the Track.specs properties
+
+        Parameters
+        ----------
+        Models : Models class
+            Specifications for all beacon models
+
+        Returns
+        -------
+        None.
+
+        """
+        if not self.model:
+            self.log.error("Model not known. Check input")
+
+        # retrieve the default specs and the one for the beacon model in question
+        self.specs.load_model_specs(self.model, Models)
 
     def load_metadata(self, Meta):
         """
@@ -289,10 +404,13 @@ class Track:
         # check that one and only one record is returned
         if len(record) == 0:
             self.log.error("metadata not found, exiting....")
-            sys.exit(1)
+            raise Exception(f"The metadata for beacon {self.beacon_id} was not found")
+
         if len(record) > 1:
             self.log.error("beacon metadata duplicated, exiting....")
-            sys.exit(1)
+            raise Exception(
+                f"The metadata search for beacon {self.beacon_id} returned duplicate records"
+            )
 
         # load properties
         self.reader = record.reader.iloc[0]
@@ -320,133 +438,94 @@ class Track:
                     "Unrecognized track end format - trimming will not work as expected"
                 )
 
-    def clean(self, specs):
+    def clean(self):
         """
         Assign NaN to sensor values that exceed the minimum/maximum ranges.
-
-        Parameters
-        ----------
-        Specs : Specs - beacons model specifications class
-            The specifications class.
-
-        Returns
-        -------
-        None.
-
 
         """
         self.log.info("Cleaning track")
 
-        # retrieve the default specs and the one for the beacon model in question
-        default_specs = specs.df.loc[specs.df.beacon_model == "Default"]
-        beacon_specs = specs.df.loc[specs.df.beacon_model == self.model]
-
-        # TODO - put in log file
-        assert (
-            len(default_specs) == 1
-        ), "unkown model, check spelling -or- duplicate model retrieved"
-        assert (
-            len(beacon_specs) == 1
-        ), "unkown model, check spelling -or- duplicate model retrieved"
-
-        # find which specs are undefined (=?) and replace with default
-        beacon_specs_ind = beacon_specs.loc[:].values == "?"
-        beacon_specs_ind = np.argwhere(beacon_specs_ind.flatten()).tolist()
-        beacon_specs_ind = [i for row in beacon_specs_ind for i in row]
-        beacon_specs.iloc[0, beacon_specs_ind] = default_specs.iloc[0, beacon_specs_ind]
-
-        # now coerce the data to floats, satellites is really an integer, so try, but skip if NA
-        specs = beacon_specs.filter(regex="_max|_min")
-        specs = specs.astype(float)
-        try:
-            specs = specs.astype({"satellites_max": int, "satellites_min": int})
-        except:
-            pass
+        if not self.specs.make:
+            self.log.error("No beacon specs are available, no cleaning attempted")
+            return
 
         # Latitude
         self.data.loc[
-            (self.data["latitude"] >= specs.latitude_max.iloc[0])
-            | (self.data["latitude"] <= specs.latitude_min.iloc[0]),
+            (self.data["latitude"] >= self.specs.latitude_max)
+            | (self.data["latitude"] <= self.specs.latitude_min),
             "latitude",
         ] = np.nan
 
         # Longitude
         self.data.loc[
-            (self.data["longitude"] >= specs.longitude_max.iloc[0])
-            | (self.data["longitude"] <= specs.longitude_min.iloc[0])
+            (self.data["longitude"] >= self.specs.longitude_max)
+            | (self.data["longitude"] <= self.specs.longitude_min)
             | (self.data["longitude"] == 0),
             "longitude",
         ] = np.nan
 
         # Air temperature
         self.data.loc[
-            (self.data["temperature_air"] >= specs.temperature_air_max.iloc[0])
-            | (self.data["temperature_air"] <= specs.temperature_air_min.iloc[0]),
+            (self.data["temperature_air"] >= self.specs.temperature_air_max)
+            | (self.data["temperature_air"] <= self.specs.temperature_air_min),
             "temperature_air",
         ] = np.nan
 
         # Internal temperature
         self.data.loc[
-            (
-                self.data["temperature_internal"]
-                >= specs.temperature_internal_max.iloc[0]
-            )
+            (self.data["temperature_internal"] >= self.specs.temperature_internal_max)
             | (
-                self.data["temperature_internal"]
-                <= specs.temperature_internal_min.iloc[0]
+                self.data["temperature_internal"] <= self.specs.temperature_internal_min
             ),
             "temperature_internal",
         ] = np.nan
 
         # Surface temperature
         self.data.loc[
-            (self.data["temperature_surface"] >= specs.temperature_surface_max.iloc[0])
-            | (
-                self.data["temperature_surface"]
-                <= specs.temperature_surface_min.iloc[0]
-            ),
+            (self.data["temperature_surface"] >= self.specs.temperature_surface_max)
+            | (self.data["temperature_surface"] <= self.specs.temperature_surface_min),
             "temperature_surface",
         ] = np.nan
 
         # Pressure
         self.data.loc[
-            (self.data["pressure"] >= specs.pressure_max.iloc[0])
-            | (self.data["pressure"] <= specs.pressure_min.iloc[0]),
+            (self.data["pressure"] >= self.specs.pressure_max)
+            | (self.data["pressure"] <= self.specs.pressure_min),
             "pressure",
         ] = np.nan
 
         # Pitch
         self.data.loc[
-            (self.data["pitch"] >= specs.pitch_max.iloc[0])
-            | (self.data["pitch"] <= specs.pitch_min.iloc[0]),
+            (self.data["pitch"] >= self.specs.pitch_max)
+            | (self.data["pitch"] <= self.specs.pitch_min),
             "pitch",
         ] = np.nan
 
         # Roll
         self.data.loc[
-            (self.data["roll"] >= specs.roll_max.iloc[0])
-            | (self.data["roll"] <= specs.roll_min.iloc[0]),
+            (self.data["roll"] >= self.specs.roll_max)
+            | (self.data["roll"] <= self.specs.roll_min),
             "roll",
         ] = np.nan
 
         # Heading
         self.data.loc[
-            (self.data["heading"] >= specs.heading_max.iloc[0])
-            | (self.data["heading"] <= specs.heading_min.iloc[0]),
+            (self.data["heading"] >= self.specs.heading_max)
+            | (self.data["heading"] <= self.specs.heading_min),
             "heading",
         ] = np.nan
 
         # Satellites
         self.data.loc[
-            (self.data["satellites"] >= specs.satellites_max.iloc[0])
-            | (self.data["satellites"] <= specs.satellites_min.iloc[0]),
+            (self.data["satellites"] >= self.specs.satellites_max)
+            | (self.data["satellites"] <= self.specs.satellites_min),
             "satellites",
         ] = np.nan
 
         # Battery voltage
         self.data.loc[
-            (self.data["voltage"] >= specs.voltage_max.iloc[0])
-            | (self.data["voltage"] <= specs.voltage_min.iloc[0]),
+            (self.data["voltage"] >= self.specs.voltage_max)
+            | (self.data["voltage"] <= self.specs.voltage_min),
             "voltage",
         ] = np.nan
 
@@ -482,7 +561,7 @@ class Track:
         Order the track chronologically and remove redundant entries.
 
         """
-        # sort by datetime_data, and loc_accuracy if available.
+        # sort by datetime_data, and loc_accuracy if available. The best loc_accuracy is the highest number
         self.data.sort_values(["datetime_data", "loc_accuracy"], inplace=True)
         # look for repeated values
         # sdf_dup = self.data.loc[self.data.duplicated(subset=["datetime_data"], keep=False)] # all lines
@@ -527,7 +606,6 @@ class Track:
             Standardized track data - now with speed, etc.
 
         """
-
         # Ensure rows are sorted by datetime.
         assert self.data[
             "datetime_data"
@@ -559,11 +637,12 @@ class Track:
         self.data["direction"] = self.data["direction"].round(0)
         self.data["speed"] = self.data["speed"].round(3)
 
+        # set property
+        self.speeded = True
+        self.log.info("Calculated displacement, direction and speed for track")
+
         # recalculate stats here since things may have changed
         self.stats()
-
-        self.speeded = True
-        # self.log.info("Calculated displacement, direction and speed for track")
 
     def speed_limit(self, threshold=10):
         """
@@ -585,7 +664,6 @@ class Track:
         -------
         sdf : Pandas dataframe
             Standardized track data - now limited.
-
 
         """
         # needs to be in a loop since if there is a fly-away point, you have going out and coming back
@@ -681,28 +759,25 @@ class Track:
 
     def output(self, types=["csv"], path_output=".", file_output=None):
         """
-                Output the track to a file.
+        Output the track to a file.
 
-                Note the default is a csv (non-spatial) format.  Other options include track points
-                (_pt) or track lines (_ln) in a kml or gpkg file [let's move on from shapefiles, eh!].
-                See types option below.   Note that there is no fancy styling of the data.
+        Note the default is a csv (non-spatial) format.  Other options include track points
+        (_pt) or track lines (_ln) in a kml or gpkg file [let's move on from shapefiles, eh!].
+        See types option below.   Note that there is no fancy styling of the data.
 
-                The script checks for an existing file.  If one is there, that will be logged.
-                The file will not be overwritten.
+        The script checks for an existing file.  If one is there, that will be logged.
+        The file will not be overwritten.
 
-                Parameters
-                ----------
-                types : list of st        # reset the index, which copies the
-                        self.data.reset_index(inplace=True)
-        r, optional
-                    list of output types to generate ['csv', 'pt_kml', 'ln_kml', 'pt_gpkg','ln_gpkg']. The default is 'csv'.
-                path_output : str, optional
-                    Path to put the output. The default is the current directory
-                file_output : str, optional
-                    filename of output. The default is None, which will autogenerate on the Beacon ID
-                Returns
-                -------
-                None.
+        Parameters
+        ----------
+        types : list of output types to generate ['csv', 'pt_kml', 'ln_kml', 'pt_gpkg','ln_gpkg']. The default is 'csv'.
+        path_output : str, optional
+            Path to put the output. The default is the current directory
+        file_output : str, optional
+            filename of output. The default is None, which will autogenerate on the Beacon ID
+        Returns
+        -------
+        None.
 
         """
         if not file_output:
@@ -757,9 +832,9 @@ class Track:
                 self.trackline.to_file(
                     f"{os.path.join(path_output, file_output)}_ln.kml", driver="KML"
                 )
-                self.log.info("File already exists, writing as trackline kml file")
+                self.log.info("Track output as trackline kml file")
             else:
-                self.log.error("Track output as trackline kml failed!")
+                self.log.error("File already exists, writing as trackline kml failed!")
 
     def resample(self, timestep="D", agg_function=None, first=True):
         """
@@ -815,7 +890,8 @@ class Track:
         elif agg_function == "median":
             number_f = "median"
         else:
-            print("error")
+            self.log.error("Check resampling parameters")
+            raise Exception("Check resampling parameters")
         if first:
             string_f = "first"
         else:
@@ -875,49 +951,196 @@ class Track:
 
         self.stats()
 
-    def track_metadata(self, csv_export=False):
+    def track_metadata(self, meta_format=None, export=False):
         """
-        Make a dataframe of the known track metadata.
+        Make a dictionary of the known track metadata for export.
 
         Parameters
         ----------
-        model : bool, optional
-            Include the model metadata as well (what sensor data are available). The default is False.
-
+        meta_format : str, optional
+            Specify 'pandas' or 'json' format. The default (None) is a dictionary.
+        export : bool, optional
+            Export to file in working directory. The default is False.
 
         Returns
         -------
-        track_meta_df : pandas dataframe
-            A dataframe with the track metadata
+        track_meta : TYPE
+            DESCRIPTION.
 
         """
-        # Make a dictionary
-        track_meta_dict = {
-            "year": self.year,
-            "id": self.id,
-            "beacon_id": self.beacon_id,
-            "observations": self.observations,
-            "track_start": self.data_start,
-            "track_end": self.data_end,
-            "duration": self.duration,
-            "latitude_start": self.latitude_start,
-            "longitude_start": self.longitude_start,
-            "latitude_end": self.latitude_end,
-            "longitude_end": self.latitude_end,
-            "distance": self.distance,
-            "reader": self.reader,
-        }
+        # some tracks may not have beacon specs, let's find out...
+        have_specs = False
+        # get the specs for the beacon here but only run if you have specs
+        # test to see if specs exist
+        if "make" in self.specs.__dict__:
+            have_specs = True
+            s_meta = copy.deepcopy(self.specs.__dict__)
 
+            # don't want every entry
+            remove_keys = ["log", "deployment"]
+            for key in remove_keys:
+                s_meta.pop(key, None)  # Use pop to avoid KeyError if key doesn't exist
 
-reader
-beacon_wmo
-beacon_make
-beacon_model
-beacon_transmitter
-temperature_int
-temperature_surface
-temperature_air
-pressure
-pitch
-roll
-heading
+        # get all the properties of the track
+        t_meta = copy.deepcopy(self.__dict__)
+
+        # don't want every entry
+        remove_keys = [
+            "log",
+            "data",
+            "specs",
+            "trackpoints",
+            "trackline",
+        ]
+        for key in remove_keys:
+            t_meta.pop(key, None)  # Use pop to avoid KeyError if key doesn't exist
+
+        if have_specs:
+            track_meta_dict = t_meta | s_meta
+        else:
+            track_meta_dict = t_meta
+
+        if meta_format == "json":
+            track_meta = json.dumps(track_meta_dict, indent=4)
+            if export:
+                with open(f"{self.beacon_id}_meta.json", "w") as file_export:
+                    file_export.write(track_meta)
+        if meta_format == "pandas":
+            track_meta = pd.DataFrame([track_meta_dict])
+            if export:
+                track_meta.to_csv(f"{self.beacon_id}_meta.csv", index=False)
+
+        return track_meta
+
+    # The following graphing functions are in track_fig.py but listed here so they can
+    # be a method of Track.
+
+    def plot_map(self, path_output=".", interactive=False, dpi=300):
+        """
+        Plot a map of the track.
+
+        See track_fig.py
+        TODO:  configure to add *other_tracks to the plot
+
+        Parameters
+        ----------
+        track : track object
+            Standardized beacon track object.
+        path_output : str, optional
+            Path to save output. The default is ".".
+        dpi : int, optional
+            Resolution of the graph in dots per inch. The default is 300.
+        interactive:
+        log : logger object
+            Enter a logger object
+
+        Returns
+        -------
+        None.
+
+        """
+
+        # call the function in track_fig.py
+        plot_map(
+            self,
+            path_output=path_output,
+            dpi=dpi,
+            interactive=interactive,
+            log=self.log,
+        )
+
+    def plot_temp(self, path_output=".", interactive=False, dpi=300):
+        """
+        Plot a temperatures for the track.
+
+        See track_fig.py
+        TODO:  configure to add *other_tracks to the plot
+
+        Parameters
+        ----------
+        track : track object
+            Standardized beacon track object.
+        path_output : str, optional
+            Path to save output. The default is ".".
+        dpi : int, optional
+            Resolution of the graph in dots per inch. The default is 300.
+        log : logger object
+            Enter a logger object
+
+        Returns
+        -------
+        None.
+
+        """
+        # call the function in track_fig.py
+        plot_temp(
+            self,
+            path_output=path_output,
+            dpi=dpi,
+            interactive=interactive,
+            log=self.log,
+        )
+
+    def plot_dist(self, path_output=".", interactive=False, dpi=300):
+        """
+        Plot distributions along the track.
+
+        See track_fig.py
+        TODO:  configure to add *other_tracks to the plot
+
+        Parameters
+        ----------
+        track : track object
+            Standardized beacon track object.
+        path_output : str, optional
+            Path to save output. The default is ".".
+        dpi : int, optional
+            Resolution of the graph in dots per inch. The default is 300.
+        log : logger object
+            Enter a logger object
+
+        Returns
+        -------
+        None.
+
+        """
+        # call the function in track_fig.py
+        plot_dist(
+            self,
+            path_output=path_output,
+            dpi=dpi,
+            interactive=interactive,
+            log=self.log,
+        )
+
+    def plot_time(self, path_output=".", interactive=False, dpi=300):
+        """
+        Plot a timeseries of the track.
+
+        See track_fig.py
+        TODO:  configure to add *other_tracks to the plot
+
+        Parameters
+        ----------
+        track : track object
+            Standardized beacon track object.
+        path_output : str, optional
+            Path to save output. The default is ".".
+        dpi : int, optional
+            Resolution of the graph in dots per inch. The default is 300.
+        log : logger object
+            Enter a logger object
+
+        Returns
+        -------
+        None.
+
+        """
+        # call the function in track_fig.py
+        plot_time(
+            self,
+            path_output=path_output,
+            dpi=dpi,
+            interactive=interactive,
+            log=self.log,
+        )

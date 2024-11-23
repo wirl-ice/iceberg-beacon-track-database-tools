@@ -42,7 +42,7 @@ prefix = len(scandir) + len(os.path.sep)
 if not os.path.isdir(outdir):
     os.makedirs(outdir)
 
-log = track_processing.tracklog("Test", outdir)
+log = track_processing.tracklog("Test", outdir, level="INFO")
 log.info("Starting run.....")
 
 metadata = Meta(meta_file, log)
@@ -58,18 +58,42 @@ for root, dirs, files in os.walk(scandir, topdown=True):
     for f in files:
         if Path(f).stem in metadata.df.beacon_id.values:
             print(f"\n\n......{f}.......")
-            df = track_processing.track_process(
-                os.path.join(root, f),
-                os.path.join(outdir, root[prefix:]),
-                metadata=metadata,
-                reader=None,
-                specs=modeldata,
-                track_start=None,  # need to pull from Meta
-                track_end=None,  # need to pull from Meta
-                output_file=None,
-                output_types=["csv"],
+
+            # df = track_processing.track_process(
+            #     os.path.join(root, f),
+            #     os.path.join(outdir, root[prefix:]),
+            #     metadata=metadata,
+            #     reader=None,
+            #     specs=modeldata,
+            #     track_start=None,  # need to pull from Meta
+            #     track_end=None,  # need to pull from Meta
+            #     output_file=None,
+            #     output_types=["csv"],
+            # )
+
+            trk = Track(os.path.join(root, f), metadata=metadata, logger=log)
+            trk.load_model_specs(modeldata)
+            trk.clean()
+            trk.sort()
+            trk.speed()
+            # trk.trim()
+            # trk.speed_limit()
+            trk.output(
+                ["csv", "pt_kml", "ln_kml"],
+                path_output=os.path.join(outdir, root[prefix:]),
             )
-            alltrack_meta = pd.concat([alltrack_meta, df]).reset_index(drop=True)
+
+            # do this after all the data have been cleaned.
+            trk_meta = trk.track_metadata("pandas")
+
+            trk.plot_map(path_output=os.path.join(outdir, root[prefix:]))
+            trk.plot_temp(os.path.join(outdir, root[prefix:]))
+            trk.plot_dist(os.path.join(outdir, root[prefix:]))
+            trk.plot_time(os.path.join(outdir, root[prefix:]))
+
+            log.info("Completed track processing... \n")
+
+            alltrack_meta = pd.concat([alltrack_meta, trk_meta]).reset_index(drop=True)
 
 
-alltrack_meta.to_csv(os.path.join(outdir, "test_batch2.csv"), index=False)
+alltrack_meta.to_csv(os.path.join(outdir, "test.csv"), index=False)

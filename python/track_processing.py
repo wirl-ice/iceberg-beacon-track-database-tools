@@ -15,7 +15,7 @@ from pathlib import Path
 import pandas as pd
 
 # custom modules
-from itbd import Track, Meta, Specs, nolog
+from itbd import Track, Meta, Models, nolog
 
 
 def tracklog(beacon_id, path_output, level="DEBUG"):
@@ -58,6 +58,11 @@ def tracklog(beacon_id, path_output, level="DEBUG"):
 
     # Create a logger instance here - it will be named after the module name (__main__?)
     track_log = logging.getLogger()
+
+    # Remove all handlers associated with the logger (avoids duplicates)
+    if track_log.hasHandlers():
+        track_log.handlers.clear()
+
     track_log.setLevel(logging.DEBUG)  # sets the default level for this logger
 
     # Create handlers - these control output from the logger
@@ -127,7 +132,7 @@ def read_args():
         "--spec_file",
         type=str,
         default=None,
-        help="the path/name of the specifications csv file",
+        help="the path/name of the model specifications file",
     )
     parser.add_argument(
         "-s",
@@ -220,7 +225,7 @@ def read_args():
 
     # read in the spec file
     if spec_file:
-        specs = Specs(spec_file)
+        specs = Models(spec_file)
     else:
         specs = None
 
@@ -292,14 +297,18 @@ def track_process(
         log.error(
             "You must specify a valid metadata object or reader function to read a track"
         )
-    if specs:  # no point cleaning without the specs
-        trk.clean(specs)
+
+    if specs:  # no point cleaning without the beacon specs
+        trk.load_model_specs(specs)
+        trk.clean()
     trk.sort()
     trk.speed()
     trk.speed_limit()
-    trk.trim()
+    # trk.trim()
     trk.output(output_types, path_output=output_path, file_output=output_file)
+    trk_meta = trk.track_metadata("pandas")
     log.info("Completed track processing... \n")
+    return trk_meta
 
 
 def main():

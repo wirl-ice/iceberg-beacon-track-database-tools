@@ -12,6 +12,7 @@ Each function takes the raw data file path/name and puts it into the standardize
 At a minimum, the date/time, latitude and longitude are required.  Other columns are 
 optional.
 
+
 --
 Created December 2022 by Adam Garbo based on R scripts from Derek Mueller, Cindy
 Lopes, Anna Crawford and Jill Rajewicz
@@ -25,6 +26,7 @@ import numpy as np
 from pathlib import Path
 import datetime as dt
 from collections import namedtuple
+import re
 
 
 def nolog():
@@ -99,7 +101,7 @@ def create_sdf(nrows):
         "heading": float,
         # "satellites" : int,
         "voltage": float,
-        "loc_accuracy": float,
+        # "loc_accuracy": int,
         "distance": float,
         "speed": float,
         "direction": float,
@@ -118,6 +120,52 @@ def create_sdf(nrows):
     sdf.datetime_transmit = pd.to_datetime(sdf.datetime_transmit, utc=True)
 
     return sdf
+
+
+#### Helper functions
+
+
+def dms2dd(string):
+    """
+    Extract degrees, minutes and seconds from a string
+
+    Assumes that the format is deg min sec or deg min, or deg.  Never deg sec, etc.
+    Also assumes there will be no negative min or sec.
+
+    Parameters
+    ----------
+    string : str
+        A string containing deg, min, seconds like 71° 20' 23.20800"
+
+    Returns
+    -------
+    dd : float
+        decimal degree.
+
+    """
+    # Find all numbers in the string (all integers and floating point numbers in string)
+    dms = re.findall(r"\d+\.\d+|-?\d+", string)
+    # convert them all to floating point numbers
+    dms = [float(i) for i in dms]
+    # how many are there?
+    match len(dms):
+        case 3:
+            pass
+        case 2:
+            dms.append(0)
+        case 1:
+            dms.append(0)
+            dms.append(0)
+        case _:
+            dms = [0, 0, 0]
+    degs, mins, secs = dms
+
+    decSec = float(secs) / 3600
+    decMin = float(mins) / 60
+    dd = abs(degs) + decMin + decSec
+    if degs < 0:
+        dd = dd * -1
+    return dd
 
 
 # -----------------------------------------------------------------------------
@@ -546,7 +594,9 @@ def canatec(raw_data_file, log=None):
     sdf["beacon_id"] = Path(raw_data_file).stem
 
     try:
-        sdf["datetime_data"] = pd.to_datetime(rdf["ReadingDate"], utc=True)
+        sdf["datetime_data"] = pd.to_datetime(
+            rdf["ReadingDate"], utc=True, yearfirst="True"
+        )
         sdf["latitude"] = rdf["Latitude"]
         sdf["longitude"] = rdf["Longitude"]
 
@@ -854,10 +904,12 @@ def iabp(raw_data_file, log=None):
     sdf["beacon_id"] = Path(raw_data_file).stem
 
     try:
-
+        # use the position doy for the timestamp (along with year)
         sdf["datetime_data"] = pd.to_datetime(rdf["Year"], format="%Y", utc=True) + rdf[
-            "DOY"
+            "POS_DOY"
         ].sub(1).apply(pd.Timedelta, unit="D")
+        # round to the nearest second
+        sdf["datetime_data"].dt.round(freq="s")
 
         sdf["latitude"] = rdf["Lat"]
         sdf["longitude"] = rdf["Lon"]
@@ -934,98 +986,119 @@ def iip(raw_data_file, log=None):
     return sdf
 
 
-# def oceanetic(raw_data_file):
-#     """
-#     Convert raw data from Oceanetic format to standardized dataframe.
+def oceanetic(raw_data_file, log=None):
+    """
+    Convert raw data from Oceanetic format to standardized dataframe.
 
-#     Parameters
-#     ----------
-#     raw_data_file : string
-#         Path to raw data CSV file.
+    Parameters
+    ----------
+    raw_data_file : string
+        Path to raw data CSV file.
 
-#     Returns
-#     -------
-#     sdf : Pandas DataFrame
-#         Standardized Pandas dataframe ready for cleaning.
+    Returns
+    -------
+    sdf : Pandas DataFrame
+        Standardized Pandas dataframe ready for cleaning.
 
-#     Raw data format
-#     ----------------------------------
-#     Columns:
-#         IMEI
-#         Year
-#         Month
-#         Day
-#         Hour
-#         Minute
-#         Latitude
-#         Longitude
-#         Temperature
-#         Voltage Battery
-#         AtmPress
-#         FormatID
+    Raw data format
+    ----------------------------------
+    Columns:
+        beacon id
+        yr
+        mm
+        dd
+        hr
+        lat
+        long
+    """
 
-#        *or*
+    # read in the raw data frame - rdf
+    rdf = pd.read_csv(raw_data_file, index_col=False, skipinitialspace=True)
 
-#        beacon id
-#        yr
-#        mm
-#        dd
-#        hr
-#        lat
-#        long
-#     """
-#     # read in the raw data frame - rdf
-#     rdf = pd.read_csv(raw_data_file, index_col=False, skipinitialspace=True)
+    # create an empty standard data frame - sdf - filled with NAs
+    sdf = create_sdf(len(rdf))
 
-#     # create an empty standard data frame - sdf - filled with NAs
-#     sdf = create_sdf(len(rdf))
+    # Unique beacon identifier
+    sdf["beacon_id"] = Path(raw_data_file).stem
 
-#     # Unique beacon identifier
-#     sdf["beacon_id"] = Path(raw_data_file).stem
+    try:
+        rdf.rename(
+            columns={"yr": "year", "mm": "month", "dd": "day", "hr": "hour"},
+            inplace=True,
+        )
+        sdf["datetime_data"] = pd.to_datetime(
+            rdf[["year", "month", "day", "hour"]], utc=True
+        )
 
-#     try:
+        # Latitude
+        sdf["latitude"] = rdf["lat"]
 
-#         # Datetime format for beacon IDs: 2011_300034013463170 and 0082470
-#         if "Year" in rdf:
-#             sdf["datetime_data"] = pd.to_datetime(
-#                 rdf[["Year", "Month", "Day", "Hour", "Minute"]], utc=True
-#             )
-#         # Datetime format for all other beacon IDs
-#         elif "yr" in rdf:
-#             rdf.rename(
-#                 columns={"yr": "year", "mm": "month", "dd": "day", "hr": "hour"},
-#                 inplace=True,
-#             )
-#             sdf["datetime_data"] = pd.to_datetime(
-#                 rdf[["year", "month", "day", "hour"]], utc=True
-#             )
+        # Longitude
+        sdf["longitude"] = rdf["long"]
 
-#         # Latitude
-#         if "Latitude" in rdf:
-#             sdf["latitude"] = rdf["Latitude"]
-#         elif "lat" in rdf:
-#             sdf["latitude"] = rdf["lat"]
+    except:
+        print(f"Problem with raw data file {raw_data_file}, check formatting")
+        sys.exit(1)
 
-#         # Longitude
-#         if "Longitude" in rdf:
-#             sdf["longitude"] = rdf["Longitude"]
-#         elif "long" in rdf:
-#             sdf["longitude"] = rdf["long"]
+    return sdf
 
-#         if "Temperature" in rdf:
-#             sdf["temperature_internal"] = rdf["Temperature"]
 
-#         if "AtmPress" in rdf:
-#             sdf["pressure"] = rdf["AtmPress"]
+def ceos(raw_data_file, log=None):
+    """
+    Convert raw data from CEOS format to standardized dataframe.
 
-#         if "Voltage Battery" in rdf:
-#             sdf["voltage"] = rdf["Voltage Battery"]
+    Parameters
+    ----------
+    raw_data_file : string
+        Path to raw data CSV file.
 
-#     except:
-#         print(f"Problem with raw data file {raw_data_file}, check formatting")
-#         sys.exit(1)
+    Returns
+    -------
+    sdf : Pandas DataFrame
+        Standardized Pandas dataframe ready for cleaning.
 
-#     return sdf
+    Raw data format
+    ----------------------------------
+    Columns:
+        imei
+        unknown
+        unknown
+        date
+        time
+        lat
+        hemi
+        long
+        hemi
+        unknown
+        unknown
+        unknown
+        unknown
+    """
+    # read in the raw data frame - rdf
+    rdf = pd.read_csv(raw_data_file, index_col=False, skipinitialspace=True)
+
+    # create an empty standard data frame - sdf - filled with NAs
+    sdf = create_sdf(len(rdf))
+
+    # Unique beacon identifier
+    sdf["beacon_id"] = Path(raw_data_file).stem
+
+    try:
+        sdf["datetime_data"] = pd.to_datetime(
+            rdf["date"].str.cat(rdf["time"], sep=" "), utc=True
+        )
+
+        # Latitude
+        sdf["latitude"] = rdf["lat"]
+
+        # Longitude
+        sdf["longitude"] = rdf["long"]
+
+    except:
+        print(f"Problem with raw data file {raw_data_file}, check formatting")
+        sys.exit(1)
+
+    return sdf
 
 
 def wirl_sbd(raw_data_file, log=None):
@@ -1124,6 +1197,7 @@ def rockstar(raw_data_file, log=None):
         GPS Time (UTC) (17-08-2016 20:00:06)
         Latitude
         Longitude
+        Temperature (only sometimes)
 
     """
     # set up the logger to output nowhere if None
@@ -1131,7 +1205,14 @@ def rockstar(raw_data_file, log=None):
         log = nolog()
 
     # read in the raw data frame - rdf
-    rdf = pd.read_csv(raw_data_file, index_col=False, skipinitialspace=True)
+    with open(raw_data_file, "r") as fp:
+        lines = fp.readlines()
+        for row in lines:
+            word = "ID,GPS"  # ------
+            if row.find(word) != -1:
+                skip = lines.index(row)
+
+    rdf = pd.read_csv(raw_data_file, index_col=False, skiprows=skip)
 
     # create an empty standard data frame - sdf - filled with NAs
     sdf = create_sdf(len(rdf))
@@ -1141,12 +1222,16 @@ def rockstar(raw_data_file, log=None):
 
     try:
         # Datetime format for beacon IDs: 2011_300034013463170 and 0082470
+        # there are 2 columns with the same label.  they seem to be always the same...
         sdf["datetime_data"] = pd.to_datetime(
             rdf["GPS Time (UTC)"], dayfirst=True, utc=True
         )
 
         sdf["latitude"] = rdf["Latitude"]
         sdf["longitude"] = rdf["Longitude"]
+
+        if "Temperature" in rdf:
+            sdf["temperature_internal"] = rdf["Temperature"]
 
     except:
         print(f"Problem with raw data file {raw_data_file}, check formatting")
@@ -1207,7 +1292,7 @@ def solara(raw_data_file, log=None):
     return sdf
 
 
-def svp(raw_data_file, log=None):
+def svp_old_throw_away(raw_data_file, log=None):
     """
     Convert raw data from Metocean SVP format to standardized dataframe.
 
@@ -1230,11 +1315,11 @@ def svp(raw_data_file, log=None):
     ----------------------------------
     Columns:
         Asset Name / Asset.Name
-        Asset Id  / Asset.Id
+        Asset Id  / Asset.Id /
         Data Date (UTC) / DataDate_UTC
         Received Date (UTC)
-        LATITUDE
-        LONGITUDE
+        LATITUDE   # this is in dd.dddd format
+        LONGITUDE  # this is in dd.dddd format
         FMTID
         YEAR
         MONTH
@@ -1304,6 +1389,127 @@ def svp(raw_data_file, log=None):
         # Battery voltage
         if "VBAT" in rdf:
             sdf["voltage"] = rdf["VBAT"]
+
+    except:
+        print(f"Problem with raw data file {raw_data_file}, check formatting")
+        sys.exit(1)
+
+    return sdf
+
+
+def svp(raw_data_file, log=None):
+    """
+    Convert raw data from Metocean SVP format to standardized dataframe.
+
+    - SVP-I-BXGS-LP beacons have BP, GPS, and SST
+    - SVP-I-XXGS-LP beacons have GPS and SST, no BP
+    - SVP-I-BXGSA-L-AD beacons have BP, GPS, SST, AT, lithium battery and are
+    designed for air deployment in Arctic regions
+
+    Parameters
+    ----------
+    raw_data_file : string
+        Path to raw data CSV file.
+
+    Returns
+    -------
+    sdf : Pandas DataFrame
+        Standardized Pandas dataframe ready for cleaning.
+
+    Raw data format
+    ----------------------------------
+    Columns:
+        Asset Name / Asset.Name
+        Asset Id  / Asset.Id / Modem ID
+        Data Date (UTC) / DataDate_UTC  / Date(GMT)
+        Received Date (UTC)
+        LATITUDE   # this is in dd.dddd format / GPS LATITUDE (DEGREES) # dd mm.mmmmmm format
+        LONGITUDE  # this is in dd.dddd format / GPS LONGITUDE (DEGREES) # dd mm.mmmmmm format
+        FMTID / FORMAT ID
+        YEAR
+        MONTH
+        DAY / DAY (day)
+        HOUR / HOUR (hr)
+        MIN  / MINUTE (min)
+        SST  / Sea Surface Temperature (�C)
+        BP  / Barometric Pressure (mbar)
+        BPT / Barometric Pressure Tendency (mbar)
+        AT
+        VBAT / Battery Voltage (V)
+        GPSDELAY / Time Since Last GPS fix (min)
+        SNR  / GPS reported Signal to Noise ratio (dB)
+        TTFF / Time to First fix (s)
+        SBDTIME  / Iridium Transmission Duration (s)
+        Report Body / Report.Body / Hex Data
+
+    """
+    # set up the logger to output nowhere if None
+    if log == None:
+        log = nolog()
+
+    # read in the raw data frame - rdf
+    rdf = pd.read_csv(
+        raw_data_file, index_col=False, skipinitialspace=True, encoding_errors="replace"
+    )
+
+    # create an empty standard data frame - sdf - filled with NAs
+    sdf = create_sdf(len(rdf))
+
+    # Unique beacon identifier
+    sdf["beacon_id"] = Path(raw_data_file).stem
+
+    try:
+
+        # Data timestamp
+        if "DATA DATE (UTC)" in rdf:
+            sdf["datetime_data"] = pd.to_datetime(rdf["DATA DATE (UTC)"], utc=True)
+        elif "Data Date (UTC)" in rdf:
+            sdf["datetime_data"] = pd.to_datetime(rdf["Data Date (UTC)"], utc=True)
+        elif "DataDate_UTC" in rdf:
+            sdf["datetime_data"] = pd.to_datetime(rdf["DataDate_UTC"], utc=True)
+        elif "Date(GMT)" in rdf:
+            sdf["datetime_data"] = pd.to_datetime(rdf["Date(GMT)"], utc=True)
+
+        # Data transmission timestamp
+        if "RECEIVED DATE (UTC)" in rdf:
+            sdf["datetime_transmit"] = pd.to_datetime(
+                rdf["RECEIVED DATE (UTC)"], utc=True
+            )
+        elif "Received Date (UTC)" in rdf:
+            sdf["datetime_transmit"] = pd.to_datetime(
+                rdf["Received Date (UTC)"], utc=True
+            )
+
+        if "GPS LATITUDE (DEGREES)" in rdf:
+            sdf["latitude"] = rdf["GPS LATITUDE (DEGREES)"].apply(dms2dd)
+        else:
+            sdf["latitude"] = rdf["LATITUDE"]
+        if "GPS LONGITUDE (DEGREES)" in rdf:
+            sdf["longitude"] = rdf["GPS LONGITUDE (DEGREES)"].apply(dms2dd)
+        else:
+            sdf["longitude"] = rdf["LONGITUDE"]
+
+        # Air temperature
+        if "AT" in rdf:
+            sdf["temperature_air"] = rdf["AT"]
+
+        # Surface temperature
+        if "SST" in rdf:
+            sdf["temperature_surface"] = rdf["SST"]
+        if "Sea Surface Temperature (�C)" in rdf:
+            sdf["temperature_surface"] = rdf["Sea Surface Temperature (�C)"]
+
+        # Barometric pressure
+        if "BP" in rdf:
+            sdf["pressure"] = rdf["BP"]
+        if "Barometric Pressure (mbar)" in rdf:
+            sdf["pressure"] = rdf["Barometric Pressure (mbar)"]
+
+        # Battery voltage
+        if "VBAT" in rdf:
+            sdf["voltage"] = rdf["VBAT"]
+        if "Battery Voltage (V)" in rdf:
+            sdf["voltage"] = rdf["Battery Voltage (V)"]
 
     except:
         print(f"Problem with raw data file {raw_data_file}, check formatting")
