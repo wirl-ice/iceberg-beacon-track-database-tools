@@ -3,16 +3,20 @@
 """
 track_proceessing.py
 
-Stand-alone script to process tracks for the ITBD.  
+Stand-alone script to process tracks for the ITBD (Iceberg Tracking Beacon Database) 
+
+--or--
+
+If you have standardized data already, it can be used to make plots and output data
+
+Author: Derek Mueller Jan 2025
 
 """
-
 import os
 import sys
 import argparse
 import logging
 from pathlib import Path
-import pandas as pd
 
 # custom modules
 from itbd import Track, Meta, Models, nolog
@@ -94,17 +98,43 @@ def read_args():
 
     This function facilitates the command line operation of the workflow. Note that most
     of the arguments are not required, since they have defaults. There are some choices:
-        The use can specify the reader, beacon model, track start and end times for trimming,
+        The user can specify the reader, beacon model, track start and end times for trimming,
         or leave them blank (which may limit what steps can be accomplished),
         or provide the path to the metadata file.  If the metdata file is present, the
         arguments mentioned above will be overwritten.
 
     Returns
     -------
-    a list of the arguments.
+    a list of the arguments in order
 
     """
-    prog_description = "Beacon track standardization and cleaning functions"
+    prog_description = """Beacon track processing functions
+    
+    For reading-in standard data files:
+        - do not include the -rd (--raw_data) flag 
+        - -r (--reader) will be ignored and reader listed in the meta_file will be ignored
+        - -m (--model) will be ignored
+        - -sf (--spec_file) will be ignored
+        - track can be re-trimmed as required
+        - file and plot outputs can be requested
+        
+    For reading-in, standardizing and cleaning raw data: 
+        - include the -rd (--raw_data) flag 
+        - the reader must be specified (-r or listed in the meta_file -mf)
+        - trimming (track_start and/or track_end) must be listed or in meta_file
+        - file and plot outputs can be requested
+    
+    Example: read standard data file 2021_300434065868240.csv and output a map in the current directory: 
+        >python track_processing.py 2021_300434065868240.csv . -2011-08-08 13:00:00 2011-08-12 21:00:00 -op map
+
+    Example: read standard data file 2011_300234010031950.csv, trim it and output a map, time plot and kml 
+    in the parent directory:     
+        >python track_processing.py 2011_300234010031950.csv .. -s '2011-08-08 13:00:00' -e '2011-08-12 21:00:00' -op map time -ot ln_kml
+
+    For more info see github readme.
+        
+    """
+
     parser = argparse.ArgumentParser(prog_description)
 
     # these are the required parameters - all others have default values
@@ -118,7 +148,7 @@ def read_args():
         "--reader",
         type=str,
         default="standard",
-        help="provide the name of the reader function",
+        help="provide the name of the reader function (default is 'standard' clean data)",
     )
     parser.add_argument(
         "-m",
@@ -153,8 +183,8 @@ def read_args():
         "--meta_file",
         type=str,
         default=None,
-        help="the path/name of the metadata csv file. Note that the script will seek \
-            reader, model, track_start, track_end in the meta_file",
+        help="the path/name of the metadata csv file. Note that the script will OVERWRITE \
+            arguments reader, model, track_start, track_end with values in this file",
     )
     parser.add_argument(
         "-of",
@@ -171,6 +201,33 @@ def read_args():
         nargs="+",
         choices={"csv", "pt_kml", "ln_kml", "pt_gpkg", "ln_gpkg"},
         help="list the output types to produce:  ; defaults to producing csv only",
+    )
+    parser.add_argument(
+        "-op",
+        "--output_plots",
+        type=str,
+        default="map",
+        nargs="+",
+        choices={"map", "time", "dist", "trim"},
+        help="list the output plots to produce; defaults to producing map only",
+    )
+    parser.add_argument(
+        "-i",
+        "--interactive",
+        action="store_true",
+        help="create interactive plots; defaults to non-interactive plots",
+    )
+    parser.add_argument(
+        "-t",
+        "--trim_check",
+        action="store_true",
+        help="set -t to check where the trim points _would be_ on the map and trim plot; defaults to false",
+    )
+    parser.add_argument(
+        "-rd",
+        "--raw_data",
+        action="store_true",
+        help="set -rd to work with raw data; defaults to false",
     )
     parser.add_argument(
         "-q",
@@ -192,6 +249,10 @@ def read_args():
     meta_file = args.meta_file
     output_file = args.output_file
     output_types = args.output_types
+    output_plots = args.output_plots
+    interactive = args.interactive
+    trim_check = args.trim_check
+    raw_data = args.raw_data
     quiet = args.quiet
 
     # some attempt at error trapping early on....
@@ -240,6 +301,10 @@ def read_args():
         track_end,
         output_file,
         output_types,
+        output_plots,
+        interactive,
+        trim_check,
+        raw_data,
         quiet,
     ]
 
@@ -255,71 +320,121 @@ def track_process(
     track_end=None,
     output_file=None,
     output_types=["csv"],
+    output_plots=None,
+    interactive=False,
+    trim_check=False,
+    raw_data=False,
 ):
     """
-        Process a raw track: standardize, clean, trim and output.
+     Process a raw track: standardize, purge, trim and output.
 
-    #TODO write this properly
-        Parameters
-        ----------
-        data_file : str
-            path to the track data file.
-        output_path : TYPE
-            DESCRIPTION.
-        reader : TYPE
-            DESCRIPTION.
-        model : TYPE
-            DESCRIPTION.
-        specs_df : TYPE
-            DESCRIPTION.
-        track_start : TYPE
-            DESCRIPTION.
-        track_end : TYPE
-            DESCRIPTION.
-        output_file : TYPE
-            DESCRIPTION.
-        output_types : TYPE
-            DESCRIPTION.
+    Parameters
+    ----------
+    data_file : str
+        DESCRIPTION.
+    output_path : str
+        DESCRIPTION.
+    metadata : str, optional
+        DESCRIPTION. The default is None.
+    reader : TYPE, optional
+        DESCRIPTION. The default is None.
+    model : TYPE, optional
+        DESCRIPTION. The default is None.
+    specs : TYPE, optional
+        DESCRIPTION. The default is None.
+    track_start : TYPE, optional
+        DESCRIPTION. The default is None.
+    track_end : TYPE, optional
+        DESCRIPTION. The default is None.
+    output_file : TYPE, optional
+        DESCRIPTION. The default is None.
+    output_types : TYPE, optional
+        DESCRIPTION. The default is ["csv"].
+    output_plots : TYPE, optional
+        DESCRIPTION. The default is None.
+    interactive : TYPE, optional
+        DESCRIPTION. The default is False.
+    trim_check : TYPE, optional
+        DESCRIPTION. The default is False.
+    raw_data : TYPE, optional
+        DESCRIPTION. The default is False.
 
-        Returns
-        -------
-        None.
+    Returns
+    -------
+    None.
 
     """
     log = logging.getLogger()
     log.info(f"\n~Processing {Path(data_file).stem}....\n")
 
-    if metadata:
-        trk = Track(data_file, metadata=metadata, logger=log)
-    elif reader:
-        trk = Track(data_file, reader=reader, logger=log)
+    if metadata and raw_data:
+        trk = Track(
+            data_file, metadata=metadata, raw_data=raw_data, logger=log
+        )  # get reader from metadata file
+    elif reader and raw_data:
+        trk = Track(
+            data_file,
+            reader=reader,
+            model=model,
+            track_start=track_start,
+            track_end=track_end,
+            raw_data=raw_data,
+            logger=log,
+        )  # get reader from user
+    elif not raw_data:
+        trk = Track(
+            data_file,
+            reader="standard",
+            model=model,
+            track_start=track_start,
+            track_end=track_end,
+            logger=log,
+        )  # this is not raw data
     else:
         log.error(
-            "You must specify a valid metadata object or reader function to read a track"
+            "You must specify a valid metadata object or reader function to read a raw data track"
         )
 
-    if specs:  # no point cleaning without the beacon specs
+    # note that the steps purge, trim, sort, speed, and speed_limit are for raw data
+    # if you have standard data, it is possible to trim it to a specific period, as desired
+    # the script runs sort, speed and speed_limit regardless (doesn't take much time/ can't hurt)
+
+    if (
+        specs and raw_data
+    ):  # no point purging bad data without the beacon specs, only raw data needs purging
         trk.load_model_specs(specs)
-        trk.clean()
+        trk.purge()
     trk.sort()
     trk.speed()
     trk.speed_limit()
-    # trk.trim()
+
+    # if you want to see where the trim points are, don't run trim
+    if not trim_check:
+        trk.trim()
+
+    # output the track files
     trk.output(output_types, path_output=output_path, file_output=output_file)
+
+    # generate figures
+    if "map" in output_plots:
+        trk.plot_map(interactive=interactive, path_output=output_path)
+    if "trim" in output_plots:
+        trk.plot_trim(interactive=interactive, path_output=output_path)
+    if "time" in output_plots:
+        trk.plot_time(interactive=interactive, path_output=output_path)
+    if "dist" in output_plots:
+        trk.plot_dist(interactive=interactive, path_output=output_path)
+
+    # create a trk_meta object:
     trk_meta = trk.track_metadata("pandas")
+
+    # complete the run.
     log.info("Completed track processing... \n")
     return trk_meta
 
 
 def main():
-    """
-    Main function.
-
-    """
-    import pdb
-
-    pdb.set_trace()
-    # read in arguments from the command line.
+    """Run main function."""
     (
         data_file,
         output_path,
@@ -331,6 +446,10 @@ def main():
         track_end,
         output_file,
         output_types,
+        output_plots,
+        interactive,
+        raw_data,
+        trim_check,
         quiet,
     ) = read_args()
 
@@ -350,13 +469,12 @@ def main():
         track_end,
         output_file,
         output_types,
+        output_plots,
+        interactive,
+        raw_data,
+        trim_check,
     )
 
 
 if __name__ == "__main__":
     main()
-
-
-# # Problem IDs:
-# 2009_300034012571050
-# 2010_300034012592660

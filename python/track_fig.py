@@ -12,19 +12,14 @@ Visualizations include:
     dist - statistical distributions - polar plot of direction, histogram of speed
     temp - temperature changes (used for checking if beacon is still on target)
 
-Author: Adam Garbo, December 2022
-Modified: Derek Mueller, July 2024
+Author: Derek Mueller, July 2024 to Jan 2025, modifying code from Adam Garbo from 2021
 """
 import os
-import sys
 import logging
-import argparse
-from pathlib import Path
 import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-import matplotlib.ticker as mticker
 import matplotlib.dates as mdates
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
@@ -54,6 +49,7 @@ def plot_map(track, path_output=".", dpi=300, interactive=False, log=None):
     Create a map of the iceberg track.
 
     Map is saved as a png, the star indicates the start
+
 
     Parameters
     ----------
@@ -91,7 +87,7 @@ def plot_map(track, path_output=".", dpi=300, interactive=False, log=None):
 
     # Plot latitude and longitude
     fig = plt.figure(figsize=(10, 10), constrained_layout=True)
-    ax = plt.axes(projection=ccrs.Orthographic(x, y))
+    ax = plt.axes(projection=ccrs.Orthographic(x, y), zorder=1)
     ax.add_feature(coast)
     ax.set_adjustable("datalim")
     gl = ax.gridlines(
@@ -116,7 +112,44 @@ def plot_map(track, path_output=".", dpi=300, interactive=False, log=None):
         edgecolor="black",
         legend=False,
         transform=ccrs.PlateCarree(),
+        zorder=2,
     )
+
+    # plot the track trimming points so it can be verified before trimming.
+    # green dot is the first good value, orange dot is the last good value
+
+    if not track.trimmed:
+        if not pd.isnull(track.track_start):
+            ax.plot(
+                # you only want the first one...
+                track.data.longitude.loc[
+                    track.data.datetime_data <= track.track_start
+                ].iloc[-1],
+                track.data.latitude.loc[
+                    track.data.datetime_data <= track.track_start
+                ].iloc[-1],
+                marker="o",
+                ms=8,
+                mfc="g",
+                mec="k",
+                transform=ccrs.PlateCarree(),
+            )
+
+        if not pd.isnull(track.track_end):
+            ax.plot(
+                # you only want the last one...
+                track.data.longitude.loc[
+                    track.data.datetime_data >= track.track_end
+                ].iloc[0],
+                track.data.latitude.loc[
+                    track.data.datetime_data >= track.track_end
+                ].iloc[0],
+                marker="o",
+                ms=8,
+                mfc="tab:orange",
+                mec="k",
+                transform=ccrs.PlateCarree(),
+            )
 
     # plot the very start of the track
     ax.plot(
@@ -159,19 +192,21 @@ def plot_map(track, path_output=".", dpi=300, interactive=False, log=None):
     log.info("Plotting map complete")
 
 
-def plot_temp(track, path_output=".", dpi=300, interactive=False, log=None):
+def plot_trim(track, path_output=".", dpi=300, interactive=False, log=None):
     """
-    Create a graph of the beacon temperature.
+    Create a graph of the beacon temperature and battery voltage.
 
     There are 3 panels:
         Temperature (of the air, surface or internal, depending on what is available)
-        7 day rolling mean of temperature
-        7 day rolling standard deviation of temperature
+        5 and 3 day rolling mean and standard deviation of temperature
 
-    This is useful for finding the start and end of the track:
-        When beacons are deployed they may still be acclimatizing to ambient conditions
+    This is useful for finding the end of the track:
         When beacons fall off their target into the water, the standard deviation should
             decrease.  Temperature should approach water temperature (typically decreasing)
+
+    Note when beacons are deployed they may still be acclimatizing to ambient conditions.
+    In this scenario, the rolling mean and std are less helpful because their windows are
+    positioned on the left to capture a sudden change.
 
     Parameters
     ----------
@@ -195,7 +230,7 @@ def plot_temp(track, path_output=".", dpi=300, interactive=False, log=None):
     logging.getLogger("PIL").setLevel(logging.WARNING)
     logging.getLogger("matplotlib").setLevel(logging.WARNING)
 
-    log.info("Plotting temp")
+    log.info("Plotting trim")
 
     # get the temperature
     track.data["temperature"] = track.data["temperature_air"]
@@ -210,19 +245,37 @@ def plot_temp(track, path_output=".", dpi=300, interactive=False, log=None):
                 temp_type = "NA"
                 track.data["temperature"] = 0
 
-    track.data["Tmean"] = track.data.rolling(
-        window="7d", on="datetime_data", center=True
-    ).temperature.mean()
-    track.data["Tstd"] = track.data.rolling(
-        window="7d", on="datetime_data", center=True
-    ).temperature.std()
-
-    # plotting  - t temp, m mean, s std
-    fig, (t, m, s, v) = plt.subplots(
-        4, 1, figsize=(10, 8), sharex=True, constrained_layout=True
+    # the following makes a left aligned window which should match well with any event
+    # reverse the series, run the rolling operation and reverse again. Center false
+    # keeps the window index on the right, reversing sets this to the left.
+    track.data["Tmean5"] = (
+        track.data[::-1]
+        .rolling(window="5d", on="datetime_data", center=False)
+        .temperature.mean()[::-1]
+    )
+    track.data["Tmean3"] = (
+        track.data[::-1]
+        .rolling(window="3d", on="datetime_data", center=False)
+        .temperature.mean()[::-1]
     )
 
-    # Temperature plot
+    track.data["Tstd5"] = (
+        track.data[::-1]
+        .rolling(window="5d", on="datetime_data", center=False)
+        .temperature.std()[::-1]
+    )
+    track.data["Tstd3"] = (
+        track.data[::-1]
+        .rolling(window="3d", on="datetime_data", center=False)
+        .temperature.std()[::-1]
+    )
+
+    # plotting  - t temp, m mean, s std
+    fig, (t, r, v) = plt.subplots(
+        3, 1, figsize=(10, 8), sharex=True, constrained_layout=True
+    )
+
+    # Temperature plot  = t
     t.grid(ls="dotted")
     sns.lineplot(
         ax=t,
@@ -234,37 +287,118 @@ def plot_temp(track, path_output=".", dpi=300, interactive=False, log=None):
     )
     t.set(xlabel=None, ylabel="Temperature (°C)")
 
-    # Rolling temperature mean plot
-    m.grid(ls="dotted")
+    # Rolling temperature mean/std plot = r
+    r.grid(ls="dotted")
     sns.lineplot(
-        ax=m, x="datetime_data", y="Tmean", data=track.data, errorbar=None, color="r"
+        ax=r,
+        x="datetime_data",
+        y="Tmean5",
+        label="5 day mean",
+        data=track.data,
+        errorbar=None,
+        color="r",
+        linestyle="-",
     )
-    m.set(xlabel=None, ylabel="Temp. rolling mean (°C)")
-
-    # Rolling temperature std plot
-    s.grid(ls="dotted")
     sns.lineplot(
-        ax=s, x="datetime_data", y="Tstd", data=track.data, errorbar=None, color="k"
+        ax=r,
+        x="datetime_data",
+        y="Tmean3",
+        label="3 day mean",
+        data=track.data,
+        errorbar=None,
+        color="r",
+        linestyle="--",
     )
-    s.set(xlabel=None, ylabel="Temp. rolling std (°C)")
 
+    sns.lineplot(
+        ax=r,
+        x="datetime_data",
+        y="Tstd5",
+        label="5 day std",
+        data=track.data,
+        errorbar=None,
+        color="k",
+        linestyle="-",
+    )
+    sns.lineplot(
+        ax=r,
+        x="datetime_data",
+        y="Tstd3",
+        label="3 day std",
+        data=track.data,
+        errorbar=None,
+        color="k",
+        linestyle="--",
+    )
+    r.legend(
+        loc="upper center"
+    )  # This position avoids overlap with beginning and end of track
+    r.set(xlabel=None, ylabel="Temp. rolling (°C)")
+
+    # Voltage plot = v
     v.grid(ls="dotted")
     sns.lineplot(
-        ax=s, x="datetime_data", y="voltage", data=track.data, errorbar=None, color="k"
+        ax=v,
+        x="datetime_data",
+        y="voltage",
+        data=track.data,
+        label="battery",
+        errorbar=None,
+        color="g",
     )
     v.set(xlabel=None, ylabel="Battery (V)")
     plt.xticks(rotation=45, horizontalalignment="center")
+    v.get_legend().remove()
 
-    # plot the track trimming points so it can be verified before trimming.
+    if track.data.pitch.notna().any():
+        # plot pitch and roll on y axis - only if there is data...
+        v2 = v.twinx()
+
+        v2.set_ylabel("Tilt (degrees)", color="black", rotation=270, labelpad=15)
+        sns.lineplot(
+            ax=v2,
+            x="datetime_data",
+            y="pitch",
+            label="pitch",
+            data=track.data,
+            errorbar=None,
+            color="m",
+        )
+        sns.lineplot(
+            ax=v2,
+            x="datetime_data",
+            y="roll",
+            label="roll",
+            data=track.data,
+            errorbar=None,
+            color="c",
+        )
+        v2.tick_params(axis="y", labelcolor="black")
+        v2.set_ylim([-185, 185])
+
+        handles_v1, labels_v1 = v.get_legend_handles_labels()
+        handles_v2, labels_v2 = v2.get_legend_handles_labels()
+
+        v2.legend(
+            handles_v1 + handles_v2, labels_v1 + labels_v2, loc="upper center"
+        )  # This position avoids overlap with beginning and end of track
+
+    # plot the track trimming points so it can be verified before trimming. zorder >> big
     if not track.trimmed:
         if not pd.isnull(track.track_start):
-            t.axvline(track.track_start, linestyle="dashdot", color="g")
-            m.axvline(track.track_start, linestyle="dashdot", color="g")
-            s.axvline(track.track_start, linestyle="dashdot", color="g")
+            t.axvline(track.track_start, linestyle="dashdot", color="g", zorder=100)
+            r.axvline(track.track_start, linestyle="dashdot", color="g", zorder=100)
+            v.axvline(track.track_start, linestyle="dashdot", color="g", zorder=100)
         if not pd.isnull(track.track_end):
-            t.axvline(track.track_end, linestyle="dashdot", color="g")
-            m.axvline(track.track_end, linestyle="dashdot", color="g")
-            s.axvline(track.track_end, linestyle="dashdot", color="g")
+            t.axvline(
+                track.track_end, linestyle="dashdot", color="tab:orange", zorder=100
+            )
+            r.axvline(
+                track.track_end, linestyle="dashdot", color="tab:orange", zorder=100
+            )
+            v.axvline(
+                track.track_end, linestyle="dashdot", color="tab:orange", zorder=100
+            )
 
     if temp_type == "NA":
         fig.suptitle(
@@ -274,17 +408,17 @@ def plot_temp(track, path_output=".", dpi=300, interactive=False, log=None):
         )
     else:
         fig.suptitle(
-            f"{track.beacon_id} {temp_type} temperature plot",
+            f"{track.beacon_id} {temp_type} temperature trim plot",
             fontweight="bold",
             fontsize=18,
         )
 
-    s.text(
+    v.text(
         0,
         -0.61,
         f"Start (*): {track.data_start:%Y-%m-%d %H:%M:%S} UTC, End: {track.data_end:%Y-%m-%d %H:%M:%S} UTC\n  \
         Duration: {track.duration:.2f} days, Distance: {track.distance:,.2f} km, Observations: {track.observations:,}",
-        transform=s.transAxes,
+        transform=v.transAxes,
         color="black",
         fontsize=12,
         fontweight="regular",
@@ -297,14 +431,14 @@ def plot_temp(track, path_output=".", dpi=300, interactive=False, log=None):
 
     else:
         plt.savefig(
-            os.path.join(path_output, f"{track.beacon_id}_temp.png"),
+            os.path.join(path_output, f"{track.beacon_id}_trim.png"),
             dpi=dpi,
             transparent=False,
             bbox_inches="tight",
         )
         plt.close()
 
-        log.info("Plotting temp complete")
+        log.info("Plotting trim complete")
 
 
 def plot_dist(track, path_output=".", dpi=300, interactive=False, log=None):
@@ -340,14 +474,16 @@ def plot_dist(track, path_output=".", dpi=300, interactive=False, log=None):
     p = plt.subplot(122, projection="polar")
 
     # Histogram of the speed
-    """ clean data -- this should not be needed, so commented out. (but kept here in case someone want to use it )
-    unreasonably high >2.8 m/s Garbo, > 8 m/s Dalton  Dalton fastest was 2.3 m/s
+    """ Deal with high speeds -- this should not be needed, so commented out. (but kept here in case someone want to use it )
+    unreasonably high speeds >2.8 m/s Garbo thesis, > 8 m/s Dalton thesis 
+    Dalton's fastest was 2.3 m/s
+    # code to remove data
     track.data.replace([np.inf, -np.inf], np.nan, inplace=True)
     track.data.loc[track.data["speed"] > 5] = np.nan  # there is no way an iceberg moves faster than 5 m/s
 
     Create histogram
     here we are scaling under the assumption that there will not be any speeds greater 
-    than 2.5 m/s (i.e., more constrained)
+    than 2.5 m/s (i.e., more constrained than above)
     by setting the same lower and upper limit, the histograms are comparable
     """
     xlowerlim = 0
@@ -355,12 +491,10 @@ def plot_dist(track, path_output=".", dpi=300, interactive=False, log=None):
     nbins = int(10 * (xupperlim - xlowerlim) / 0.5)  # this sets the number of bins
 
     """ Here bins start with 0 to 0.05 m/s. That represents a displacement of 180 m so there is
-    likely true motion within that bin.
+    likely true motion within that bin, but much of it is likely positional error.
     Dalton examined a stationary gps beacon and found mean + 1 SD = 0.04 m/s.
     """
 
-    # TODO - calculate the number of observations to right edge to the histogram and print that out?
-    out_of_range = sum(track.data.speed > xupperlim)
     # calcuate bins and values
     values, bins = np.histogram(
         track.data.speed[~np.isnan(track.data.speed)],
@@ -369,34 +503,46 @@ def plot_dist(track, path_output=".", dpi=300, interactive=False, log=None):
     )
     # convert to fraction of all obs
     frac = values / len(track.data.speed[~np.isnan(track.data.speed)])
-    # cumfrac = np.cumsum(frac)
+    cumfrac = np.cumsum(frac)
 
     # here we set the y axis (left) limits - they represent fraction of obs within each bin
     ylowerlim = 0
-    yupperlim = 1
+    yupperlim = 100
 
     h.set_xlabel("Speed (m/s)")
-    h.set_ylabel("Fraction of observations", color="red")
-    h.hist(bins[:-1], bins, weights=frac, color="red")
+    h.set_ylabel("Observations (%)", color="red")
+
+    h.hist(bins[:-1], bins, weights=frac * 100, color="red")
     h.tick_params(axis="y", labelcolor="red")
     h.set_ylim([ylowerlim, yupperlim * 1.01])
     h.set_xlim([xlowerlim, xupperlim])
 
-    # plot cummulative hist on right y axis
+    # plot exceedence hist on right y axis
     h2 = h.twinx()
 
-    h2.set_ylabel(
-        "Cumulative fraction of observations", color="blue", rotation=270, labelpad=15
-    )
-    h2.hist(
-        bins[:-1], bins, weights=frac, color="blue", histtype="step", cumulative=True
+    h2.set_ylabel("Exceedence probability (%)", color="blue", rotation=270, labelpad=15)
+
+    # since the cumulative fraction is descending, we need to use the stairs function.
+    h2.stairs(
+        100 - cumfrac * 100,
+        bins,
+        color="blue",
     )
     h2.tick_params(axis="y", labelcolor="blue")
     h2.set_ylim([ylowerlim, yupperlim * 1.01])
 
+    # Calculate the number of observations to right edge to the histogram and print that
+    out_of_range = sum(track.data.speed > xupperlim)
+    if out_of_range > 0:
+        plt.text(
+            0.4,
+            95,
+            f"Warning: {out_of_range} values exceed {xupperlim} m/s",
+        )
+
     # Polar plot of speed and direction
     p.plot(
-        track.data.direction,
+        np.deg2rad(track.data.direction),
         track.data.speed,
         marker="o",
         markerfacecolor="b",
@@ -465,7 +611,6 @@ def plot_time(track, path_output=".", dpi=300, interactive=False, log=None):
     None.
 
     """
-
     # set up the logger to output nowhere if None
     if log == None:
         log = nolog()
@@ -509,17 +654,54 @@ def plot_time(track, path_output=".", dpi=300, interactive=False, log=None):
         t.set(xlabel=None, ylabel="No temperature available (°C)")
 
     # Distance plot
+    d.grid(ls="dotted")
     sns.lineplot(
         ax=d, x="datetime_data", y="distance", data=track.data, errorbar=None, color="r"
     )
     d.set(xlabel=None, ylabel="Displacement (m)")
-
+    d.set_ylim(
+        0,
+        track.data.distance.quantile(0.99),
+    )
     # quiver plot
+    q.grid(ls="dotted")
     u = track.data.speed * np.sin(np.radians(track.data.direction))
     v = track.data.speed * np.cos(np.radians(track.data.direction))
 
-    q.quiver(track.data["datetime_data"], 0, u, v)
+    time_numeric = mdates.date2num(track.data["datetime_data"])
+    q_ax = q.quiver(
+        time_numeric,
+        np.zeros_like(time_numeric),
+        u,
+        v,
+        scale=1,  # scale 1 will scale arrows the same as q.set_ylim()
+        angles="uv",  # select uv since you are plotting along time (not space)
+        scale_units="y",  # scale as per the q.set_ylim
+        width=0.002,  # width of the arrow (keep small)
+    )
+    # this sets the y axis limits and therefore the scale of the arrows
+    # setting this to 90th percentile
+    q.set_ylim(-1 * track.data.speed.quantile(0.99), track.data.speed.quantile(0.99))
+
     q.set(xlabel=None, ylabel="Velocity (m/s)")
+
+    # 2 reference arrows
+    if track.data.speed.quantile(0.99) >= 1:
+        ref_arrow = 0.2
+    if track.data.speed.quantile(0.99) < 1:
+        ref_arrow = 0.1
+    if track.data.speed.quantile(0.99) < 0.1:
+        ref_arrow = 0.02
+    q.quiverkey(
+        q_ax,
+        X=0.9,
+        Y=0.9,
+        U=ref_arrow,
+        label=f"{ref_arrow} m/s",
+        color="grey",
+        labelpos="E",
+    )
+
     fig.align_ylabels()
     plt.xticks(rotation=45, horizontalalignment="center")
 
@@ -535,6 +717,17 @@ def plot_time(track, path_output=".", dpi=300, interactive=False, log=None):
         fontsize=12,
         fontweight="regular",
     )
+
+    # plot the track trimming points so it can be verified before trimming.
+    if not track.trimmed:
+        if not pd.isnull(track.track_start):
+            t.axvline(track.track_start, linestyle="dashdot", color="g")
+            d.axvline(track.track_start, linestyle="dashdot", color="g")
+            q.axvline(track.track_start, linestyle="dashdot", color="g")
+        if not pd.isnull(track.track_end):
+            t.axvline(track.track_end, linestyle="dashdot", color="tab:orange")
+            d.axvline(track.track_end, linestyle="dashdot", color="tab:orange")
+            q.axvline(track.track_end, linestyle="dashdot", color="tab:orange")
 
     if interactive:
         plt.show()
@@ -610,6 +803,9 @@ def main():
         plot_dist(trk, path_output=path_output)
         plot_time(trk, path_output=path_output)
 
+
+if __name__ == "__main__":
+    main()
 """
 
 """
@@ -625,32 +821,3 @@ def plot(track, *other_tracks):
 this will use matplotlibs colours to plot each one as a different colour
 need to deal with the title and text.
 """
-
-
-"""
-if __name__ == "__main__":
-    main()
-"""
-
-
-# std_file = "/home/dmueller/Desktop/cis_iceberg_beacon_database_0.3/standardized_data/2010/300034012592660/2010_300034012592660.csv"
-
-# output = "/home/dmueller/Desktop"
-# path_output = output
-
-# # Get standardized data output path
-# path_output = Path(file).resolve().parents[0]
-
-# # Get unique beacon ID
-# filename = Path(file).stem
-
-
-# # -----------------------------------------------------------------------------
-# # Configure logging
-# # -----------------------------------------------------------------------------
-
-# logger = logging.getLogger(__name__)
-# logger.setLevel(logging.INFO)
-# formatter = logging.Formatter(
-#     "%(asctime)s:%(msecs)d %(name)s %(levelname)s %(message)s", "%Y-%m-%d %H:%M:%S"
-# )

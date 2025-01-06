@@ -1,5 +1,5 @@
 """
-track_readers.py
+track_readers.py.
 
 A collection of functions that convert from various beacon data formats to
 a standardized format.
@@ -16,7 +16,7 @@ optional.
 --
 Created December 2022 by Adam Garbo based on R scripts from Derek Mueller, Cindy
 Lopes, Anna Crawford and Jill Rajewicz
-Modified June-July 2024 by Derek Mueller
+Rewritten June-July 2024 by Derek Mueller
 
 """
 
@@ -236,7 +236,7 @@ def standard(raw_data_file, log=None):
         sdf["direction"] = rdf["direction"]
 
     except:
-        print(f"Problem with raw data file {raw_data_file}, check formatting")
+        print(f"Problem with standard data file {raw_data_file}, check formatting")
         sys.exit(1)
 
     return sdf
@@ -601,103 +601,17 @@ def canatec(raw_data_file, log=None):
         sdf["longitude"] = rdf["Longitude"]
 
         if "TempExternal" in rdf:
-            sdf["temperature_surface"] = rdf["TempExternal"]
-
-        if "TempInternal" in rdf:
-            sdf["temperature_internal"] = rdf["TempInternal"]
-
-        if "Pressure" in rdf:
-            sdf["pressure"] = rdf["Pressure"]
-
-        if "BatteryVoltage" in rdf:
-            sdf["voltage"] = rdf["BatteryVoltage"]
-
-        if "Satellites" in rdf:
-            sdf["satellites"] = rdf["Satellites"]
-
-    except:
-        print(f"Problem with raw data file {raw_data_file}, check formatting")
-        sys.exit(1)
-
-    return sdf
-
-
-def icebeacon(raw_data_file, log=None):
-    """
-    Convert raw data from Metocean ICEB-I-XA format to standardized dataframe.
-
-    Parameters
-    ----------
-    raw_data_file : string
-        Path to raw data CSV file.
-
-    Returns
-    -------
-    sdf : Pandas DataFrame
-        Standardized Pandas dataframe ready for cleaning.
-
-    Raw data format
-    ----------------------------------
-    Columns (case sensitive):
-        ReadingDate
-        Latitude
-        Longitude
-        Elevation
-        Heading
-        Speed
-        Fix
-        Satellites
-        HDOP
-        VDOP
-        VerticalVelocity
-        Pressure
-        TempExternal
-        TempInternal
-        BeaconAlarmState
-        BatteryVoltage
-        ModemVoltage
-
-    """
-    # set up the logger to output nowhere if None
-    if log == None:
-        log = nolog()
-
-    # read in the raw data frame - rdf
-    rdf = pd.read_csv(raw_data_file, index_col=False, skipinitialspace=True)
-
-    # create an empty standard data frame - sdf - filled with NAs
-    sdf = create_sdf(len(rdf))
-
-    # Unique beacon identifier
-    sdf["beacon_id"] = Path(raw_data_file).stem
-
-    try:
-
-        # Data timestamp
-        sdf["datetime_data"] = pd.to_datetime(
-            rdf["ReadingDate"], "%m/%d/%Y %I:%M:%S %p", utc=True
-        )  # 7/16/2009 6:15:00 PM
-
-        sdf["latitude"] = rdf["Latitude"]
-        sdf["longitude"] = rdf["Longitude"]
-
-        # Air temperature
-        if "TempExternal" in rdf:
             sdf["temperature_air"] = rdf["TempExternal"]
 
-        # Internal temperature
         if "TempInternal" in rdf:
             sdf["temperature_internal"] = rdf["TempInternal"]
 
-        # Barometric pressure
         if "Pressure" in rdf:
             sdf["pressure"] = rdf["Pressure"]
 
-        # Battery voltage
         if "BatteryVoltage" in rdf:
             sdf["voltage"] = rdf["BatteryVoltage"]
 
-        # Satellites
         if "Satellites" in rdf:
             sdf["satellites"] = rdf["Satellites"]
 
@@ -1162,9 +1076,11 @@ def wirl_sbd(raw_data_file, log=None):
 
         if "Temperature" in rdf:
             sdf["temperature_internal"] = rdf["Temperature"]
+            sdf.loc[sdf["temperature_internal"] == -99, "temperature_internal"] = np.nan
 
         if "AtmPress" in rdf:
             sdf["pressure"] = rdf["AtmPress"]
+            sdf.loc[sdf["pressure"] == -99, "pressure"] = np.nan
 
         if "Voltage Battery" in rdf:
             sdf["voltage"] = rdf["Voltage Battery"]

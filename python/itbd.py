@@ -6,17 +6,23 @@ itbd.py
 Main module for the Iceberg Tracking Beacon Database (ITDB).
 
 Defines the class 'Track' containing an individual iceberg track along with methods and properties.
-Defines the class 'Models' containing beacon model specifications, used for cleaning
 Defines the class 'Meta' containing the database metadata
+Defines the class 'Models' containing beacon model specifications, read in from a table
+Defines the class 'Specs' containing a single beacon model specifications, used for purging bad data
 
-Includes a workflow for cleaning a beacon track using these classes
+Note that creating an instance of a Track that _is_ in the standard format assumes the track 
+ has been processed, which means to complete all the steps in a workflow for cleaning,
+ standardizing and adding derived data. 
 
+The functions to read the various raw_data formats and define the standard format are in track_readers.py
+The functions to plot figures are in track_fig.py
+
+The database itself is created using this code-base.  To (re-)create the database use track_collation.py
+
+Author: Derek Mueller Jul-Jan 2025, with contribution from Adam Garbo's code
 """
 
 import os
-import sys
-import argparse
-import logging
 from pathlib import Path
 import pandas as pd
 import geopandas as gpd
@@ -29,7 +35,7 @@ import copy
 
 # this functionality is in other modules.  Import
 import track_readers
-from track_fig import plot_temp, plot_map, plot_dist, plot_time
+from track_fig import plot_trim, plot_map, plot_dist, plot_time
 
 
 def nolog():
@@ -169,9 +175,7 @@ class Specs:
 
 
 class Meta:
-    """
-    Class that reads a metadata file and stores all rows in a dataframe
-    """
+    """Class that reads a metadata file and stores all rows in a dataframe."""
 
     def __init__(self, meta_file, logger=None):
         """
@@ -184,9 +188,9 @@ class Meta:
         logger: instance of logger class
             Pass a logger here if you want
 
-            Returns
-            -------
-            None.
+        Returns
+        -------
+        None.
 
         """
         if logger is None:
@@ -206,7 +210,10 @@ class Meta:
 
 class Track:
     """
-    This class represents an iceberg beacon track.
+    Class representing an iceberg beacon track.
+
+    This track could be a raw data file or a track that has been processed into a
+    the standard format.
     """
 
     def __init__(
@@ -217,12 +224,13 @@ class Track:
         track_start=None,
         track_end=None,
         metadata=None,
+        raw_data=False,
         logger=None,
     ):
         """
         Read the track raw or standardized data.
 
-        Note the default is to read standardized data (which should also be fully cleaned)
+        Note the default is to read standardized data (which should also be fully processed)
         If metadata is provided, that info will be used; otherwise properties
         will be set from keywords here
 
@@ -240,6 +248,8 @@ class Track:
             Datetime to trim the end of the track. The default is None.
         metadata : Meta Class, optional
             An object of the meta class. The default is None.
+        raw_data : bool, optional
+            Set to true if you are working with raw data.  The default is False.
         logger : logger instance, optional
             A logger instance to log to. The default is None.
 
@@ -248,13 +258,13 @@ class Track:
         None.
 
         """
-
         if logger == None:
             logger = nolog()
         self.log = logger  # a log instance is now part of the class
 
         self.datafile = data_file
         self.beacon_id = Path(self.datafile).stem
+        self.raw_data = raw_data
 
         self.log.info(f"~Starting to process beacon {self.beacon_id}......")
 
@@ -268,6 +278,10 @@ class Track:
         else:
             self.load_metadata(metadata)
 
+        # this simply overrides the reader column in the metadata
+        if not self.raw_data:
+            self.reader = "standard"
+
         self.log.info(
             f"Reading data from {self.datafile} using the {self.reader} reader"
         )
@@ -275,11 +289,20 @@ class Track:
         reader_function = getattr(track_readers, self.reader)
         self.data = reader_function(self.datafile, self.log)
 
-        # at a minimum these cleaning steps should be taken since a track must have all 3 of these
+        # at a minimum this cleaning step should be taken since a track must have all 3 of these
         # Drop all rows where datetime_data, latitude or longitude is nan
         self.data.dropna(
             subset=["datetime_data", "latitude", "longitude"], inplace=True
         )
+
+        # check here to see if there are any data in the track.
+        if len(self.data) < 1:
+            self.log.error(
+                f"No data read from {self.datafile} using the {self.reader} reader"
+            )
+            raise Exception(
+                f"No data read from {self.datafile} using the {self.reader} reader"
+            )
 
         # make sure these datetimes convert ok
         if self.track_start:
@@ -294,15 +317,22 @@ class Track:
             except:
                 self.log.error("Unrecognized track end format")
                 raise Exception("Check track end value")
-        # This captures the data file start and end - it does not necessarily relate to the track.
+
+        # Save these values as a backup.  They need to be preserved for data custody purposes
+        self.requested_track_start = self.track_start
+        self.requested_track_end = self.track_end
+
+        # This captures the data file start and end - it does not necessarily relate to the track start/end.
         self.data_start = self.data.datetime_data.min()
         self.data_end = self.data.datetime_data.max()
+        # checks to see that the track_start and track_end are within the data limits
+        self.reset_track_limits()
 
         self.trackpoints = None
         self.trackline = None
 
-        # These properties track what has been done to the track.
-        self.cleaned = False
+        # These properties record what has been done to the track.
+        self.purged = False
         self.sorted = False
         self.speeded = False
         self.speedlimited = False
@@ -311,7 +341,7 @@ class Track:
 
         # if the reader is standard then assume this has been done previously.
         if self.reader == "standard":
-            self.cleaned = True
+            self.purged = True
             self.sorted = True
             self.speeded = True
             self.speedlimited = True
@@ -322,10 +352,14 @@ class Track:
 
         # make room for beacon specs that could be associated with this track later
         self.specs = Specs(logger=self.log)
-
-        self.log.info(
-            f"Raw data read-in with {self.observations} rows of valid data from {self.data_start} to {self.data_end}"
-        )
+        if self.raw_data:
+            self.log.info(
+                f"Raw data read-in with {self.observations} rows of valid data from {self.data_start} to {self.data_end}"
+            )
+        else:
+            self.log.info(
+                f"Standard data read-in with {self.observations} rows of valid data from {self.data_start} to {self.data_end}"
+            )
 
     def stats(self):
         """
@@ -338,12 +372,14 @@ class Track:
         None.
 
         """
-
         # populate some simple properties that all tracks have
-        self.beacon_id = self.data.beacon_id.iloc[0]
+        # self.beacon_id = self.data.beacon_id.iloc[0]
         self.year, self.id = self.beacon_id.split("_")
         if self.trimmed:
-            duration = self.track_end - self.track_start
+            try:  # this will work if the track_start and track_end are in metadata
+                duration = self.track_end - self.track_start
+            except:  # otherwise this should be ok (standardized data for example)
+                duration = self.data_end - self.data_start
         else:
             duration = self.data_end - self.data_start
         self.duration = round(duration.days + duration.seconds / (24 * 60 * 60), 2)
@@ -367,9 +403,50 @@ class Track:
         else:
             self.distance = None
 
+    def reset_track_limits(self):
+        """
+        Check to make sure that the track_start and track_end are valid.
+
+        The track_start should not be < data_start and the track_end should not be >
+        data_end.  If that is so, reset the track limits and log the issue.
+
+        This can happen when data at the start or end of the track is rejected by
+        various cleaning functions.
+
+        Run this after all cleaning steps after sorting the data.
+
+        Returns
+        -------
+        None.
+
+        """
+        if self.track_start == None:
+            self.track_start = self.data.datetime_data.min()
+            self.log.warning(
+                "The track_start was set to the time of the earliest good data point"
+            )
+
+        if self.track_end == None:
+            self.track_end = self.data.datetime_data.max()
+            self.log.warning(
+                "The track_end was set to the time of the last good data point"
+            )
+
+        if self.track_start < self.data.datetime_data.min():
+            self.track_start = self.data.datetime_data.min()
+            self.log.warning(
+                "The track_start was reset to the time of the earliest good data point"
+            )
+
+        if self.track_end > self.data.datetime_data.max() or self.track_end == None:
+            self.track_end = self.data.datetime_data.max()
+            self.log.warning(
+                "The track_end was reset to the time of the last good data point"
+            )
+
     def load_model_specs(self, Models):
         """
-        Load the model specs into the Track.specs properties
+        Load the model specs into the Track.specs properties.
 
         Parameters
         ----------
@@ -438,96 +515,101 @@ class Track:
                     "Unrecognized track end format - trimming will not work as expected"
                 )
 
-    def clean(self):
-        """
-        Assign NaN to sensor values that exceed the minimum/maximum ranges.
-
-        """
-        self.log.info("Cleaning track")
+    def purge(self):
+        """Purge bad data by assigning NaN to values that exceed the min/max range."""
+        self.log.info("Purging bad data from track")
 
         if not self.specs.make:
-            self.log.error("No beacon specs are available, no cleaning attempted")
+            self.log.error("No beacon specs are available, no data purging attempted")
             return
 
         # Latitude
         self.data.loc[
-            (self.data["latitude"] >= self.specs.latitude_max)
-            | (self.data["latitude"] <= self.specs.latitude_min),
+            (self.data["latitude"] > self.specs.latitude_max)
+            | (self.data["latitude"] < self.specs.latitude_min),
             "latitude",
         ] = np.nan
 
         # Longitude
         self.data.loc[
-            (self.data["longitude"] >= self.specs.longitude_max)
-            | (self.data["longitude"] <= self.specs.longitude_min)
+            (self.data["longitude"] > self.specs.longitude_max)
+            | (self.data["longitude"] < self.specs.longitude_min)
             | (self.data["longitude"] == 0),
             "longitude",
         ] = np.nan
 
         # Air temperature
         self.data.loc[
-            (self.data["temperature_air"] >= self.specs.temperature_air_max)
-            | (self.data["temperature_air"] <= self.specs.temperature_air_min),
+            (self.data["temperature_air"] > self.specs.temperature_air_max)
+            | (self.data["temperature_air"] < self.specs.temperature_air_min),
             "temperature_air",
         ] = np.nan
 
         # Internal temperature
         self.data.loc[
-            (self.data["temperature_internal"] >= self.specs.temperature_internal_max)
-            | (
-                self.data["temperature_internal"] <= self.specs.temperature_internal_min
-            ),
+            (self.data["temperature_internal"] > self.specs.temperature_internal_max)
+            | (self.data["temperature_internal"] < self.specs.temperature_internal_min),
             "temperature_internal",
         ] = np.nan
 
         # Surface temperature
         self.data.loc[
-            (self.data["temperature_surface"] >= self.specs.temperature_surface_max)
-            | (self.data["temperature_surface"] <= self.specs.temperature_surface_min),
+            (self.data["temperature_surface"] > self.specs.temperature_surface_max)
+            | (self.data["temperature_surface"] < self.specs.temperature_surface_min),
             "temperature_surface",
         ] = np.nan
 
         # Pressure
         self.data.loc[
-            (self.data["pressure"] >= self.specs.pressure_max)
-            | (self.data["pressure"] <= self.specs.pressure_min),
+            (self.data["pressure"] > self.specs.pressure_max)
+            | (self.data["pressure"] < self.specs.pressure_min),
             "pressure",
         ] = np.nan
 
         # Pitch
         self.data.loc[
-            (self.data["pitch"] >= self.specs.pitch_max)
-            | (self.data["pitch"] <= self.specs.pitch_min),
+            (self.data["pitch"] > self.specs.pitch_max)
+            | (self.data["pitch"] < self.specs.pitch_min),
             "pitch",
         ] = np.nan
 
         # Roll
         self.data.loc[
-            (self.data["roll"] >= self.specs.roll_max)
-            | (self.data["roll"] <= self.specs.roll_min),
+            (self.data["roll"] > self.specs.roll_max)
+            | (self.data["roll"] < self.specs.roll_min),
             "roll",
         ] = np.nan
 
         # Heading
         self.data.loc[
-            (self.data["heading"] >= self.specs.heading_max)
-            | (self.data["heading"] <= self.specs.heading_min),
+            (self.data["heading"] > self.specs.heading_max)
+            | (self.data["heading"] < self.specs.heading_min),
             "heading",
         ] = np.nan
 
         # Satellites
         self.data.loc[
-            (self.data["satellites"] >= self.specs.satellites_max)
-            | (self.data["satellites"] <= self.specs.satellites_min),
+            (self.data["satellites"] > self.specs.satellites_max)
+            | (self.data["satellites"] < self.specs.satellites_min),
             "satellites",
         ] = np.nan
 
         # Battery voltage
         self.data.loc[
-            (self.data["voltage"] >= self.specs.voltage_max)
-            | (self.data["voltage"] <= self.specs.voltage_min),
+            (self.data["voltage"] > self.specs.voltage_max)
+            | (self.data["voltage"] < self.specs.voltage_min),
             "voltage",
         ] = np.nan
+
+        # Drop data with poor accuracy (as specified in the specs)
+        drop_index = self.data[
+            (self.data["loc_accuracy"] > self.specs.loc_accuracy_max)
+            | (self.data["loc_accuracy"] < self.specs.loc_accuracy_min)
+        ].index
+        self.data.drop(drop_index, inplace=True)
+        self.log.info(
+            f"{len(drop_index)} records ({len(drop_index)/len(self.data):.1%}) removed due to unacceptable location accuracy"
+        )
 
         # Drop all rows where datetime_data, latitude or longitude is nan
         self.data.dropna(
@@ -550,17 +632,17 @@ class Track:
         # reset the index
         self.data.reset_index(drop=True, inplace=True)
 
+        # check to see that the track_start and track_end are within the data limits
+        self.reset_track_limits()
+
         # recalculate stats here since things may have changed
         self.stats()
 
-        self.cleaned = True
-        self.log.info("Track cleaned")
+        self.purged = True
+        self.log.info("Track bad data purged")
 
     def sort(self):
-        """
-        Order the track chronologically and remove redundant entries.
-
-        """
+        """Order the track chronologically and remove redundant entries."""
         # sort by datetime_data, and loc_accuracy if available. The best loc_accuracy is the highest number
         self.data.sort_values(["datetime_data", "loc_accuracy"], inplace=True)
         # look for repeated values
@@ -568,7 +650,10 @@ class Track:
         sdf_dup = self.data.loc[
             self.data.duplicated(subset=["datetime_data"], keep="last")
         ]  # keep last dup
-        self.log.info(f"There are {len(sdf_dup)} duplicates in this track")
+        if self.raw_data:
+            self.log.info(
+                f"There are {len(sdf_dup)} duplicate timestamps in this track to be removed"
+            )
 
         # remove all rows with duplicate times, prefer the one with best location accuracy
         self.data.drop_duplicates(
@@ -583,29 +668,20 @@ class Track:
         # reset the index
         self.data.reset_index(drop=True, inplace=True)
 
+        # check to see that the track_start and track_end are within the data limits
+        self.reset_track_limits()
+
         # recalculate stats here since things may have changed
         self.stats()
 
         self.sorted = True
-        self.log.info(
-            f"Track sorted, duplicates removed (if any). The track now has {self.observations} rows"
-        )
+        if self.raw_data:
+            self.log.info(
+                f"Track sorted, duplicates removed (if any). The track now has {self.observations} rows"
+            )
 
     def speed(self):
-        """
-        Calculate speed, direction, distance and back azimuth between iceberg positions.
-
-        Parameters
-        ----------
-        sdf : Pandas dataframe
-            Standardized track data.  Note: clean and order it first!
-
-        Returns
-        -------
-        sdf : Pandas dataframe
-            Standardized track data - now with speed, etc.
-
-        """
+        """Calculate speed, direction, distance and back azimuth between iceberg positions."""
         # Ensure rows are sorted by datetime.
         assert self.data[
             "datetime_data"
@@ -615,12 +691,15 @@ class Track:
         geodesic = pyproj.Geod(ellps="WGS84")
 
         # Calculate forward azimuth and great circle distance between modelled coordinates
-        self.data["direction"], back_azimuth, self.data["distance"] = geodesic.inv(
+        self.data["direction"], backaz, self.data["distance"] = geodesic.inv(
             self.data["longitude"].shift().tolist(),
             self.data["latitude"].shift().tolist(),
             self.data["longitude"].tolist(),
             self.data["latitude"].tolist(),
         )
+        ## Note here that no displacement (same lat/lon repeated) yields direction 180
+        ## and distance 0 in the NH.  In SH it is direction 0 and distance 0 which might
+        ## need to be considered if there is SH data.
 
         # Convert azimuth from (-180° to 180°) to (0° to 360°)
         self.data["direction"] = ((self.data["direction"] + 360) % 360).round(2)
@@ -632,7 +711,7 @@ class Track:
         self.data["speed"] = self.data["distance"] / time_delta
 
         # Round columns
-        # df = df.round({"distance": 1, "speed": 2, "direction": 2}) # Not working?
+        # to assess whether there are consecutive duplicate positions, comment these lines
         self.data["distance"] = self.data["distance"].round(0)
         self.data["direction"] = self.data["direction"].round(0)
         self.data["speed"] = self.data["speed"].round(3)
@@ -644,26 +723,22 @@ class Track:
         # recalculate stats here since things may have changed
         self.stats()
 
-    def speed_limit(self, threshold=10):
+    def speed_limit(self, threshold=5):
         """
         Remove gross speeding violations from data.
 
         Note the intent here is to remove only the very worst rows from datasets.  It is
         a very crude way to cut down on clearly wrong position data.  Note high speeds are
         due to inaccurate positions, but also inprecise positions over short periods of time.
-        It is important to be careful.
+
+        It is important to be careful not to cut out good data.
+
+        The default value here is 5 m/s or 18 kph or 432 km/d (this is very conservative)
 
         Parameters
         ----------
-        sdf : Pandas dataframe
-            Standardized track data.
         threshold : float, optional
             A threshold, beyond which rows are removed (m/s). The default is 10.
-
-        Returns
-        -------
-        sdf : Pandas dataframe
-            Standardized track data - now limited.
 
         """
         # needs to be in a loop since if there is a fly-away point, you have going out and coming back
@@ -680,6 +755,9 @@ class Track:
         # reset the index
         self.data.reset_index(drop=True, inplace=True)
 
+        # check to see that the track_start and track_end are within the data limits
+        self.reset_track_limits()
+
         # recalculate stats here since things may have changed
         self.stats()
 
@@ -689,19 +767,13 @@ class Track:
         """
         Trim a track to a specified start and end time.
 
-        Parameters
-        ----------
-        sdf : Pandas dataframe
-            Standardized track data.
-        track_start : datetime, optional
-            track start time (earlier values will be removed). The default is None (no trim).
-        track_end : datetime, optional
-            track end time (later values will be removed). The default is None (no trim).
+        The track_start and track_end properties are used to determine where to trim
+        These need to be provided intentionally (as an argument or read from metadata)
+        during the initialization of the track
 
-        Returns
-        -------
-        sdf : Pandas dataframe
-            Standardized track data - now trimmed.
+        Note that you will want to AFTER running the speed and speed limit, since the
+        track_start and track_end will automatically be moved if bad data are found
+        at the start and end of the track.
 
         """
         if self.track_start:
@@ -710,7 +782,7 @@ class Track:
                 inplace=True,
             )
             self.log.info(
-                f"Track start trimmed from {self.data_start} to {self.track_start}"
+                f"Track start trimmed from {self.data_start} to just before {self.track_start}"
             )
             self.trimmed_start = True
 
@@ -719,24 +791,22 @@ class Track:
                 self.data[self.data["datetime_data"] > self.track_end].index,
                 inplace=True,
             )
-            self.log.info(f"Track end trimmed from {self.data_end} to {self.track_end}")
+            self.log.info(
+                f"Track end trimmed from {self.data_end} to just after {self.track_end}"
+            )
             self.trimmed_end = True
 
         # reset the index
         self.data.reset_index(drop=True, inplace=True)
 
+        # Also flag that general trimming was done here.
+        self.trimmed = True
+
         # recalculate stats here since things may have changed
         self.stats()
 
     def geo(self):
-        """
-        Add a geodataframe of track points and a track line to the track object.
-
-        Returns
-        -------
-        None.
-
-        """
+        """Add a geodataframe of track points and a track line to the track object."""
         # Convert to GeoPandas dataframe
         self.trackpoints = gpd.GeoDataFrame(
             self.data,
@@ -775,6 +845,7 @@ class Track:
             Path to put the output. The default is the current directory
         file_output : str, optional
             filename of output. The default is None, which will autogenerate on the Beacon ID
+
         Returns
         -------
         None.
@@ -792,7 +863,11 @@ class Track:
             # Write CSV file without index column
             if not os.path.isfile(f"{os.path.join(path_output, file_output)}.csv"):
                 self.data.to_csv(
-                    f"{os.path.join(path_output, file_output)}.csv", index=False
+                    f"{os.path.join(path_output, file_output)}.csv",
+                    index=False,
+                    # date_format='%Y-%m-%d %H:%M:%S', # easy to read natively with Excel/Libre
+                    # date_format="%Y-%m-%dT%H:%M:%SZ", # one ISO8601 format
+                    date_format="%Y-%m-%dT%H:%M:%S%:z",  # another ISO8601 format (python 3.12 and up)
                 )
                 self.log.info("Track output as csv file")
             else:
@@ -858,7 +933,7 @@ class Track:
         agg_function : str, optional
             Aggregation function: median, mean, None. The default is None.
         first : bool, optional
-            If agg_fuction is none, or for columns that cannot be aggreaged, \
+            If agg_fuction is none, or for columns that cannot be aggregated, \
                 take first (True) or last (False) value for the time period. The default is True.
         
         Returns
@@ -898,8 +973,8 @@ class Track:
             string_f = "last"
 
         # this sort of thing is trivial
-        sdf.resample("D").last()
-        sdf.resample("D").first()
+        # sdf.resample("D").last()
+        # sdf.resample("D").first()
 
         # with mixed data types the way you aggregate needs to be controlled for each column
         sdf_ = sdf.resample(timestep).agg(
@@ -925,6 +1000,9 @@ class Track:
 
         self.data = sdf_.drop(["u", "v"], axis=1)
 
+        # check to see that the track_start and track_end are within the data limits
+        self.reset_track_limits()
+
         # after doing the resampling it will be important to run:
         self.refresh()
 
@@ -948,6 +1026,9 @@ class Track:
         # if you have geospatial data, it must be recreated
         if self.geoed:
             self.geo()
+
+        # check to see that the track_start and track_end are within the data limits
+        self.reset_track_limits()
 
         self.stats()
 
@@ -1039,7 +1120,6 @@ class Track:
         None.
 
         """
-
         # call the function in track_fig.py
         plot_map(
             self,
@@ -1049,9 +1129,9 @@ class Track:
             log=self.log,
         )
 
-    def plot_temp(self, path_output=".", interactive=False, dpi=300):
+    def plot_trim(self, path_output=".", interactive=False, dpi=300):
         """
-        Plot a temperatures for the track.
+        Plot a trim diagnostic graph for the track.
 
         See track_fig.py
         TODO:  configure to add *other_tracks to the plot
@@ -1073,7 +1153,7 @@ class Track:
 
         """
         # call the function in track_fig.py
-        plot_temp(
+        plot_trim(
             self,
             path_output=path_output,
             dpi=dpi,
