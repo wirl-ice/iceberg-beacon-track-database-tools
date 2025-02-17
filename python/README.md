@@ -1,9 +1,8 @@
 # Iceberg Tracking Beacon Database: Standardization, Visualization and Collation 
 
-Authors: Adam Garbo, Derek Mueller 
-with earlier contributions by Jill Rajewicz, Anna Crawford and Cindy Lopes 
+Authors: Derek Mueller, Adam Garbo, Jill Rajewicz, Anna Crawford and Cindy Lopes 
 
-Date: 2024-07-31
+Date: 2024-11-22
 
 ## Introduction
 This Python code ingests raw tracking beacon data, standardizes it to a common format, peforms a number of data cleaning steps and outputs visualization and data products.
@@ -107,5 +106,5 @@ A CSV will be produced with the following column headings:
 ## Changelog:
 2022-12-10
 * Converted all iceberg beacon database processing scripts from the R programming language to Python
-2024-07-3
+2024-07-01
 * Refactored code to 

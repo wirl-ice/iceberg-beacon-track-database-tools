@@ -416,14 +416,15 @@ def track_process(
     trk.output(output_types, path_output=output_path, file_output=output_file)
 
     # generate figures
-    if "map" in output_plots:
-        trk.plot_map(interactive=interactive, path_output=output_path)
-    if "trim" in output_plots:
-        trk.plot_trim(interactive=interactive, path_output=output_path)
-    if "time" in output_plots:
-        trk.plot_time(interactive=interactive, path_output=output_path)
-    if "dist" in output_plots:
-        trk.plot_dist(interactive=interactive, path_output=output_path)
+    if output_plots:
+        if "map" in output_plots:
+            trk.plot_map(interactive=interactive, path_output=output_path)
+        if "trim" in output_plots:
+            trk.plot_trim(interactive=interactive, path_output=output_path)
+        if "time" in output_plots:
+            trk.plot_time(interactive=interactive, path_output=output_path)
+        if "dist" in output_plots:
+            trk.plot_dist(interactive=interactive, path_output=output_path)
 
     # create a trk_meta object:
     trk_meta = trk.track_metadata("pandas")

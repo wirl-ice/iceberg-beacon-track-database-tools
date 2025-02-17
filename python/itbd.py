@@ -37,6 +37,9 @@ import copy
 import track_readers
 from track_fig import plot_trim, plot_map, plot_dist, plot_time
 
+# turn on the copy-on-write functionality
+pd.options.mode.copy_on_write = True
+
 
 def nolog():
     """
@@ -490,10 +493,25 @@ class Track:
             )
 
         # load properties
-        self.reader = record.reader.iloc[0]
-        self.model = record.beacon_model.iloc[0]
-        self.track_start = record.track_start.iloc[0]
-        self.track_end = record.track_end.iloc[0]
+        try:
+            self.reader = record.reader.iloc[0]
+        except:
+            self.reader = "standard"
+
+        try:
+            self.model = record.beacon_model.iloc[0]
+        except:
+            self.model = "Default"
+
+        try:
+            self.track_start = record.track_start.iloc[0]
+        except:
+            self.track_start = None
+
+        try:
+            self.track_end = record.track_end.iloc[0]
+        except:
+            self.track_end = None
 
         self.log.info(f"Beacon model: {self.model}")
         self.log.info(f"Track start: {self.track_start} and end: {self.track_end}")
@@ -712,9 +730,10 @@ class Track:
 
         # Round columns
         # to assess whether there are consecutive duplicate positions, comment these lines
-        self.data["distance"] = self.data["distance"].round(0)
-        self.data["direction"] = self.data["direction"].round(0)
-        self.data["speed"] = self.data["speed"].round(3)
+        # TODO uncomment
+        # self.data["distance"] = self.data["distance"].round(0)
+        # self.data["direction"] = self.data["direction"].round(0)
+        # self.data["speed"] = self.data["speed"].round(3)
 
         # set property
         self.speeded = True
@@ -823,7 +842,6 @@ class Track:
 
         # Set CRS
         self.trackline.crs = "EPSG:4326"
-
         self.geoed = True
         self.log.info("Track geospatial data created")
 
@@ -832,11 +850,21 @@ class Track:
         Output the track to a file.
 
         Note the default is a csv (non-spatial) format.  Other options include track points
-        (_pt) or track lines (_ln) in a kml or gpkg file [let's move on from shapefiles, eh!].
-        See types option below.   Note that there is no fancy styling of the data.
+        (_pt) or track lines (_ln) in a gpkg or kml file [let's move on from shapefiles, eh!].
+        See types option below.
 
-        The script checks for an existing file.  If one is there, that will be logged.
-        The file will not be overwritten.
+        The script checks for an existing file. If one is there, that will be logged.
+        The file will not be overwritten and data export will fail.
+
+        Notes about data formats:
+            - the csv file is the output format 'of record'
+            - the gpkg _ln and _pt files are the geospatial format of record. The _pt version
+              has attribut data.  Since the _pt data is a far larger file, it seemed like a good
+              idea to keep _ln and _pt data separate.
+            - the kml _ln and _pt files are meant for a quick look only (convienient to view):
+                - there is no fancy symbology in the kml output.
+                - the kml_pt output is restricted to beacon_id and the timestamp.
+
 
         Parameters
         ----------
@@ -895,7 +923,8 @@ class Track:
 
         if "pt_kml" in types:
             if not os.path.isfile(f"{os.path.join(path_output, file_output)}_pt.kml"):
-                self.trackpoints.to_file(
+                # note the name will be the beacon id and the description will be the timestamp.
+                self.trackpoints[["beacon_id", "datetime_data", "geometry"]].to_file(
                     f"{os.path.join(path_output, file_output)}_pt.kml", driver="KML"
                 )
                 self.log.info("Track output as trackpoint kml file")

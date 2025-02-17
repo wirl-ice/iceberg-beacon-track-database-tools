@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 track_collation.py
@@ -26,12 +25,15 @@ from shapely.geometry import LineString
 
 
 import track_processing
-from itbd import Meta, Models, Track
+from itbd import Meta, Models
+
+# turn on the copy-on-write functionality
+pd.options.mode.copy_on_write = True
 
 
 def combine_data(src, outname):
     """
-    Walk through source folder looking for standard csv files, concatenate and output
+    Walk through source folder looking for standard csv files, concatenate and output.
 
     Parameters
     ----------
@@ -232,7 +234,7 @@ def file_jockey(src, dest, ext, levelup=0, copy=True):
 # Complete this to set up runtime parameters (all hard coded)
 
 # The run name will be the name of the log and metadata file
-run_name = "Test_20250105_trim"
+run_name = "20250216a"
 
 # path to the metadata file
 meta_file = (
@@ -243,13 +245,15 @@ meta_file = (
 spec_file = "/home/dmueller/Desktop/cis_iceberg_beacon_database_0.3/database/models.ods"
 
 # directory to look through for data
-scandir = "/home/dmueller/Desktop/cis_iceberg_beacon_database_0.3/raw_data/"
+scandir = "/home/dmueller/Desktop/cis_iceberg_beacon_database_0.3/raw_data"
 
 # put the output data here
 outdir = "/home/dmueller/Desktop/cis_iceberg_beacon_database_0.3/" + run_name
 
 # log file name
 logfile = run_name
+
+level = 2  # set to level 2, if you are working out of the raw data folder (files are 2 levels below the raw_data dir)
 
 ans = input(
     f"Note this will overwrite files in the folder {outdir} press y to continue, or any other key to quit: "
@@ -286,6 +290,7 @@ for root, dirs, files in os.walk(scandir, topdown=True):
     for d in dirs:
         if not os.path.isdir(os.path.join(outdir, root[prefix:], d)):
             os.mkdir(os.path.join(outdir, root[prefix:], d))
+    files.sort()  # this will keep the processing more ordered
     for f in files:
 
         if Path(f).stem in metadata.df.beacon_id.values:
@@ -307,37 +312,8 @@ for root, dirs, files in os.walk(scandir, topdown=True):
                 output_plots=["trim", "map", "dist", "time"],
                 interactive=False,
                 raw_data=True,
-                trim_check=True,
+                trim_check=False,
             )
-
-            # this is the track_processing routine:
-            # trk = Track(
-            #     os.path.join(root, f), metadata=metadata, raw_data=True, logger=log
-            # )
-            # trk.load_model_specs(modeldata)
-            # trk.purge()
-            # trk.sort()
-            # # TODO uncomment trk.trim()
-            # trk.speed()
-            # trk.speed_limit()
-
-            # # create track metadata after all the data have been cleaned
-            # trk_meta = trk.track_metadata("pandas")
-            # # TODO Save track metadata too as a json?
-
-            # # output files
-            # trk.output(
-            #     ["csv", "pt_kml", "ln_kml", "pt_gpkg", "ln_gpkg"],
-            #     path_output=os.path.join(outdir, root[prefix:]),
-            # )
-
-            # # output plots
-            # trk.plot_map(path_output=os.path.join(outdir, root[prefix:]))
-            # trk.plot_trim(os.path.join(outdir, root[prefix:]))
-            # trk.plot_dist(os.path.join(outdir, root[prefix:]))
-            # trk.plot_time(os.path.join(outdir, root[prefix:]))
-
-            # log.info("Completed track processing... \n")
 
             # add track metadata to the dataframe of all metadata
             alltrack_meta = pd.concat([alltrack_meta, trk_meta]).reset_index(drop=True)
@@ -356,13 +332,14 @@ os.makedirs(Path(outdir + "_tmp") / "figures/trim")
 os.makedirs(Path(outdir + "_tmp") / "figures/dist")
 
 
-file_jockey(outdir, Path(outdir + "_tmp") / "data", "csv", levelup=2)
-file_jockey(outdir, Path(outdir + "_tmp") / "geodata", "gpkg", levelup=2)
-file_jockey(outdir, Path(outdir + "_tmp") / "figures/maps", "map.png", levelup=2)
-file_jockey(outdir, Path(outdir + "_tmp") / "figures/time", "time.png", levelup=2)
-file_jockey(outdir, Path(outdir + "_tmp") / "figures/dist", "dist.png", levelup=2)
-file_jockey(outdir, Path(outdir + "_tmp") / "figures/trim", "trim.png", levelup=2)
+file_jockey(outdir, Path(outdir + "_tmp") / "data", "csv", levelup=level)
+file_jockey(outdir, Path(outdir + "_tmp") / "geodata", "gpkg", levelup=level)
+file_jockey(outdir, Path(outdir + "_tmp") / "figures/maps", "map.png", levelup=level)
+file_jockey(outdir, Path(outdir + "_tmp") / "figures/time", "time.png", levelup=level)
+file_jockey(outdir, Path(outdir + "_tmp") / "figures/dist", "dist.png", levelup=level)
+file_jockey(outdir, Path(outdir + "_tmp") / "figures/trim", "trim.png", levelup=level)
 
 # move data from tmp to actual folder
+alldata = combine_data(Path(outdir + "_tmp") / "data", run_name)
 
-alldata = combine_data(Path(outdir) / "data", run_name)
+alldata.to_csv(Path(outdir) / "alldata.csv", index=False)

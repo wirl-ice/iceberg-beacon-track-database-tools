@@ -29,6 +29,10 @@ from collections import namedtuple
 import re
 
 
+# turn on the copy-on-write functionality
+pd.options.mode.copy_on_write = True
+
+
 def nolog():
     """
     Create a logger instance that doesn't do anything.
@@ -127,7 +131,7 @@ def create_sdf(nrows):
 
 def dms2dd(string):
     """
-    Extract degrees, minutes and seconds from a string
+    Extract degrees, minutes and seconds from a string.
 
     Assumes that the format is deg min sec or deg min, or deg.  Never deg sec, etc.
     Also assumes there will be no negative min or sec.
@@ -501,6 +505,10 @@ def calib_iridium(raw_data_file, log=None):
     sdf["beacon_id"] = Path(raw_data_file).stem
 
     try:
+        # TODO document properly
+        # note the this removes all 'stale' gps location data from the track
+        if "GPSDELAY" in rdf.columns:
+            rdf = rdf[rdf["GPSDELAY"] == 0]
 
         # Data timestamp
         if "DATA DATE (UTC)" in rdf:
@@ -534,6 +542,10 @@ def calib_iridium(raw_data_file, log=None):
         # Battery voltage
         if "VBAT" in rdf:
             sdf["voltage"] = rdf["VBAT"]
+
+        # GPSDELAY TODO REMOVE
+        if "GPSDELAY" in rdf:
+            sdf["gps_delay"] = rdf["GPSDELAY"]
 
     except:
         print(f"Problem with raw data file {raw_data_file}, check formatting")
@@ -847,6 +859,79 @@ def iabp(raw_data_file, log=None):
     return sdf
 
 
+def globalstar(raw_data_file, log=None):
+    """
+    Convert raw data from GlobalStar format to standardized dataframe.
+
+    Parameters
+    ----------
+    raw_data_file : string
+        Path to raw data CSV file.
+
+    Returns
+    -------
+    sdf : Pandas DataFrame
+        Standardized Pandas dataframe ready for cleaning.
+
+    Raw data format
+    ----------------------------------
+    Columns:  (from CCORE)
+        INDEX
+        BERG_ID
+        DT_TAG_POS_UTC (2019-04-29T23:03UTC)
+        LAT_TAG
+        LON_TAG
+    OR  (from IIP)
+        INDEX
+        ID
+        DATETIME (2019-04-29T23:03UTC)
+        LATITUDE
+        LONGITUDE
+
+    """
+    # set up the logger to output nowhere if None
+    if log == None:
+        log = nolog()
+
+    # read in the raw data frame - rdf
+    rdf = pd.read_csv(raw_data_file, index_col=False, skipinitialspace=True)
+
+    # create an empty standard data frame - sdf - filled with NAs
+    sdf = create_sdf(len(rdf))
+
+    # Unique beacon identifier
+    sdf["beacon_id"] = Path(raw_data_file).stem
+
+    try:
+        # This is the C-CORE format
+        sdf["datetime_data"] = pd.to_datetime(
+            rdf["DT_TAG_POS_UTC"], format="%Y-%m-%dT%H:%MUTC", utc=True
+        )
+
+        sdf["latitude"] = rdf["LAT_TAG"]
+
+        sdf["longitude"] = rdf["LON_TAG"]
+
+    except:
+
+        # This is the IIP format
+        try:
+
+            sdf["datetime_data"] = pd.to_datetime(
+                rdf["DATETIME"], format="%Y-%m-%dT%H:%MUTC", utc=True
+            )
+
+            sdf["latitude"] = rdf["LATITUDE"]
+
+            sdf["longitude"] = rdf["LONGITUDE"]
+
+        except:
+            print(f"Problem with raw data file {raw_data_file}, check formatting")
+            sys.exit(1)
+
+    return sdf
+
+
 def iip(raw_data_file, log=None):
     """
     Convert raw data from Metocean IIP GlobalStar format to standardized dataframe.
@@ -900,6 +985,67 @@ def iip(raw_data_file, log=None):
     return sdf
 
 
+def iip_ccore(raw_data_file, log=None):
+    """
+    Convert raw data from Metocean IIP-C-CORE GlobalStar format to standardized dataframe.
+
+    Parameters
+    ----------
+    raw_data_file : string
+        Path to raw data CSV file.
+
+    Returns
+    -------
+    sdf : Pandas DataFrame
+        Standardized Pandas dataframe ready for cleaning.
+
+    Raw data format
+    ----------------------------------
+    Columns:
+        Year
+        Month
+        Day
+        Hour
+        Minute
+        Second
+        Latitude (^oN)
+        Longitude (^oE)
+        Distance (nmi)
+        Speed (kts)
+        Course (^o)
+
+    Other columns are for notes and will be ignored
+    """
+    # set up the logger to output nowhere if None
+    if log == None:
+        log = nolog()
+
+    # read in the raw data frame - rdf
+    rdf = pd.read_csv(raw_data_file, index_col=False, skipinitialspace=True)
+
+    # create an empty standard data frame - sdf - filled with NAs
+    sdf = create_sdf(len(rdf))
+
+    # Unique beacon identifier
+    sdf["beacon_id"] = Path(raw_data_file).stem
+
+    try:
+
+        sdf["datetime_data"] = pd.to_datetime(
+            rdf[["Year", "Month", "Day", "Hour", "Minute", "Second"]], utc=True
+        )
+
+        sdf["latitude"] = rdf["Latitude (^oN)"]
+
+        sdf["longitude"] = rdf["Longitude (^oE)"]
+
+    except:
+        print(f"Problem with raw data file {raw_data_file}, check formatting")
+        sys.exit(1)
+
+    return sdf
+
+
 def oceanetic(raw_data_file, log=None):
     """
     Convert raw data from Oceanetic format to standardized dataframe.
@@ -924,8 +1070,8 @@ def oceanetic(raw_data_file, log=None):
         hr
         lat
         long
-    """
 
+    """
     # read in the raw data frame - rdf
     rdf = pd.read_csv(raw_data_file, index_col=False, skipinitialspace=True)
 
@@ -936,6 +1082,7 @@ def oceanetic(raw_data_file, log=None):
     sdf["beacon_id"] = Path(raw_data_file).stem
 
     try:
+
         rdf.rename(
             columns={"yr": "year", "mm": "month", "dd": "day", "hr": "hour"},
             inplace=True,
@@ -1208,6 +1355,7 @@ def solara(raw_data_file, log=None):
     return sdf
 
 
+# TODO - remove?
 def svp_old_throw_away(raw_data_file, log=None):
     """
     Convert raw data from Metocean SVP format to standardized dataframe.
@@ -1269,6 +1417,9 @@ def svp_old_throw_away(raw_data_file, log=None):
 
     try:
 
+        if "GPSDELAY" in rdf.columns:
+            rdf = rdf[rdf["GPSDELAY"] == 0]
+
         # Data timestamp
         if "DATA DATE (UTC)" in rdf:
             sdf["datetime_data"] = pd.to_datetime(rdf["DATA DATE (UTC)"], utc=True)
@@ -1305,6 +1456,10 @@ def svp_old_throw_away(raw_data_file, log=None):
         # Battery voltage
         if "VBAT" in rdf:
             sdf["voltage"] = rdf["VBAT"]
+
+        # GPSDELAY TODO REMOVE
+        if "GPSDELAY" in rdf:
+            sdf["gps_delay"] = rdf["GPSDELAY"]
 
     except:
         print(f"Problem with raw data file {raw_data_file}, check formatting")
@@ -1352,7 +1507,7 @@ def svp(raw_data_file, log=None):
         BPT / Barometric Pressure Tendency (mbar)
         AT
         VBAT / Battery Voltage (V)
-        GPSDELAY / Time Since Last GPS fix (min)
+        GPSDELAY / Time Since Last GPS fix (min) (up to 4095)
         SNR  / GPS reported Signal to Noise ratio (dB)
         TTFF / Time to First fix (s)
         SBDTIME  / Iridium Transmission Duration (s)
@@ -1376,7 +1531,10 @@ def svp(raw_data_file, log=None):
 
     try:
 
-        # Data timestamp
+        if "GPSDELAY" in rdf.columns:
+            rdf = rdf[rdf["GPSDELAY"] == 0]
+
+        # Data timestamp  - these options cover different output formats from Linc.
         if "DATA DATE (UTC)" in rdf:
             sdf["datetime_data"] = pd.to_datetime(rdf["DATA DATE (UTC)"], utc=True)
         elif "Data Date (UTC)" in rdf:
@@ -1427,6 +1585,9 @@ def svp(raw_data_file, log=None):
         if "Battery Voltage (V)" in rdf:
             sdf["voltage"] = rdf["Battery Voltage (V)"]
 
+        # GPSDELAY TODO REMOVE
+        if "GPSDELAY" in rdf:
+            sdf["gps_delay"] = rdf["GPSDELAY"]
     except:
         print(f"Problem with raw data file {raw_data_file}, check formatting")
         sys.exit(1)

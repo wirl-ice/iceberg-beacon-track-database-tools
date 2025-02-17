@@ -26,6 +26,10 @@ import cartopy.feature as cfeature
 from collections import namedtuple
 
 
+# turn on the copy-on-write functionality
+pd.options.mode.copy_on_write = True
+
+
 def nolog():
     """
     Create a logger instance that doesn't do anything.
