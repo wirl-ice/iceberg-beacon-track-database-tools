@@ -2,19 +2,20 @@
 """
 track_collation.py
 
-Batch process many tracks and/or collate many tracks into a larger database 
+Batch process many tracks and/or collate many tracks into a larger database
 
 Note you must have a metadata file and a beacon specs file to run this
 
 The file structure of the raw data folders (scandir) is preserved.  Some scripts below
-(commented out for now) can be used to move files into a different arrangement. 
+(commented out for now) can be used to move files into a different arrangement.
 
-Save plots, geospatial data, etc. 
+Save plots, geospatial data, etc.
 Save log/logs
 
 Author: Derek Mueller Jan 2025
 """
 
+# import
 import os
 import sys
 import shutil
@@ -23,7 +24,7 @@ from pathlib import Path
 import geopandas as gpd
 from shapely.geometry import LineString
 
-
+# import ITBD modules
 import track_processing
 from itbd import Meta, Models
 
@@ -152,10 +153,6 @@ def file_jockey(src, dest, ext, levelup=0, copy=True):
                     shutil.move(f_src, f_dest)
 
 
-# metadata_file = metadata
-# itbd_df = alldata
-
-
 # def database_stats(itbd_df, metadata, modeldata):
 #     """
 
@@ -174,6 +171,10 @@ def file_jockey(src, dest, ext, levelup=0, copy=True):
 #     """
 
 
+# ###IMPORTANT - I changed this to read from a file so removed .df from metadata -
+# ### we want the most up to date info (from the concatenated metadata not the input metadata)
+
+
 #     # number of tracks
 #     print(
 #         f"The ITBD contains {len(itbd_df.beacon_id.unique()):,} tracks comprised of a total of {len(itbd_df):,} positions"
@@ -182,15 +183,15 @@ def file_jockey(src, dest, ext, levelup=0, copy=True):
 
 #     # number of groups and projects
 #     print(
-#         f"A total of {len(metadata.df.data_owner.unique()):,} groups from government, \
-#     industry and academia contributed data from {len(metadata.df.project.unique()):,} different projects."
+#         f"A total of {len(metadata.data_owner.unique()):,} groups from government, \
+#     industry and academia contributed data from {len(metadata.project.unique()):,} different projects."
 #     )
 
 #     # # for unique data owners
 #     # table data owner, number of beacons, list years
-#     track_count = metadata.df.groupby("data_owner").agg("beacon_id").count().reset_index()
+#     track_count = metadata.groupby("data_owner").agg("beacon_id").count().reset_index()
 #     unique_years = (
-#         metadata.df.groupby("data_owner")["year"]
+#         metadata.groupby("data_owner")["year"]
 #         .agg(lambda x: sorted(x.unique()))
 #         .reset_index()
 #     )
@@ -199,8 +200,8 @@ def file_jockey(src, dest, ext, levelup=0, copy=True):
 #     table_data_owners["year"] = table_data_owners["year"].apply(
 #         lambda x: ",".join(map(str, map(int, x)))
 #     )
-#     table_data_owners.to_csv("table_data_owners.csv", index=False)
 
+#     table_data_owners.to_csv(f"{Path(outdir) / 'table_data_owners.csv'}", index=False)
 
 #     # # for named targets
 #     # table target name, source, target type, number of beacons, year of deployments
@@ -209,10 +210,10 @@ def file_jockey(src, dest, ext, levelup=0, copy=True):
 #     # consequence and lump
 
 #     targets = (
-#         metadata.df.groupby("iceberg_name")
+#         metadata.groupby("iceberg_name")
 #         .agg(
 #             years=("year", list),
-#             sources=("target_source", "first"),
+#             sources=("iceberg_source", "first"),
 #             beacons=("beacon_id", "count"),
 #             type=("shape", list),
 #             size=("size", list),
@@ -221,10 +222,10 @@ def file_jockey(src, dest, ext, levelup=0, copy=True):
 #     )
 #     targets["years"] = targets["years"].apply(lambda x: ",".join(map(str, map(int, x))))
 
-#     targets.to_csv("table_targets.csv", index=False)
+#     targets.to_csv(f"{Path(outdir) / 'table_targets.csv'}", index=False)
 
 #     # table tracks vs model / manufacturer
-#     model_df = modeldata.df[["make", "model"]]
+#     model_df = modeldata[["make", "model"]]
 #     model_df = metadata.df.groupby("beacon_model").agg(number=("beacon_id", "count"))
 
 #     pd.concat([track_count, years], axis=1).to_csv("table_data_owners.csv", index=False)
@@ -234,7 +235,7 @@ def file_jockey(src, dest, ext, levelup=0, copy=True):
 # Complete this to set up runtime parameters (all hard coded)
 
 # The run name will be the name of the log and metadata file
-run_name = "20250216a"
+run_name = "20250306"
 
 # path to the metadata file
 meta_file = (
@@ -319,8 +320,9 @@ for root, dirs, files in os.walk(scandir, topdown=True):
             alltrack_meta = pd.concat([alltrack_meta, trk_meta]).reset_index(drop=True)
 
 # output the metadata
-alltrack_meta.to_csv(os.path.join(outdir, f"{run_name}.csv"), index=False)
 
+alltrack_meta.to_csv(os.path.join(outdir, f"{run_name}.csv"), index=False, na_rep="NA")
+# TODO - add na_rep to data
 
 os.makedirs(Path(outdir + "_tmp"))
 os.makedirs(Path(outdir + "_tmp") / "data")
@@ -342,4 +344,11 @@ file_jockey(outdir, Path(outdir + "_tmp") / "figures/trim", "trim.png", levelup=
 # move data from tmp to actual folder
 alldata = combine_data(Path(outdir + "_tmp") / "data", run_name)
 
-alldata.to_csv(Path(outdir) / "alldata.csv", index=False)
+# ----
+
+# ### crashed so pick up where we left off:
+# # read col 2 as string (that's datetime transmit btw)
+# alldata = pd.read_csv(f"{Path(outdir) / 'alldata.csv'}", dtype={2: str})
+# metadata = pd.read_csv(f"{Path(outdir) }/{run_name}.csv")
+# metadata_file = metadata
+# itbd_df = alldata

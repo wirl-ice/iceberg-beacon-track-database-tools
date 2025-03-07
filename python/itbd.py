@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 itbd.py
@@ -10,18 +9,18 @@ Defines the class 'Meta' containing the database metadata
 Defines the class 'Models' containing beacon model specifications, read in from a table
 Defines the class 'Specs' containing a single beacon model specifications, used for purging bad data
 
-Note that creating an instance of a Track that _is_ in the standard format assumes the track 
+Note that creating an instance of a Track that _is_ in the standard format assumes the track
  has been processed, which means to complete all the steps in a workflow for cleaning,
- standardizing and adding derived data. 
+ standardizing and adding derived data.
 
 The functions to read the various raw_data formats and define the standard format are in track_readers.py
 The functions to plot figures are in track_fig.py
 
 The database itself is created using this code-base.  To (re-)create the database use track_collation.py
 
-Author: Derek Mueller Jul-Jan 2025, with contribution from Adam Garbo's code
+Author: Derek Mueller Jul 2024-Mar 2025, with contribution from Adam Garbo's code
 """
-
+# imports
 import os
 from pathlib import Path
 import pandas as pd
@@ -32,6 +31,7 @@ import pyproj
 from collections import namedtuple
 import json
 import copy
+import datetime
 
 # this functionality is in other modules.  Import
 import track_readers
@@ -57,6 +57,27 @@ def nolog():
         "NoOpLogger", ["debug", "info", "warning", "error", "critical"]
     )
     return NoOpLogger(*([lambda *args, **kwargs: None] * 5))
+
+
+def json_serialize(value):
+    """
+    Check to see if the value is a type that json can't serialize and, if so, convert it
+
+    Parameters
+    ----------
+    value : Any variable
+        A variable.
+
+    Returns
+    -------
+    value
+        a value in a format json can serialize
+
+    """
+    if isinstance(value, datetime.datetime):
+        return value.isoformat()
+    if isinstance(value, np.bool_):
+        return bool(value)
 
 
 class Models:
@@ -93,6 +114,7 @@ class Models:
         self.model_file = model_file
         try:
             df = pd.read_excel(model_file)
+
         except:
             pass
             self.log.error(f"Model specifications file {self.model_file} read error")
@@ -157,6 +179,19 @@ class Specs:
 
         # remove a few columns that are not needed
         beacon_specs = beacon_specs.drop(columns=["notes", "model"])
+
+        # set to boolean
+        beacon_specs["temperature_int"] = beacon_specs["temperature_int"].astype(bool)
+        beacon_specs["temperature_surface"] = beacon_specs[
+            "temperature_surface"
+        ].astype(bool)
+        beacon_specs["temperature_air"] = beacon_specs["temperature_air"].astype(bool)
+        beacon_specs["voltage"] = beacon_specs["voltage"].astype(bool)
+        beacon_specs["pressure"] = beacon_specs["pressure"].astype(bool)
+        beacon_specs["pitch"] = beacon_specs["pitch"].astype(bool)
+        beacon_specs["roll"] = beacon_specs["roll"].astype(bool)
+        beacon_specs["heading"] = beacon_specs["heading"].astype(bool)
+        beacon_specs["buoyant"] = beacon_specs["buoyant"].astype(bool)
 
         for column in beacon_specs.columns:
             setattr(self, column, beacon_specs[column].iloc[0])
@@ -499,7 +534,7 @@ class Track:
             self.reader = "standard"
 
         try:
-            self.model = record.beacon_model.iloc[0]
+            self.model = record.model.iloc[0]
         except:
             self.model = "Default"
 
@@ -532,6 +567,14 @@ class Track:
                 self.log.error(
                     "Unrecognized track end format - trimming will not work as expected"
                 )
+
+        # next pull in all the remaining available metadata and store it as meta_dict
+        record = record.drop(
+            ["beacon_id", "reader", "model", "track_start", "track_end"],
+            axis=1,
+            errors="ignore",
+        )
+        self.meta_dict = record.iloc[0].to_dict()
 
     def purge(self):
         """Purge bad data by assigning NaN to values that exceed the min/max range."""
@@ -731,9 +774,9 @@ class Track:
         # Round columns
         # to assess whether there are consecutive duplicate positions, comment these lines
         # TODO uncomment
-        # self.data["distance"] = self.data["distance"].round(0)
-        # self.data["direction"] = self.data["direction"].round(0)
-        # self.data["speed"] = self.data["speed"].round(3)
+        self.data["distance"] = self.data["distance"].round(0)
+        self.data["direction"] = self.data["direction"].round(0)
+        self.data["speed"] = self.data["speed"].round(3)
 
         # set property
         self.speeded = True
@@ -1061,66 +1104,279 @@ class Track:
 
         self.stats()
 
-    def track_metadata(self, meta_format=None, export=False):
+    def track_metadata(self, path_output=".", meta_export=None, verbose=False):
         """
-        Make a dictionary of the known track metadata for export.
+        Make a dataframe and dictionary of the known track metadata for export.
+
+        Put metadata into categories. The json is nested but the dataframe is not
 
         Parameters
         ----------
-        meta_format : str, optional
-            Specify 'pandas' or 'json' format. The default (None) is a dictionary.
-        export : bool, optional
-            Export to file in working directory. The default is False.
+        meta_export : str, optional
+            Specify 'pandas' or 'json' format or 'both'. The default (None) does not export a file.
+            Export to file in working directory.
+        verbose : Bool
+            If true, return/export all the metadata, otherwise only most of it
 
         Returns
         -------
-        track_meta : TYPE
-            DESCRIPTION.
+        track_meta : pandas dataframe
+            available track metadata.
 
         """
-        # some tracks may not have beacon specs, let's find out...
-        have_specs = False
-        # get the specs for the beacon here but only run if you have specs
-        # test to see if specs exist
-        if "make" in self.specs.__dict__:
-            have_specs = True
-            s_meta = copy.deepcopy(self.specs.__dict__)
-
-            # don't want every entry
-            remove_keys = ["log", "deployment"]
-            for key in remove_keys:
-                s_meta.pop(key, None)  # Use pop to avoid KeyError if key doesn't exist
-
         # get all the properties of the track
         t_meta = copy.deepcopy(self.__dict__)
 
-        # don't want every entry
+        # some tracks may not have beacon specs, let's find out...
+        if hasattr(self, "specs"):
+            # get the specs for the beacon here but only run if you have specs
+            s_meta = copy.deepcopy(self.specs.__dict__)
+            t_meta = t_meta | s_meta
+
+        # get the extra metadata for the beacon here if available
+        if hasattr(self, "meta_dict"):
+            x_meta = copy.deepcopy(self.meta_dict)
+            t_meta = t_meta | x_meta
+
+        # don't want every entry: this is data or log
         remove_keys = [
             "log",
             "data",
             "specs",
+            "meta_dict",
             "trackpoints",
             "trackline",
+            "deployment",
         ]
         for key in remove_keys:
             t_meta.pop(key, None)  # Use pop to avoid KeyError if key doesn't exist
 
-        if have_specs:
-            track_meta_dict = t_meta | s_meta
+        # now parse out the metadata fields based on what categories are defined:
+        identifier_metadata = [
+            "beacon_id",
+            "year",
+            "id",
+            "wmo",
+            "iceberg_name",
+            "iceberg_source",
+        ]
+
+        format_metadata = ["reader"]
+
+        comments_metadata = ["comments"]
+
+        track_metadata = [
+            "observations",
+            "duration",
+            "distance",
+            "track_start",
+            "track_end",
+            "trim_status",
+            "data_start",
+            "data_end",
+            "latitude_start",
+            "longitude_start",
+            "latitude_end",
+            "longitude_end",
+        ]
+
+        project_metadata = [
+            "project",
+            "data_owner",
+            "data_contact",
+            "data_contact_email",
+        ]
+
+        deployment_metadata = [
+            "deployed_by",
+            "deployment_method",
+            "deployment_platform",
+            "photo_comments",
+            "photo_credit",
+        ]
+
+        morphology_metadata = [
+            "shape",
+            "size",
+            "length",
+            "length_flag",
+            "width",
+            "width_flag",
+            "area",
+            "area_flag",
+            "height",
+            "height_flag",
+            "thickness",
+            "thickness_flag",
+            "draft",
+            "draft_flag",
+            "satellite_imagery",
+        ]
+
+        beacon_metadata = [
+            "model",
+            "make",
+            "transmitter",
+            "temperature_int",
+            "temperature_surface",
+            "temperature_air",
+            "voltage",
+            "pressure",
+            "pitch",
+            "roll",
+            "heading",
+            "buoyant",
+        ]
+
+        valid_range_metadata = [
+            "latitude_min",
+            "latitude_max",
+            "longitude_min",
+            "longitude_max",
+            "temperature_air_min",
+            "temperature_air_max",
+            "temperature_internal_min",
+            "temperature_internal_max",
+            "temperature_surface_min",
+            "temperature_surface_max",
+            "pressure_min",
+            "pressure_max",
+            "pitch_min",
+            "pitch_max",
+            "roll_min",
+            "roll_max",
+            "heading_min",
+            "heading_max",
+            "satellites_min",
+            "satellites_max",
+            "voltage_min",
+            "voltage_max",
+            "loc_accuracy_min",
+            "loc_accuracy_max",
+        ]
+
+        process_metadata = [
+            "datafile",
+            "raw_data",
+            "purged",
+            "sorted",
+            "speeded",
+            "speedlimited",
+            "trimmed_start",
+            "trimmed_end",
+            "trimmed",
+            "requested_track_start",
+            "requested_track_end",
+            "geoed",
+        ]
+
+        # Create dictionaries based on each of the categories
+        beacon_metadata_dict = {k: t_meta[k] for k in beacon_metadata if k in t_meta}
+        comments_metadata_dict = {
+            k: t_meta[k] for k in comments_metadata if k in t_meta
+        }
+        deployment_metadata_dict = {
+            k: t_meta[k] for k in deployment_metadata if k in t_meta
+        }
+        format_metadata_dict = {k: t_meta[k] for k in format_metadata if k in t_meta}
+        identifier_metadata_dict = {
+            k: t_meta[k] for k in identifier_metadata if k in t_meta
+        }
+        morphology_metadata_dict = {
+            k: t_meta[k] for k in morphology_metadata if k in t_meta
+        }
+        process_metadata_dict = {k: t_meta[k] for k in process_metadata if k in t_meta}
+        project_metadata_dict = {k: t_meta[k] for k in project_metadata if k in t_meta}
+        track_metadata_dict = {k: t_meta[k] for k in track_metadata if k in t_meta}
+        valid_range_metadata_dict = {
+            k: t_meta[k] for k in valid_range_metadata if k in t_meta
+        }
+
+        excluded_keys = set().union(
+            beacon_metadata,
+            comments_metadata,
+            deployment_metadata,
+            format_metadata,
+            identifier_metadata,
+            morphology_metadata,
+            process_metadata,
+            project_metadata,
+            track_metadata,
+            valid_range_metadata,
+        )
+
+        leftover_metadata_dict = {
+            k: t_meta[k] for k in t_meta if k not in excluded_keys
+        }
+
+        if verbose:
+            track_meta_dict = {
+                "identifier_metadata": identifier_metadata_dict,
+                "track_metadata": track_metadata_dict,
+                "project_metadata": project_metadata_dict,
+                "deployment_metadata": deployment_metadata_dict,
+                "format_metadata": format_metadata_dict,
+                "morphology_metadata": morphology_metadata_dict,
+                "comments_metadata": comments_metadata_dict,
+                "beacon_metadata": beacon_metadata_dict,
+                "process_metadata": process_metadata_dict,
+                "valid_range_metadata": valid_range_metadata_dict,
+                "leftover_metadata": leftover_metadata_dict,
+            }
+
         else:
-            track_meta_dict = t_meta
+            track_meta_dict = {
+                "identifier_metadata": identifier_metadata_dict,
+                "track_metadata": track_metadata_dict,
+                "project_metadata": project_metadata_dict,
+                "deployment_metadata": deployment_metadata_dict,
+                "format_metadata": format_metadata_dict,
+                "morphology_metadata": morphology_metadata_dict,
+                "comments_metadata": comments_metadata_dict,
+                "beacon_metadata": beacon_metadata_dict,
+            }
 
-        if meta_format == "json":
-            track_meta = json.dumps(track_meta_dict, indent=4)
-            if export:
-                with open(f"{self.beacon_id}_meta.json", "w") as file_export:
-                    file_export.write(track_meta)
-        if meta_format == "pandas":
-            track_meta = pd.DataFrame([track_meta_dict])
-            if export:
-                track_meta.to_csv(f"{self.beacon_id}_meta.csv", index=False)
+        flattened = {}
+        for meta_category, meta_category_dict in track_meta_dict.items():
+            for key, value in meta_category_dict.items():
+                flattened[f"{key}"] = value
 
-        return track_meta
+        # Convert to DataFrame
+        track_meta_df = pd.DataFrame([flattened])
+
+        # order columns
+        col_order = (
+            identifier_metadata
+            + track_metadata
+            + project_metadata
+            + deployment_metadata
+            + format_metadata
+            + morphology_metadata
+            + comments_metadata
+            + beacon_metadata
+            + process_metadata
+            + valid_range_metadata
+            + list(leftover_metadata_dict.keys())
+        )
+
+        new_columns = [col for col in col_order if col in track_meta_df.columns]
+        track_meta_df = track_meta_df[new_columns]
+
+        if meta_export == "json" or meta_export == "both":
+            track_meta_json = json.dumps(
+                track_meta_dict, indent=4, default=json_serialize
+            )
+            with open(
+                f"{Path(path_output)/self.beacon_id}_meta.json", "w"
+            ) as file_export:
+                file_export.write(track_meta_json)
+
+        if meta_export == "pandas" or meta_export == "both":
+            track_meta_df.to_csv(
+                f"{Path(path_output)/self.beacon_id}_meta.csv", index=False
+            )
+
+        return track_meta_df
 
     # The following graphing functions are in track_fig.py but listed here so they can
     # be a method of Track.

@@ -3,7 +3,7 @@
 """
 track_proceessing.py
 
-Stand-alone script to process tracks for the ITBD (Iceberg Tracking Beacon Database) 
+Stand-alone script to process tracks for the ITBD (Iceberg Tracking Beacon Database)
 
 --or--
 
@@ -326,42 +326,43 @@ def track_process(
     raw_data=False,
 ):
     """
-     Process a raw track: standardize, purge, trim and output.
+         Process a raw track: standardize, purge, trim and output.
 
-    Parameters
-    ----------
-    data_file : str
-        DESCRIPTION.
-    output_path : str
-        DESCRIPTION.
-    metadata : str, optional
-        DESCRIPTION. The default is None.
-    reader : TYPE, optional
-        DESCRIPTION. The default is None.
-    model : TYPE, optional
-        DESCRIPTION. The default is None.
-    specs : TYPE, optional
-        DESCRIPTION. The default is None.
-    track_start : TYPE, optional
-        DESCRIPTION. The default is None.
-    track_end : TYPE, optional
-        DESCRIPTION. The default is None.
-    output_file : TYPE, optional
-        DESCRIPTION. The default is None.
-    output_types : TYPE, optional
-        DESCRIPTION. The default is ["csv"].
-    output_plots : TYPE, optional
-        DESCRIPTION. The default is None.
-    interactive : TYPE, optional
-        DESCRIPTION. The default is False.
-    trim_check : TYPE, optional
-        DESCRIPTION. The default is False.
-    raw_data : TYPE, optional
-        DESCRIPTION. The default is False.
+        Parameters
+        ----------
+        data_file : str
+            DESCRIPTION.
+        output_path : str
+            DESCRIPTION.
+        metadata : str, optional
+            DESCRIPTION. The default is None.
+        reader : TYPE, optional
+            DESCRIPTION. The default is None.
+        model : TYPE, optional
+            DESCRIPTION. The default is None.
+        specs : TYPE, optional
+            DESCRIPTION. The default is None.
+        track_start : TYPE, optional
+            DESCRIPTION. The default is None.
+        track_end : TYPE, optional
+            DESCRIPTION. The default is None.
+        output_file : TYPE, optional
+            DESCRIPTION. The default is None.
+        output_types : TYPE, optional
+            DESCRIPTION. The default is ["csv"].
+        output_plots : TYPE, optional
+            DESCRIPTION. The default is None.
+        interactive : TYPE, optional
+            DESCRIPTION. The default is False.
+        trim_check : TYPE, optional
+            DESCRIPTION. The default is False.
+        raw_data : TYPE, optional
+            DESCRIPTION. The default is False.
 
-    Returns
-    -------
-    None.
+    TODO add meta output
+        Returns
+        -------
+        None.
 
     """
     log = logging.getLogger()
@@ -427,7 +428,7 @@ def track_process(
             trk.plot_dist(interactive=interactive, path_output=output_path)
 
     # create a trk_meta object:
-    trk_meta = trk.track_metadata("pandas")
+    trk_meta = trk.track_metadata(path_output=output_path, meta_export="json")
 
     # complete the run.
     log.info("Completed track processing... \n")
