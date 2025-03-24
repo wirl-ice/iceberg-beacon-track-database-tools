@@ -3,7 +3,7 @@
 """
 track_proceessing.py
 
-Stand-alone script to process tracks for the ITBD (Iceberg Tracking Beacon Database)
+Stand-alone script to process tracks for the IBTD (Iceberg Beacon Track Database)
 
 --or--
 
@@ -19,7 +19,7 @@ import logging
 from pathlib import Path
 
 # custom modules
-from itbd import Track, Meta, Models, nolog
+from ibtd import Track, Meta, Models, nolog
 
 
 def tracklog(beacon_id, path_output, level="DEBUG"):

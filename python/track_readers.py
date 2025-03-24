@@ -4,12 +4,12 @@ track_readers.py.
 A collection of functions that convert from various beacon data formats to
 a standardized format.
 
-Note that the formats ingested by these functions (known as the raw data in the ITBD)
+Note that the formats ingested by these functions (known as the raw data in the IBTD)
 are determined by the data owner/provider and do not necessarily represent the format of
 the original communication from the device itself.
 
 Each function takes the raw data file path/name and puts it into the standardized format
-At a minimum, the date/time, latitude and longitude are required.  Other columns are 
+At a minimum, the date/time, latitude and longitude are required.  Other columns are
 optional.
 
 
@@ -1257,10 +1257,23 @@ def rockstar(raw_data_file, log=None):
     ----------------------------------
     Columns:
         ID
-        GPS Time (UTC) (17-08-2016 20:00:06)
+        GPS Time (UTC)  (dd-mm-yyyy hh:mm:ss)
+        GPS Time (UTC)  (dd/mm/yyyy hh:mm:ss)
         Latitude
         Longitude
-        Temperature (only sometimes)
+        GPS SOG
+        SOG
+        COG
+        GPS COG
+        Altitude
+        Ext. Power
+        Battery
+        Source
+        CEP
+        Temperature
+        Reason
+        GPS PDOP
+        Nav Mode
 
     """
     # set up the logger to output nowhere if None
@@ -1276,6 +1289,9 @@ def rockstar(raw_data_file, log=None):
                 skip = lines.index(row)
 
     rdf = pd.read_csv(raw_data_file, index_col=False, skiprows=skip)
+
+    # use only data from source gps
+    rdf = rdf[rdf["Source"] == "GPS"]
 
     # create an empty standard data frame - sdf - filled with NAs
     sdf = create_sdf(len(rdf))

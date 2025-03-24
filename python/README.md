@@ -1,8 +1,8 @@
-# Iceberg Tracking Beacon Database: Standardization, Visualization and Collation 
+# Iceberg Beacon Track Database: Standardization, Visualization and Collation 
 
 Authors: Derek Mueller, Adam Garbo, Jill Rajewicz, Anna Crawford and Cindy Lopes 
 
-Date: 2024-11-22
+Date: 2025-03-23
 
 ## Introduction
 This Python code ingests raw tracking beacon data, standardizes it to a common format, peforms a number of data cleaning steps and outputs visualization and data products.
@@ -99,7 +99,7 @@ A CSV will be produced with the following column headings:
 * A text file that includes debugging information from `track_processing.py`. Can be used to troubleshoot issues with standardizing a particular dataset or beacon type.
 
 
-## Contributing to the Iceberg Tracking Beacon Database
+## Contributing to the Iceberg Beacon Track Database
 ### Adding support for new beacon types: 
 * Create new functions in `standardization_functions.py` that will convert the raw data to the standardized format using the template provided. 
 

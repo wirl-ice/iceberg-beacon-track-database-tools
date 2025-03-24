@@ -1,4 +1,4 @@
-name: itbd
+name: ibtd
 channels:
 - conda-forge
 dependencies:

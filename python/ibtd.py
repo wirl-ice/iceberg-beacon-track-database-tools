@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-itbd.py
+ibtd.py
 
-Main module for the Iceberg Tracking Beacon Database (ITDB).
+Main module for the Iceberg Beacon Track Database (IBTD).
 
 Defines the class 'Track' containing an individual iceberg track along with methods and properties.
 Defines the class 'Meta' containing the database metadata
@@ -33,7 +33,7 @@ import json
 import copy
 import datetime
 
-# this functionality is in other modules.  Import
+# this functionality is in other modules.
 import track_readers
 from track_fig import plot_trim, plot_map, plot_dist, plot_time
 
@@ -61,7 +61,7 @@ def nolog():
 
 def json_serialize(value):
     """
-    Check to see if the value is a type that json can't serialize and, if so, convert it
+    Check to see if the value is a type that json can't serialize and, if so, convert it.
 
     Parameters
     ----------
@@ -773,7 +773,6 @@ class Track:
 
         # Round columns
         # to assess whether there are consecutive duplicate positions, comment these lines
-        # TODO uncomment
         self.data["distance"] = self.data["distance"].round(0)
         self.data["direction"] = self.data["direction"].round(0)
         self.data["speed"] = self.data["speed"].round(3)

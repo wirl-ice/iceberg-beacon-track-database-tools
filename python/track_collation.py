@@ -24,9 +24,9 @@ from pathlib import Path
 import geopandas as gpd
 from shapely.geometry import LineString
 
-# import ITBD modules
+# import IBTD modules
 import track_processing
-from itbd import Meta, Models
+from ibtd import Meta, Models
 
 # turn on the copy-on-write functionality
 pd.options.mode.copy_on_write = True
@@ -153,7 +153,7 @@ def file_jockey(src, dest, ext, levelup=0, copy=True):
                     shutil.move(f_src, f_dest)
 
 
-# def database_stats(itbd_df, metadata, modeldata):
+# def database_stats(ibtd_df, metadata, modeldata):
 #     """
 
 
@@ -177,9 +177,9 @@ def file_jockey(src, dest, ext, levelup=0, copy=True):
 
 #     # number of tracks
 #     print(
-#         f"The ITBD contains {len(itbd_df.beacon_id.unique()):,} tracks comprised of a total of {len(itbd_df):,} positions"
+#         f"The IBTD contains {len(ibtd_df.beacon_id.unique()):,} tracks comprised of a total of {len(ibtd_df):,} positions"
 #     )
-#     print(f"Data span from {itbd_df.datetime_data.min()} to {itbd_df.datetime_data.max()}")
+#     print(f"Data span from {ibtd_df.datetime_data.min()} to {ibtd_df.datetime_data.max()}")
 
 #     # number of groups and projects
 #     print(
@@ -351,4 +351,4 @@ alldata = combine_data(Path(outdir + "_tmp") / "data", run_name)
 # alldata = pd.read_csv(f"{Path(outdir) / 'alldata.csv'}", dtype={2: str})
 # metadata = pd.read_csv(f"{Path(outdir) }/{run_name}.csv")
 # metadata_file = metadata
-# itbd_df = alldata
+# ibtd_df = alldata
