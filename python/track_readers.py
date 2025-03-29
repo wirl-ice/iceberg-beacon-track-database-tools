@@ -82,7 +82,6 @@ def create_sdf(nrows):
         "pitch",
         "roll",
         "heading",
-        "satellites",
         "voltage",
         "loc_accuracy",
         "distance",
@@ -103,9 +102,8 @@ def create_sdf(nrows):
         "pitch": float,
         "roll": float,
         "heading": float,
-        # "satellites" : int,
         "voltage": float,
-        # "loc_accuracy": int,
+        "loc_accuracy": int,
         "distance": float,
         "speed": float,
         "direction": float,
@@ -247,7 +245,7 @@ def standard(raw_data_file, log=None):
 
 
 def calib_argos(raw_data_file, log=None):
-    """
+    r"""
     Convert raw data from CALIB ARGOS format to standardized dataframe.
 
     Parameters
@@ -498,6 +496,16 @@ def calib_iridium(raw_data_file, log=None):
     # read in the raw data frame - rdf
     rdf = pd.read_csv(raw_data_file, index_col=False, skipinitialspace=True)
 
+    # Only use position data that is current.  GPSDELAY tells you how stale the GPS data are
+    if "GPSDELAY" in rdf.columns:
+        import pdb
+
+        pdb.set_trace()
+        log.info(
+            f'Removing {len(rdf[rdf["GPSDELAY"] == 0])} rows where the GPS data is old'
+        )
+        rdf = rdf[rdf["GPSDELAY"] == 0].reset_index()
+
     # create an empty standard data frame - sdf - filled with NAs
     sdf = create_sdf(len(rdf))
 
@@ -505,10 +513,6 @@ def calib_iridium(raw_data_file, log=None):
     sdf["beacon_id"] = Path(raw_data_file).stem
 
     try:
-        # TODO document properly
-        # note the this removes all 'stale' gps location data from the track
-        if "GPSDELAY" in rdf.columns:
-            rdf = rdf[rdf["GPSDELAY"] == 0]
 
         # Data timestamp
         if "DATA DATE (UTC)" in rdf:
@@ -542,10 +546,6 @@ def calib_iridium(raw_data_file, log=None):
         # Battery voltage
         if "VBAT" in rdf:
             sdf["voltage"] = rdf["VBAT"]
-
-        # GPSDELAY TODO REMOVE
-        if "GPSDELAY" in rdf:
-            sdf["gps_delay"] = rdf["GPSDELAY"]
 
     except:
         print(f"Problem with raw data file {raw_data_file}, check formatting")
@@ -1287,11 +1287,18 @@ def rockstar(raw_data_file, log=None):
             word = "ID,GPS"  # ------
             if row.find(word) != -1:
                 skip = lines.index(row)
+                break
+
+    if skip > 0:
+        log.info("Start of comments from raw RockSTAR file:")
+        for row in range(skip):
+            log.info(lines[row])
+        log.info("End of comments from raw RockSTAR file:")
 
     rdf = pd.read_csv(raw_data_file, index_col=False, skiprows=skip)
 
     # use only data from source gps
-    rdf = rdf[rdf["Source"] == "GPS"]
+    rdf = rdf[rdf["Source"] == "GPS"].reset_index()
 
     # create an empty standard data frame - sdf - filled with NAs
     sdf = create_sdf(len(rdf))
@@ -1300,7 +1307,6 @@ def rockstar(raw_data_file, log=None):
     sdf["beacon_id"] = Path(raw_data_file).stem
 
     try:
-        # Datetime format for beacon IDs: 2011_300034013463170 and 0082470
         # there are 2 columns with the same label.  they seem to be always the same...
         sdf["datetime_data"] = pd.to_datetime(
             rdf["GPS Time (UTC)"], dayfirst=True, utc=True
@@ -1425,6 +1431,16 @@ def svp_old_throw_away(raw_data_file, log=None):
     # read in the raw data frame - rdf
     rdf = pd.read_csv(raw_data_file, index_col=False, skipinitialspace=True)
 
+    # Only use data that is current.  GPSDELAY tells you how stale the GPS data are
+    if "GPSDELAY" in rdf.columns:
+        import pdb
+
+        pdb.set_trace()
+        log.info(
+            f'Removing {len(rdf[rdf["GPSDELAY"] == 0])} rows where the GPS data is old'
+        )
+        rdf = rdf[rdf["GPSDELAY"] == 0].reset_index()
+
     # create an empty standard data frame - sdf - filled with NAs
     sdf = create_sdf(len(rdf))
 
@@ -1432,9 +1448,6 @@ def svp_old_throw_away(raw_data_file, log=None):
     sdf["beacon_id"] = Path(raw_data_file).stem
 
     try:
-
-        if "GPSDELAY" in rdf.columns:
-            rdf = rdf[rdf["GPSDELAY"] == 0]
 
         # Data timestamp
         if "DATA DATE (UTC)" in rdf:
@@ -1472,10 +1485,6 @@ def svp_old_throw_away(raw_data_file, log=None):
         # Battery voltage
         if "VBAT" in rdf:
             sdf["voltage"] = rdf["VBAT"]
-
-        # GPSDELAY TODO REMOVE
-        if "GPSDELAY" in rdf:
-            sdf["gps_delay"] = rdf["GPSDELAY"]
 
     except:
         print(f"Problem with raw data file {raw_data_file}, check formatting")
@@ -1539,6 +1548,16 @@ def svp(raw_data_file, log=None):
         raw_data_file, index_col=False, skipinitialspace=True, encoding_errors="replace"
     )
 
+    # Only use data that is current.  GPSDELAY tells you how stale the GPS data are
+    if "GPSDELAY" in rdf.columns:
+        import pdb
+
+        pdb.set_trace()
+        log.info(
+            f'Removing {len(rdf[rdf["GPSDELAY"] == 0])} rows where the GPS data is old'
+        )
+        rdf = rdf[rdf["GPSDELAY"] == 0].reset_index()
+
     # create an empty standard data frame - sdf - filled with NAs
     sdf = create_sdf(len(rdf))
 
@@ -1546,9 +1565,6 @@ def svp(raw_data_file, log=None):
     sdf["beacon_id"] = Path(raw_data_file).stem
 
     try:
-
-        if "GPSDELAY" in rdf.columns:
-            rdf = rdf[rdf["GPSDELAY"] == 0]
 
         # Data timestamp  - these options cover different output formats from Linc.
         if "DATA DATE (UTC)" in rdf:
@@ -1601,9 +1617,6 @@ def svp(raw_data_file, log=None):
         if "Battery Voltage (V)" in rdf:
             sdf["voltage"] = rdf["Battery Voltage (V)"]
 
-        # GPSDELAY TODO REMOVE
-        if "GPSDELAY" in rdf:
-            sdf["gps_delay"] = rdf["GPSDELAY"]
     except:
         print(f"Problem with raw data file {raw_data_file}, check formatting")
         sys.exit(1)
