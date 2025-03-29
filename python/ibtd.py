@@ -5,7 +5,7 @@ ibtd.py
 Main module for the Iceberg Beacon Track Database (IBTD).
 
 Defines the class 'Track' containing an individual iceberg track along with methods and properties.
-Defines the class 'Meta' containing the database metadata
+Defines the class 'Meta' containing the track metadata
 Defines the class 'Models' containing beacon model specifications, read in from a table
 Defines the class 'Specs' containing a single beacon model specifications, used for purging bad data
 
@@ -534,7 +534,9 @@ class Track:
             self.reader = "standard"
 
         try:
-            self.model = record.model.iloc[0]
+            self.model = record.model.iloc[
+                0
+            ]  # TODO look at model vs beacon_model for var name
         except:
             self.model = "Default"
 
@@ -667,10 +669,12 @@ class Track:
             (self.data["loc_accuracy"] > self.specs.loc_accuracy_max)
             | (self.data["loc_accuracy"] < self.specs.loc_accuracy_min)
         ].index
-        self.data.drop(drop_index, inplace=True)
-        self.log.info(
-            f"{len(drop_index)} records ({len(drop_index)/len(self.data):.1%}) removed due to unacceptable location accuracy"
-        )
+
+        if len(drop_index) > 0:
+            self.data.drop(drop_index, inplace=True)
+            self.log.info(
+                f"{len(drop_index)} records ({len(drop_index)/len(self.data):.1%}) removed due to unacceptable location accuracy"
+            )
 
         # Drop all rows where datetime_data, latitude or longitude is nan
         self.data.dropna(
@@ -938,6 +942,7 @@ class Track:
                     # date_format='%Y-%m-%d %H:%M:%S', # easy to read natively with Excel/Libre
                     # date_format="%Y-%m-%dT%H:%M:%SZ", # one ISO8601 format
                     date_format="%Y-%m-%dT%H:%M:%S%:z",  # another ISO8601 format (python 3.12 and up)
+                    na_rep="NA",  # Sets no data to NA
                 )
                 self.log.info("Track output as csv file")
             else:
@@ -1181,7 +1186,7 @@ class Track:
 
         project_metadata = [
             "project",
-            "data_owner",
+            "data_contributor",
             "data_contact",
             "data_contact_email",
         ]

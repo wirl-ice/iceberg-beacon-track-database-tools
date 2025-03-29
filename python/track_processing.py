@@ -324,6 +324,7 @@ def track_process(
     interactive=False,
     trim_check=False,
     raw_data=False,
+    meta_verbose=False,
 ):
     """
          Process a raw track: standardize, purge, trim and output.
@@ -428,7 +429,9 @@ def track_process(
             trk.plot_dist(interactive=interactive, path_output=output_path)
 
     # create a trk_meta object:
-    trk_meta = trk.track_metadata(path_output=output_path, meta_export="json")
+    trk_meta = trk.track_metadata(
+        path_output=output_path, meta_export="json", verbose=meta_verbose
+    )
 
     # complete the run.
     log.info("Completed track processing... \n")
