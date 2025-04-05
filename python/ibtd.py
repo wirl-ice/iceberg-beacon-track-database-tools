@@ -736,7 +736,13 @@ class Track:
             )
 
     def speed(self):
-        """Calculate speed, direction, distance and back azimuth between iceberg positions."""
+        """Calculate speed, direction, distance between iceberg positions.
+
+        The speed is rounded to 3 decimal places and direction and distance are rounded
+        to 0 decimal places which is plenty for sig figs. Since they are floating point values, they
+        export like ##.0, implying a precision that does not exist.
+
+        """
         # Ensure rows are sorted by datetime.
         assert self.data[
             "datetime_data"
@@ -752,12 +758,14 @@ class Track:
             self.data["longitude"].tolist(),
             self.data["latitude"].tolist(),
         )
-        ## Note here that no displacement (same lat/lon repeated) yields direction 180
-        ## and distance 0 in the NH.  In SH it is direction 0 and distance 0 which might
-        ## need to be considered if there is SH data.
 
         # Convert azimuth from (-180° to 180°) to (0° to 360°)
         self.data["direction"] = ((self.data["direction"] + 360) % 360).round(2)
+
+        ## Note here that no displacement (same lat/lon repeated) yields direction 180
+        ## and distance 0 in the NH.  In SH it is direction 0 and distance 0 which might
+        ## need to be considered if there is SH data.
+        self.data.loc[self.data["distance"] == 0, "direction"] = np.nan
 
         # Calculate time delta between rows (in seconds)
         time_delta = self.data["datetime_data"].diff().dt.total_seconds()
@@ -767,6 +775,7 @@ class Track:
 
         # Round columns
         # to assess whether there are consecutive duplicate positions, comment these lines
+
         self.data["distance"] = self.data["distance"].round(0)
         self.data["direction"] = self.data["direction"].round(0)
         self.data["speed"] = self.data["speed"].round(3)
@@ -924,6 +933,7 @@ class Track:
         None.
 
         """
+
         if not file_output:
             file_output = self.beacon_id
 

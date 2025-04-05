@@ -117,7 +117,7 @@ def plot_map(track, path_output=".", dpi=300, interactive=False, log=None):
         data=track.data,
         linewidth=0.75,
         edgecolor="black",
-        facecolor="royalblue",
+        color="royalblue",  # this is the closest match to the default colour
         legend=False,
         transform=ccrs.PlateCarree(),
         zorder=3,
@@ -148,9 +148,10 @@ def plot_map(track, path_output=".", dpi=300, interactive=False, log=None):
                 ].iloc[-1],
                 marker="o",
                 ms=8,
-                mfc="g",
+                mfc="lime",
                 mec="k",
                 transform=ccrs.PlateCarree(),
+                zorder=5,
             )
 
         if not pd.isnull(track.track_end):
@@ -167,6 +168,7 @@ def plot_map(track, path_output=".", dpi=300, interactive=False, log=None):
                 mfc="tab:orange",
                 mec="k",
                 transform=ccrs.PlateCarree(),
+                zorder=6,
             )
 
     # plot the very start of the track
@@ -261,7 +263,7 @@ def plot_trim(track, path_output=".", dpi=300, interactive=False, log=None):
             temp_type = "Internal"
             track.data["temperature"] = track.data["temperature_internal"]
             if track.data["temperature_internal"].isnull().all():
-                temp_type = "NA"
+                temp_type = "No"
                 track.data["temperature"] = 0
 
     # the following makes a left aligned window which should match well with any event
@@ -300,18 +302,18 @@ def plot_trim(track, path_output=".", dpi=300, interactive=False, log=None):
         ax=t,
         x="datetime_data",
         y="temperature",
-        label="temperature",
+        label=f"{temp_type} temperature",
         data=track.data,
         errorbar=None,
         color="b",
     )
-    t.set(xlabel=None, ylabel="Temperature (°C)")
+    t.set(xlabel=None, ylabel=f"{temp_type} temperature (°C)")
     t.get_legend().remove()
 
-    if track.data.pressure.notna().any():
+    if track.data["pressure"].notna().any():
         # plot pressure on y axis - only if there is data...
         t2 = t.twinx()
-        t2.set_ylabel("Air pressure (mbar)", color="black", rotation=270, labelpad=15)
+        t2.set_ylabel("Air pressure (hPa)", color="black", rotation=270, labelpad=15)
 
         sns.lineplot(
             ax=t2,
@@ -357,7 +359,7 @@ def plot_trim(track, path_output=".", dpi=300, interactive=False, log=None):
 
     # second axis
     r2 = r.twinx()
-    r2.set_ylabel("Temp. rolling mean (°C)", color="black", rotation=270, labelpad=15)
+    r2.set_ylabel("Temp. rolling std (°C)", color="black", rotation=270, labelpad=15)
 
     sns.lineplot(
         ax=r2,
@@ -438,9 +440,9 @@ def plot_trim(track, path_output=".", dpi=300, interactive=False, log=None):
     # plot the track trimming points so it can be verified before trimming. zorder >> big
     if not track.trimmed:
         if not pd.isnull(track.track_start):
-            t.axvline(track.track_start, linestyle="dashdot", color="g", zorder=100)
-            r.axvline(track.track_start, linestyle="dashdot", color="g", zorder=100)
-            v.axvline(track.track_start, linestyle="dashdot", color="g", zorder=100)
+            t.axvline(track.track_start, linestyle="dashdot", color="lime", zorder=100)
+            r.axvline(track.track_start, linestyle="dashdot", color="lime", zorder=100)
+            v.axvline(track.track_start, linestyle="dashdot", color="lime", zorder=100)
         if not pd.isnull(track.track_end):
             t.axvline(
                 track.track_end, linestyle="dashdot", color="tab:orange", zorder=100
@@ -452,18 +454,11 @@ def plot_trim(track, path_output=".", dpi=300, interactive=False, log=None):
                 track.track_end, linestyle="dashdot", color="tab:orange", zorder=100
             )
 
-    if temp_type == "NA":
-        fig.suptitle(
-            f"{track.beacon_id} temperature not available",
-            fontweight="bold",
-            fontsize=18,
-        )
-    else:
-        fig.suptitle(
-            f"{track.beacon_id} {temp_type} temperature trim plot",
-            fontweight="bold",
-            fontsize=18,
-        )
+    fig.suptitle(
+        f"{track.beacon_id} trim plot",
+        fontweight="bold",
+        fontsize=18,
+    )
 
     # plt.xticks(rotation=45, horizontalalignment="center")
     v.tick_params(axis="x", rotation=45)
@@ -775,9 +770,9 @@ def plot_time(track, path_output=".", dpi=300, interactive=False, log=None):
     # plot the track trimming points so it can be verified before trimming.
     if not track.trimmed:
         if not pd.isnull(track.track_start):
-            t.axvline(track.track_start, linestyle="dashdot", color="g")
-            d.axvline(track.track_start, linestyle="dashdot", color="g")
-            q.axvline(track.track_start, linestyle="dashdot", color="g")
+            t.axvline(track.track_start, linestyle="dashdot", color="lime")
+            d.axvline(track.track_start, linestyle="dashdot", color="lime")
+            q.axvline(track.track_start, linestyle="dashdot", color="lime")
         if not pd.isnull(track.track_end):
             t.axvline(track.track_end, linestyle="dashdot", color="tab:orange")
             d.axvline(track.track_end, linestyle="dashdot", color="tab:orange")

@@ -654,7 +654,7 @@ def cryologger(raw_data_file, log=None):
 
         #  Barometric pressure
         if "pressure_int" in rdf:
-            sdf["pressure"] = rdf["pressure_int"] * 10  # Convert to hPa
+            sdf["pressure"] = rdf["pressure_int"]  # TODO convert units
 
         # Pitch
         if "pitch" in rdf:
