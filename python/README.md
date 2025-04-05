@@ -1,28 +1,33 @@
-# Iceberg Beacon Track Database: Standardization, Visualization and Collation 
+# Iceberg Beacon Track Database: Tools for Track Standardization, Visualization and Collation 
 
-Authors: Derek Mueller, Adam Garbo, Jill Rajewicz, Anna Crawford and Cindy Lopes 
+Authors: Derek Mueller, Adam Garbo, Jill Rajewicz and Anna Crawford
 
-Date: 2025-03-23
+Date: 2025-03-29
 
 ## Introduction
 This Python code ingests raw tracking beacon data, standardizes it to a common format, peforms a number of data cleaning steps and outputs visualization and data products.
 
 ## Python Code
 `track_processing.py`
-* Main Python script that contains functions to process raw beacon trajectory data
-  * Recursively searches through all database folders to identify files to process
+* Script that contains functions to process raw and standardized beacon track data
+  * Works on a single track to 
+  * Can run at the command line on 
   * Selects appropriate conversion function
   * Standardizes data columns
   * Cleans data according to minimum/maximum values
   * Calculates velocity
   * Creates output files
 
-`standardization_functions.py`
-* Contains Python functions to convert specific beacon types. This module is imported by `track_processing.py` and does not work on its own. 
-* Includes the standardized format definition
-* A template exists to add more functions as needed.  
+`ibtb.py`
+* This is the main module that all other scripts rely on
 
-`track_visualization.py` 
+
+`track_readers.py`
+* Contains Python functions to read specific beacon formats and output in a standard format. This module is imported by `ibtd.py` and does not work on its own. 
+* Includes the standardized format definition
+* A template exists to add more reader functions as needed.  
+
+`track_fig.py` 
 * Code to visualize beacon tracks and data. It reads a standardized csv and produces: 
   * a map of the iceberg track: `*_map.png`
   * a graph of variables over time - temperature, displacement and velocity: `*_time.png`
@@ -35,6 +40,9 @@ This Python code ingests raw tracking beacon data, standardizes it to a common f
 
 `rename_folders.py`
 * Can be used to recursively search through the entire database and rename folders as desired
+
+
+  * Recursively searches through all database folders to identify files to process
 
 ## Inputs:
 

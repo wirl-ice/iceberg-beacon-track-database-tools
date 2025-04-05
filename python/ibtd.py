@@ -798,7 +798,9 @@ class Track:
 
         It is important to be careful not to cut out good data.
 
-        The default value here is 5 m/s or 18 kph or 432 km/d (this is very conservative)
+        The default value here is 5 m/s or 18 kph or 432 km/d (this is very conservative
+        to avoid throwing away data - especially for ARGOS beacons. It could easily be set
+        lower for GNSS-based systems - likely 2 m/s would be fine)
 
         Parameters
         ----------
