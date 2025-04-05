@@ -4,9 +4,9 @@
 track_fig.py
 
 Functions to produce visualizations of beacon data after it
-has been ingested, cleaned, and standardized. 
+has been ingested, cleaned, and standardized.
 
-Visualizations include: 
+Visualizations include:
     map - a map of the iceberg track
     time - variables over time - temperature, displacement and velocity
     dist - statistical distributions - polar plot of direction, histogram of speed
@@ -92,6 +92,8 @@ def plot_map(track, path_output=".", dpi=300, interactive=False, log=None):
     # Plot latitude and longitude
     fig = plt.figure(figsize=(10, 10), constrained_layout=True)
     ax = plt.axes(projection=ccrs.Orthographic(x, y), zorder=1)
+
+    # add coast and grid
     ax.add_feature(coast)
     ax.set_adjustable("datalim")
     gl = ax.gridlines(
@@ -108,13 +110,25 @@ def plot_map(track, path_output=".", dpi=300, interactive=False, log=None):
     gl.right_labels = False
     gl.xpadding = 5
 
+    # plot the point data
     sns.scatterplot(
         x="longitude",
         y="latitude",
         data=track.data,
-        linewidth=1,
+        linewidth=0.75,
         edgecolor="black",
+        facecolor="royalblue",
         legend=False,
+        transform=ccrs.PlateCarree(),
+        zorder=3,
+    )
+
+    # plot the line data
+    ax.plot(
+        track.data["longitude"],
+        track.data["latitude"],
+        color="dimgrey",
+        linewidth=0.5,
         transform=ccrs.PlateCarree(),
         zorder=2,
     )
@@ -285,11 +299,35 @@ def plot_trim(track, path_output=".", dpi=300, interactive=False, log=None):
         ax=t,
         x="datetime_data",
         y="temperature",
+        label="temperature",
         data=track.data,
         errorbar=None,
         color="b",
     )
     t.set(xlabel=None, ylabel="Temperature (°C)")
+    t.get_legend().remove()
+
+    if track.data.pressure.notna().any():
+        # plot pressure on y axis - only if there is data...
+        t2 = t.twinx()
+        t2.set_ylabel("Air pressure (mbar)", color="black", rotation=270, labelpad=15)
+
+        sns.lineplot(
+            ax=t2,
+            x="datetime_data",
+            y="pressure",
+            label="pressure",
+            data=track.data,
+            errorbar=None,
+            color="r",
+        )
+
+        handles_t1, labels_t1 = t.get_legend_handles_labels()
+        handles_t2, labels_t2 = t2.get_legend_handles_labels()
+
+        t2.legend(
+            handles_t1 + handles_t2, labels_t1 + labels_t2, loc="upper center"
+        )  # This position avoids overlap with beginning and end of track
 
     # Rolling temperature mean/std plot = r
     r.grid(ls="dotted")
@@ -313,9 +351,15 @@ def plot_trim(track, path_output=".", dpi=300, interactive=False, log=None):
         color="r",
         linestyle="--",
     )
+    r.set(xlabel=None, ylabel="Temp. rolling mean (°C)")
+    r.get_legend().remove()
+
+    # second axis
+    r2 = r.twinx()
+    r2.set_ylabel("Temp. rolling mean (°C)", color="black", rotation=270, labelpad=15)
 
     sns.lineplot(
-        ax=r,
+        ax=r2,
         x="datetime_data",
         y="Tstd5",
         label="5 day std",
@@ -325,7 +369,7 @@ def plot_trim(track, path_output=".", dpi=300, interactive=False, log=None):
         linestyle="-",
     )
     sns.lineplot(
-        ax=r,
+        ax=r2,
         x="datetime_data",
         y="Tstd3",
         label="3 day std",
@@ -334,10 +378,13 @@ def plot_trim(track, path_output=".", dpi=300, interactive=False, log=None):
         color="k",
         linestyle="--",
     )
-    r.legend(
-        loc="upper center"
+
+    handles_r1, labels_r1 = r.get_legend_handles_labels()
+    handles_r2, labels_r2 = r2.get_legend_handles_labels()
+
+    r2.legend(
+        handles_r1 + handles_r2, labels_r1 + labels_r2, loc="upper center"
     )  # This position avoids overlap with beginning and end of track
-    r.set(xlabel=None, ylabel="Temp. rolling (°C)")
 
     # Voltage plot = v
     v.grid(ls="dotted")
@@ -351,7 +398,7 @@ def plot_trim(track, path_output=".", dpi=300, interactive=False, log=None):
         color="g",
     )
     v.set(xlabel=None, ylabel="Battery (V)")
-    plt.xticks(rotation=45, horizontalalignment="center")
+
     v.get_legend().remove()
 
     if track.data.pitch.notna().any():
@@ -417,6 +464,8 @@ def plot_trim(track, path_output=".", dpi=300, interactive=False, log=None):
             fontsize=18,
         )
 
+    # plt.xticks(rotation=45, horizontalalignment="center")
+    v.tick_params(axis="x", rotation=45)
     v.text(
         0,
         -0.61,
