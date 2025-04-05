@@ -196,13 +196,10 @@ class Specs:
         for column in beacon_specs.columns:
             setattr(self, column, beacon_specs[column].iloc[0])
 
-        # now coerce the data to floats, satellites and loc_accuracy are really integers, so try, but skip if NA
+        # now coerce the data to floats, loc_accuracy are really integers, so try, but skip if NA
         specs = beacon_specs.filter(regex="_max|_min")
         specs = specs.astype(float)
-        try:
-            specs = specs.astype({"satellites_max": int, "satellites_min": int})
-        except:
-            pass
+
         try:
             specs = specs.astype({"loc_accuracy_max": int, "loc_accuracy_min": int})
         except:
@@ -650,13 +647,6 @@ class Track:
             "heading",
         ] = np.nan
 
-        # Satellites
-        self.data.loc[
-            (self.data["satellites"] > self.specs.satellites_max)
-            | (self.data["satellites"] < self.specs.satellites_min),
-            "satellites",
-        ] = np.nan
-
         # Battery voltage
         self.data.loc[
             (self.data["voltage"] > self.specs.voltage_max)
@@ -717,7 +707,7 @@ class Track:
         ]  # keep last dup
         if self.raw_data:
             self.log.info(
-                f"There are {len(sdf_dup)} duplicate timestamps in this track to be removed"
+                f"There are {len(sdf_dup)} duplicate timestamps in this track that were removed"
             )
 
         # remove all rows with duplicate times, prefer the one with best location accuracy
@@ -805,18 +795,21 @@ class Track:
         Parameters
         ----------
         threshold : float, optional
-            A threshold, beyond which rows are removed (m/s). The default is 10.
+            A threshold, beyond which rows are removed (m/s). The default is 5.
 
         """
         # needs to be in a loop since if there is a fly-away point, you have going out and coming back
         before = len(self.data)
         while (self.data["speed"] > threshold).any():
+            self.log.info(
+                f'Removing position at {self.data.loc[self.data["speed"] > threshold, "datetime_data"].iloc[0]} due to speed limit violations'
+            )
             self.data.drop(
                 self.data[self.data["speed"] > threshold].index[0], inplace=True
             )
             self.speed()
         self.log.info(
-            f"Removed {before - len(self.data)} rows due to speed limit violations"
+            f"\nRemoved {before - len(self.data)} rows due to speed limit violations"
         )
 
         # reset the index
@@ -842,6 +835,10 @@ class Track:
         track_start and track_end will automatically be moved if bad data are found
         at the start and end of the track.
 
+        Returns
+        -------
+        None.
+
         """
         if self.track_start:
             self.data.drop(
@@ -849,7 +846,7 @@ class Track:
                 inplace=True,
             )
             self.log.info(
-                f"Track start trimmed from {self.data_start} to just before {self.track_start}"
+                f"Track start trimmed from {self.data_start} to at or just before {self.track_start}"
             )
             self.trimmed_start = True
 
@@ -859,7 +856,7 @@ class Track:
                 inplace=True,
             )
             self.log.info(
-                f"Track end trimmed from {self.data_end} to just after {self.track_end}"
+                f"Track end trimmed from {self.data_end} to at or just after {self.track_end}"
             )
             self.trimmed_end = True
 
@@ -1067,7 +1064,6 @@ class Track:
             pitch=("pitch", number_f),
             roll=("roll", number_f),
             heading=("heading", string_f),
-            satellites=("satellites", number_f),
             voltage=("voltage", number_f),
             loc_accuracy=("loc_accuracy", number_f),
             u=("u", number_f),
@@ -1253,8 +1249,6 @@ class Track:
             "roll_max",
             "heading_min",
             "heading_max",
-            "satellites_min",
-            "satellites_max",
             "voltage_min",
             "voltage_max",
             "loc_accuracy_min",

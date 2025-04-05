@@ -178,6 +178,7 @@ def plot_map(track, path_output=".", dpi=300, interactive=False, log=None):
         mfc="r",
         mec="k",
         transform=ccrs.PlateCarree(),
+        zorder=4,
     )
 
     fig.suptitle(

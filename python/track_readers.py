@@ -234,7 +234,6 @@ def standard(raw_data_file, log=None):
         sdf["pitch"] = rdf["pitch"]
         sdf["roll"] = rdf["roll"]
         sdf["heading"] = rdf["heading"]
-        sdf["satellites"] = rdf["satellites"]
         sdf["voltage"] = rdf["voltage"]
         sdf["loc_accuracy"] = rdf["loc_accuracy"]
         sdf["distance"] = rdf["distance"]
@@ -523,9 +522,6 @@ def canatec(raw_data_file, log=None):
         if "BatteryVoltage" in rdf:
             sdf["voltage"] = rdf["BatteryVoltage"]
 
-        if "Satellites" in rdf:
-            sdf["satellites"] = rdf["Satellites"]
-
     except:
         log.error(f"Problem with raw data file {raw_data_file}, check formatting")
         sys.exit(1)
@@ -671,10 +667,6 @@ def cryologger(raw_data_file, log=None):
         # Tilt-compensated heading
         if "heading" in rdf:
             sdf["heading"] = rdf["heading"]
-
-        # GNSS Satellites
-        if "satellites" in rdf:
-            sdf["satellites"] = rdf["satellites"]
 
     except:
         log.error(f"Problem with raw data file {raw_data_file}, check formatting")

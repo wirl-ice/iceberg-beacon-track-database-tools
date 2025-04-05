@@ -41,6 +41,7 @@ def tracklog(beacon_id, path_output, level="DEBUG"):
         An instance of the logger class
 
     """
+
     # create a name for the file
     loggerFileName = f"{beacon_id}.log"
 
@@ -60,7 +61,7 @@ def tracklog(beacon_id, path_output, level="DEBUG"):
         case _:
             loglevel = logging.DEBUG
 
-    # Create a logger instance here - it will be named after the module name (__main__?)
+    # Create a logger instance here - it will be named after the module name
     track_log = logging.getLogger()
 
     # Remove all handlers associated with the logger (avoids duplicates)
@@ -73,7 +74,9 @@ def tracklog(beacon_id, path_output, level="DEBUG"):
     # stream handler - output to the console
     c_handler = logging.StreamHandler()
     # file handler - output to a file
-    f_handler = logging.FileHandler(loggerFileName)
+    # Note that mode = 'w' sets logger to overwrite (not append).
+    # For some applications (testing speed_limit thresholds for example) you may want to change this
+    f_handler = logging.FileHandler(loggerFileName, mode="w")
 
     # this sets the logging level for both handlers:
     c_handler.setLevel(logging.INFO)
