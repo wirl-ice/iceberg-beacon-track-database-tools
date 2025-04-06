@@ -10,9 +10,9 @@ Visualizations include:
     map - a map of the iceberg track
     time - variables over time - temperature, displacement and velocity
     dist - statistical distributions - polar plot of direction, histogram of speed
-    temp - temperature changes (used for checking if beacon is still on target)
+    trim - time series of data that can be used for checking if beacon is still on target
 
-Author: Derek Mueller, July 2024 to Jan 2025, modifying code from Adam Garbo from 2021
+Author: Derek Mueller, July 2024-April 2025, modifying code from Adam Garbo from 2021
 """
 import os
 import logging
@@ -24,7 +24,6 @@ import matplotlib.dates as mdates
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 from collections import namedtuple
-
 
 # turn on the copy-on-write functionality
 pd.options.mode.copy_on_write = True
@@ -52,7 +51,17 @@ def plot_map(track, path_output=".", dpi=300, interactive=False, log=None):
     """
     Create a map of the iceberg track.
 
-    Map is saved as a png, the star indicates the start
+    The map is in orthographic projection, zoomed in to the track extent. A red star
+    indicates the start of the track.  Track points are plotted in blue with a thin grey
+    line underneath.
+
+    The map uses a generic coastline. Some track points are on land apparently but this
+    is due to the resolution of the map (and the retreat of glaciers, sadly).
+
+    This plot can be produced as a png or it can be viewed interactively.
+
+    If the track has been trimmed, there will be a green dot at the trim_start and an
+    orange dot at trim_end.
 
 
     Parameters
@@ -63,7 +72,10 @@ def plot_map(track, path_output=".", dpi=300, interactive=False, log=None):
         Path to save output. The default is ".".
     dpi : int, optional
         Resolution of the graph in dots per inch. The default is 300.
-
+    interactive : bool, optional
+        If true, the plot can be viewed interactively.
+    log : logger
+        A logger instance.
 
     Returns
     -------
@@ -242,19 +254,23 @@ def plot_map(track, path_output=".", dpi=300, interactive=False, log=None):
 
 def plot_trim(track, path_output=".", dpi=300, interactive=False, log=None):
     """
-    Create a graph of the beacon temperature and battery voltage.
+    Create a timeseries graph of data from the beacon to assist in finding trim_start and trim_end.
 
     There are 3 panels:
-        Temperature (of the air, surface or internal, depending on what is available)
-        5 and 3 day rolling mean and standard deviation of temperature
+        1) Temperature (of the air, surface or internal, depending on what is available), the
+        air pressure, if available.
 
-    This is useful for finding the end of the track:
-        When beacons fall off their target into the water, the standard deviation should
-            decrease.  Temperature should approach water temperature (typically decreasing)
+        2) 5 and 3 day rolling mean and standard deviation of temperature.
 
-    Note when beacons are deployed they may still be acclimatizing to ambient conditions.
-    In this scenario, the rolling mean and std are less helpful because their windows are
-    positioned on the left to capture a sudden change.
+        3) Battery voltage along with pitch and roll, if available.
+
+    When beacons fall off their target into the water, the standard deviation of temperature should
+            decrease. Temperature should approach water temperature at the same time
+            (typically decreasing).  The rolling average and std are optimized for
+            determining trim_end, not trim_start (the window is on the left). When beacons
+            are deployed, they may still be acclimatizing to ambient conditions. In this
+            scenario, the rolling mean and std are less helpful because their windows are
+            positioned on the left to capture a sudden change as it occurs.
 
     Parameters
     ----------
@@ -264,6 +280,16 @@ def plot_trim(track, path_output=".", dpi=300, interactive=False, log=None):
         Path to save output. The default is ".".
     dpi : int, optional
         Resolution of the graph in dots per inch. The default is 300.
+    interactive : bool, optional
+        If true, the plot can be viewed interactively.
+    log : logger
+        A logger instance.
+
+
+    This plot can be produced as a png or it can be viewed interactively.
+
+    If the track has not been trimmed, there will be a green vertical line at the
+    trim_start and an orange vertical line at trim_end.
 
     Returns
     -------
@@ -521,6 +547,19 @@ def plot_dist(track, path_output=".", dpi=300, interactive=False, log=None):
     """
     Create a graph of the track's statistical distributions.
 
+    This figure has a histogram for iceberg speed on the left and a polar plot of velocity
+    on the right.  The histogram has bars that are 0.05 m/s wide. It goes up to 2.5 m/s
+    consistently so that tracks can be compared.  If there are positions that exceed this
+    this is written on the graph.  The cumulative histogram is also plotted in blue.  This
+    is also known as an exceedence plot showing the percentage of time the iceberg speed
+    is at or below a given level.
+
+    The polar plot shows speed and direction of the iceberg.  This plot scales with data
+    so cannot be intercompared as easily.
+
+    This figure can be produced as a png or it can be viewed interactively.
+
+
     Parameters
     ----------
     track : track object
@@ -529,6 +568,10 @@ def plot_dist(track, path_output=".", dpi=300, interactive=False, log=None):
         Path to save output. The default is ".".
     dpi : int, optional
         Resolution of the graph in dots per inch. The default is 300.
+    interactive : bool, optional
+        If true, the plot can be viewed interactively.
+    log : logger
+        A logger instance.
 
     Returns
     -------
@@ -671,7 +714,16 @@ def plot_time(track, path_output=".", dpi=300, interactive=False, log=None):
         Distance (scatter plot)
         Speed and direction (quiver)
 
-    TODO: Subsample to a daily timestep?
+    All graphs scale with the data.  The temperature plot is straightforward.  The
+    distance plot shows only up to a certain percentile of the data since this variable
+    is often highly skewed.  The quiver plot is very challenging to scale for all the
+    various tracks. It is at a level that works most of the time.
+
+    This plot can be produced as a png or it can be viewed interactively.
+
+    If the track has been trimmed, there will be a green dot at the trim_start and an
+    orange dot at trim_end.
+
 
     Parameters
     ----------
@@ -681,6 +733,10 @@ def plot_time(track, path_output=".", dpi=300, interactive=False, log=None):
         Path to save output. The default is ".".
     dpi : int, optional
         Resolution of the graph in dots per inch. The default is 300.
+    interactive : bool, optional
+        If true, the plot can be viewed interactively.
+    log : logger
+        A logger instance.
 
     Returns
     -------

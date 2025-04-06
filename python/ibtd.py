@@ -10,15 +10,15 @@ Defines the class 'Models' containing beacon model specifications, read in from 
 Defines the class 'Specs' containing a single beacon model specifications, used for purging bad data
 
 Note that creating an instance of a Track that _is_ in the standard format assumes the track
- has been processed, which means to complete all the steps in a workflow for cleaning,
- standardizing and adding derived data.
+ has been processed, which means all the steps in a workflow for cleaning, standardizing
+ and adding derived data are complete.
 
 The functions to read the various raw_data formats and define the standard format are in track_readers.py
 The functions to plot figures are in track_fig.py
 
-The database itself is created using this code-base.  To (re-)create the database use track_collation.py
+The Database itself is created using this code-base.  To (re-)create the Database use track_collation.py
 
-Author: Derek Mueller Jul 2024-Mar 2025, with contribution from Adam Garbo's code
+Author: Derek Mueller Jul 2024-Apr 2025, with contribution from Adam Garbo's code
 """
 # imports
 import os
@@ -63,6 +63,8 @@ def json_serialize(value):
     """
     Check to see if the value is a type that json can't serialize and, if so, convert it.
 
+    In practice that means converting datetime to string and numpy boolean to regular T/F
+
     Parameters
     ----------
     value : Any variable
@@ -84,27 +86,20 @@ class Models:
     """
     Class that holds info/specifications for all beacon models.
 
-    Currently that is the valid range (min, max) of various sensors but this could be
-    expanded to hold any data related to the model
+    Currently this is the valid range (min, max) of various sensors and some beacon attributes
+    but this could be expanded to hold any data related to the model.
 
 
     """
 
     def __init__(self, model_file, logger=None):
         """
-        Read spec file and create a dataframe.
+        Read beacon specification file and create a dataframe.
 
         Parameters
         ----------
         model_file : str
             Full path to the model_file (*.ods or *.xls or *.xlsx).
-
-        Returns
-        -------
-        model_df : pandas dataframe
-            Specifications for all beacon models.
-        logger: instance of logger class
-            Pass a logger here if you want
 
         """
         if logger is None:
@@ -141,14 +136,14 @@ class Specs:
 
     def load_model_specs(self, model, Models):
         """
-        Read the model spec record for this beacon and write track properties.
+        Read the model specs record for this beacon and write them to track properties.
 
         Parameters
         ----------
         model : str
             The exact name of the beacon model
         Models : Models object
-            An instance of the class Models representing a dataframe of all the model specs.
+            An instance of the class Models representing a dataframe of all the beacon specs.
 
         """
         self.log.debug("Reading model specifications")
@@ -251,6 +246,8 @@ class Track:
 
     This track could be a raw data file or a track that has been processed into a
     the standard format.
+
+    Tracks have many properties and methods for data cleaning and inspection.
     """
 
     def __init__(
@@ -267,14 +264,14 @@ class Track:
         """
         Read the track raw or standardized data.
 
-        Note the default is to read standardized data (which should also be fully processed)
-        If metadata is provided, that info will be used; otherwise properties
+        Note the default is to read standardized data (which assumes it was fully processed)
+        If track metadata is provided, that info will be used; otherwise properties
         will be set from keywords here
 
         Parameters
         ----------
         data_file : str
-            path to the raw data file.
+            path to the raw/standard data file.
         reader : str, optional
             name of the reader function to use. The default is "standard".
         model : str, optional
@@ -284,7 +281,7 @@ class Track:
         trim_end : str, optional
             timestamp to trim the end of the track. The default is None.
         metadata : Meta Class, optional
-            An object of the meta class. The default is None.
+            An object of the Meta class. The default is None.
         raw_data : bool, optional
             Set to true if you are working with raw data.  The default is False.
         logger : logger instance, optional
@@ -304,6 +301,7 @@ class Track:
         self.datafile = data_file
         self.beacon_id = Path(self.datafile).stem
         self.year, self.id = self.beacon_id.split("_")
+
         # raw_data flag
         self.raw_data = raw_data
 
@@ -472,7 +470,7 @@ class Track:
         Parameters
         ----------
         speed : bool, optional
-            If true the refresh_stats will recalculate speed. The default is True.
+            If true refresh_stats will recalculate speed. The default is True.
 
         Returns
         -------
@@ -587,7 +585,7 @@ class Track:
 
         self.log.info(f"Beacon model: {self.model}")
         self.log.info(
-            f"trim_start: {self.trim_start} and trim_end: {self.trim_end} are requested"
+            f"trim_start: {self.trim_start} and trim_end: {self.trim_end} requested"
         )
 
         # convert to datetime and check for errors
@@ -703,7 +701,7 @@ class Track:
         if len(drop_index) > 0:
             self.data.drop(drop_index, inplace=True)
             self.log.info(
-                f"{len(drop_index)} records ({len(drop_index)/len(self.data):.1%}) removed due to unacceptable location accuracy"
+                f"{len(drop_index)} records ({len(drop_index)/len(self.data):.1%}) removed due to unacceptable loc_accuracy."
             )
 
         # Drop all rows where datetime_data, latitude or longitude is nan
@@ -731,7 +729,13 @@ class Track:
         self.refresh_stats()
 
     def sort(self):
-        """Order the track chronologically and remove redundant entries."""
+        """
+        Order the track chronologically and remove redundant entries.
+
+        Some data formats are ordered in reverse, whereas others can have duplicates.
+        This function takes care of these issues.
+
+        """
         # sort by datetime_data, and loc_accuracy if available. The best loc_accuracy is the highest number
         self.data.sort_values(["datetime_data", "loc_accuracy"], inplace=True)
         # look for repeated values
@@ -740,9 +744,7 @@ class Track:
             self.data.duplicated(subset=["datetime_data"], keep="last")
         ]  # keep last dup
         if self.raw_data:
-            self.log.info(
-                f"There are {len(sdf_dup)} duplicate timestamps in this track that were removed"
-            )
+            self.log.info(f"{len(sdf_dup)} rows with duplicate timestamps were removed")
 
         # remove all rows with duplicate times, prefer the one with best location accuracy
         self.data.drop_duplicates(
@@ -820,8 +822,9 @@ class Track:
         Remove gross speeding violations from data.
 
         Note the intent here is to remove only the very worst rows from datasets.  It is
-        a very crude way to cut down on clearly wrong position data.  Note high speeds are
-        due to inaccurate positions, but also inprecise positions over short periods of time.
+        a very crude way to cut down on _clearly wrong_ position data.  Note high speeds are
+        often due to inaccurate positions, but also inprecise positions over short periods
+        of time.
 
         It is important to be careful not to cut out good data.
 
@@ -871,7 +874,6 @@ class Track:
         None.
 
         """
-        # TODO - is it possible to get here without having a trim_start or end?
         if self.trim_start:
             self.data.drop(
                 self.data[self.data["datetime_data"] < self.trim_start].index,
@@ -899,7 +901,14 @@ class Track:
         self.refresh_stats()
 
     def geo(self):
-        """Add a geodataframe of track points and a track line to the track object."""
+        """
+        Add a geodataframe of track points and a track line to the track object.
+
+        This method converts track data into a geospatial points (self.trackpoints) and
+        linestring (self.trackline).
+
+
+        """
         # Convert to GeoPandas dataframe
         self.trackpoints = gpd.GeoDataFrame(
             self.data,
@@ -932,13 +941,13 @@ class Track:
 
         Notes about data formats:
             - the csv file is the output format 'of record'
-            - the gpkg _ln and _pt files are the geospatial format of record. The _pt version
-              has attribut data.  Since the _pt data is a far larger file, it seemed like a good
-              idea to keep _ln and _pt data separate.
+            - the gpkg _ln and _pt files are the recommended geospatial format. The _pt
+              version contains and attribute table. Since the _pt data is a far larger
+              file, it seemed like a good idea to keep _ln and _pt data separate.
             - the kml _ln and _pt files are meant for a quick look only (convienient to view):
                 - there is no fancy symbology in the kml output.
                 - the kml_pt output is restricted to beacon_id and the timestamp.
-
+                - sometimes the kml_pt file loads slowly.
 
         Parameters
         ----------
@@ -946,14 +955,13 @@ class Track:
         path_output : str, optional
             Path to put the output. The default is the current directory
         file_output : str, optional
-            filename of output. The default is None, which will autogenerate on the Beacon ID
+            filename of output. The default is None, which will autogenerate on the beacon_id
 
         Returns
         -------
         None.
 
         """
-
         if not file_output:
             file_output = self.beacon_id
 
@@ -1022,15 +1030,16 @@ class Track:
 
         Timestep can be D for daily or h for hourly or multiples of D or h (eg '7D', '12h')
         After resampling other track properties will be refreshed.
-        Other agg_fuctions might be wanted (max?, min?) but these are not implemented. 
-        One day maybe interpolations? 
-        
-        Since the track data and properies will be overwritten, it is a good idea to make a copy first: 
-            test_track = track
-            test_track.resample(timestep="6h")
-           
-        Note this has not been thoroughly tested! 
-            
+        Other agg_fuctions might be wanted (max?, min?) but these are not implemented.
+        One day maybe there will be interpolations?
+
+        Since the track data and properies will be overwritten, it is a good idea to make
+        a copy first:
+            track_6h = copy.deepcopy(track)
+            track_6h.resample(timestep="6h")
+
+        Note this method has not been thoroughly tested!
+
         Parameters
         ----------
         timestep : str, optional
@@ -1038,9 +1047,10 @@ class Track:
         agg_function : str, optional
             Aggregation function: median, mean, None. The default is None.
         first : bool, optional
-            If agg_fuction is none, or for columns that cannot be aggregated, \
-                take first (True) or last (False) value for the time period. The default is True.
-        
+            If agg_fuction is none, or for columns that cannot be aggregated,
+                take first (True) or last (False) value for the time period. The default
+                is True.
+
         Returns
         -------
         None.
@@ -1111,15 +1121,16 @@ class Track:
         """
         Make a dataframe and dictionary of the known track metadata for export.
 
-        Put metadata into categories. The json is nested but the dataframe is not
+        Put metadata into categories. The json is nested but the dataframe is not.
 
         Parameters
         ----------
+        path_output : str, optional
+            path where the output should be saved.  The default is the current directory.
         meta_export : str, optional
             Specify 'pandas' or 'json' format or 'both'. The default (None) does not export a file.
-            Export to file in working directory.
         verbose : Bool
-            If true, return/export all the metadata, otherwise only most of it
+            If true, return/export all the metadata, otherwise only the most useful.
 
         Returns
         -------
@@ -1263,11 +1274,9 @@ class Track:
             "sorted",
             "speeded",
             "speedlimited",
+            "trimmed",
             "trimmed_start",
             "trimmed_end",
-            "trimmed",
-            "requested_track_start",
-            "requested_track_end",
             "geoed",
         ]
 
@@ -1374,7 +1383,7 @@ class Track:
 
         if meta_export == "pandas" or meta_export == "both":
             track_meta_df.to_csv(
-                f"{Path(path_output)/self.beacon_id}_meta.csv", index=False
+                f"{Path(path_output)/self.beacon_id}_meta.csv", index=False, na_rep="NA"
             )
 
         return track_meta_df
@@ -1386,20 +1395,16 @@ class Track:
         """
         Plot a map of the track.
 
-        See track_fig.py
-        TODO:  configure to add *other_tracks to the plot
+        See track_fig.py for more details.
 
         Parameters
         ----------
-        track : track object
-            Standardized beacon track object.
         path_output : str, optional
-            Path to save output. The default is ".".
+            Path to save output. The default is the current directory.
         dpi : int, optional
             Resolution of the graph in dots per inch. The default is 300.
-        interactive:
-        log : logger object
-            Enter a logger object
+        interactive: bool
+            Create an interactive map that can be panned and zoomed.
 
         Returns
         -------
@@ -1419,19 +1424,16 @@ class Track:
         """
         Plot a trim diagnostic graph for the track.
 
-        See track_fig.py
-        TODO:  configure to add *other_tracks to the plot
+        See track_fig.py for more details.
 
         Parameters
         ----------
-        track : track object
-            Standardized beacon track object.
         path_output : str, optional
-            Path to save output. The default is ".".
+            Path to save output. The default is the current directory.
         dpi : int, optional
             Resolution of the graph in dots per inch. The default is 300.
-        log : logger object
-            Enter a logger object
+        interactive: bool
+            Create an interactive map that can be panned and zoomed.
 
         Returns
         -------
@@ -1451,19 +1453,16 @@ class Track:
         """
         Plot distributions along the track.
 
-        See track_fig.py
-        TODO:  configure to add *other_tracks to the plot
+        See track_fig.py for more details.
 
         Parameters
         ----------
-        track : track object
-            Standardized beacon track object.
         path_output : str, optional
-            Path to save output. The default is ".".
+            Path to save output. The default is the current directory.
         dpi : int, optional
             Resolution of the graph in dots per inch. The default is 300.
-        log : logger object
-            Enter a logger object
+        interactive: bool
+            Create an interactive map that can be panned and zoomed.
 
         Returns
         -------
@@ -1483,19 +1482,16 @@ class Track:
         """
         Plot a timeseries of the track.
 
-        See track_fig.py
-        TODO:  configure to add *other_tracks to the plot
+        See track_fig.py for more details.
 
         Parameters
         ----------
-        track : track object
-            Standardized beacon track object.
         path_output : str, optional
-            Path to save output. The default is ".".
+            Path to save output. The default is the current directory.
         dpi : int, optional
             Resolution of the graph in dots per inch. The default is 300.
-        log : logger object
-            Enter a logger object
+        interactive: bool
+            Create an interactive map that can be panned and zoomed.
 
         Returns
         -------

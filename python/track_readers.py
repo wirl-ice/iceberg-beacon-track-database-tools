@@ -12,15 +12,14 @@ Each function takes the raw data file path/name and puts it into the standardize
 At a minimum, the date/time, latitude and longitude are required.  Other columns are
 optional.
 
-A few variable names are somewhat terse, so here is the definition:
+A few variable names are somewhat terse, so defined here:
     sdf - standard data frame
     rdf - raw data frame
 
 
---
 Created December 2022 by Adam Garbo based on R scripts from Derek Mueller, Cindy
 Lopes, Anna Crawford and Jill Rajewicz
-Rewritten June-July 2024 by Derek Mueller
+Rewritten June-July 2024 by Derek Mueller, and further modified to Apr 2025
 
 """
 
@@ -31,7 +30,6 @@ from pathlib import Path
 import datetime as dt
 from collections import namedtuple
 import re
-
 
 # turn on the copy-on-write functionality
 pd.options.mode.copy_on_write = True
@@ -133,7 +131,7 @@ def create_sdf(nrows):
 
 def dms2dd(string):
     """
-    Extract degrees, minutes and seconds from a string.
+    Convert degrees, minutes and seconds from a string to dd.dddd as float.
 
     Assumes that the format is deg min sec or deg min, or deg.  Never deg sec, etc.
     Also assumes there will be no negative min or sec.
@@ -174,9 +172,7 @@ def dms2dd(string):
     return dd
 
 
-# -----------------------------------------------------------------------------
 # Standardization functions
-# -----------------------------------------------------------------------------
 
 
 def standard(raw_data_file, log=None):
@@ -255,6 +251,8 @@ def calib_argos(raw_data_file, log=None):
     ----------
     raw_data_file : string
         Path to raw data CSV file.
+    log : logger
+        A logger instance.
 
     Returns
     -------
@@ -460,6 +458,8 @@ def canatec(raw_data_file, log=None):
     ----------
     raw_data_file : string
         Path to raw data CSV file.
+    log : logger
+        A logger instance.
 
     Returns
     -------
@@ -537,6 +537,8 @@ def pathfinder_ccore(raw_data_file, log=None):
     ----------
     raw_data_file : string
         Path to raw data CSV file.
+    log : logger
+        A logger instance.
 
     Returns
     -------
@@ -589,6 +591,8 @@ def cryologger(raw_data_file, log=None):
     ----------
     raw_data_file : string
         Path to raw data CSV file.
+    log : logger
+        A logger instance.
 
     Returns
     -------
@@ -654,7 +658,7 @@ def cryologger(raw_data_file, log=None):
 
         #  Barometric pressure
         if "pressure_int" in rdf:
-            sdf["pressure"] = rdf["pressure_int"]  # TODO convert units
+            sdf["pressure"] = rdf["pressure_int"]
 
         # Pitch
         if "pitch" in rdf:
@@ -685,6 +689,8 @@ def iabp(raw_data_file, log=None):
     ----------
     raw_data_file : string
         Path to raw data CSV file.
+    log : logger
+        A logger instance.
 
     Returns
     -------
@@ -758,6 +764,8 @@ def globalstar(raw_data_file, log=None):
     ----------
     raw_data_file : string
         Path to raw data CSV file.
+    log : logger
+        A logger instance.
 
     Returns
     -------
@@ -831,6 +839,8 @@ def oceanetic(raw_data_file, log=None):
     ----------
     raw_data_file : string
         Path to raw data CSV file.
+    log : logger
+        A logger instance.
 
     Returns
     -------
@@ -889,6 +899,8 @@ def ceos(raw_data_file, log=None):
     ----------
     raw_data_file : string
         Path to raw data CSV file.
+    log : logger
+        A logger instance.
 
     Returns
     -------
@@ -947,6 +959,8 @@ def wirl_sbd(raw_data_file, log=None):
     ----------
     raw_data_file : string
         Path to raw data CSV file.
+    log : logger
+        A logger instance.
 
     Returns
     -------
@@ -1024,6 +1038,8 @@ def rockstar(raw_data_file, log=None):
     ----------
     raw_data_file : string
         Path to raw data CSV file.
+    log : logger
+        A logger instance.
 
     Returns
     -------
@@ -1110,6 +1126,8 @@ def solara(raw_data_file, log=None):
     ----------
     raw_data_file : string
         Path to raw data CSV file.
+    log : logger
+        A logger instance.
 
     Returns
     -------
@@ -1163,7 +1181,7 @@ def metocean(raw_data_file, log=None):
     - SVP-I-BXGS-LP beacons have BP, GPS, and SST
     - SVP-I-XXGS-LP beacons have GPS and SST, no BP
     - SVP-I-BXGSA-L-AD beacons have BP, GPS, SST, AT, lithium battery and are
-    designed for air deployment in Arctic regions
+        designed for air deployment in Arctic regions
 
     Note that variable names are slightly different so lots of if/else blocks
 
@@ -1171,6 +1189,8 @@ def metocean(raw_data_file, log=None):
     ----------
     raw_data_file : string
         Path to raw data CSV file.
+    log : logger
+        A logger instance.
 
     Returns
     -------
@@ -1328,6 +1348,8 @@ def bio(raw_data_file, log=None):
     ----------
     raw_data_file : string
         Path to raw data CSV file.
+    log : logger
+        A logger instance.
 
     Returns
     -------
@@ -1389,6 +1411,8 @@ def navidatum(raw_data_file, log=None):
     ----------
     raw_data_file : string
         Path to raw data CSV file.
+    log : logger
+        A logger instance.
 
     Returns
     -------
@@ -1439,7 +1463,9 @@ def fn_template(raw_data_file, log=None):
     ----------
     raw_data_file : string
         Path to raw data CSV file.
-
+    log : logger
+        A logger instance.
+        
     Returns
     -------
     sdf : Pandas DataFrame

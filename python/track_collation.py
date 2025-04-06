@@ -60,6 +60,16 @@ def combine_data(indir, outdir, run_name):
     alltrack_data : GeoPandas.GeoDataFrame
         A geodatafame of all the track points and attributes.
 
+    Example
+    -------
+    Scan the processed data directory, combine all tracks, and save outputs with basename "ibtd_v1"
+    combined_data = combine_data("/path/to/processed_tracks", "/path/to/output", "ibtd_v1")
+
+    This will create:
+    - /path/to/output/ibtd_v1.csv (all track points)
+    - /path/to/output/ibtd_v1_pt.gpkg (geopackage of track points)
+    - /path/to/output/ibtd_v1_ln.gpkg (geopackage of track lines)
+
     """
     alltrack_data = pd.DataFrame()
     for root, dirs, files in os.walk(indir):
@@ -113,14 +123,14 @@ def file_mover(src, dest, ext, levelup=0, copy=True):
     """
     Move files of a certain type to a new directory, and optionally simplify the tree.
 
-    Note that you cannot have the dest directory inside the src directory
+    Note that you cannot have the dest directory inside the src directory.
 
-    Defaults to copy for safety
-    levelup =0 for the same dir structure as the source folder
-    levelup =1 for putting files from all tracks together by year
-    levelup =2 for putting files from all tracks in the same folder
+    Levelup is used to simpliy the directory structure:
+    levelup =0 put files in the same dir structure as the source folder (<dest>/year/track/track_file)
+    levelup =1 put files from all tracks together by year (<dest>/year/track_files)
+    levelup =2 put files from all tracks in the same dest folder (<dest>/track_files)
 
-    Warning: No clobber protection
+    Warning: No clobber protection. Defaults to copy (not move) for safety.
 
     Parameters
     ----------
@@ -132,9 +142,6 @@ def file_mover(src, dest, ext, levelup=0, copy=True):
         File extension to match (e.g., '.png', '.csv' or even 'map.png', etc)
     levelup : int, optional
         Number of directory levels to move up when recreating structure.
-        0 = maintain exact structure
-        1 = move files up one directory level
-        2 = move files up two directory levels
         The default is 0.
     copy : bool, optional
         If True, copy files instead of moving them. The default is True
@@ -179,6 +186,14 @@ def file_mover(src, dest, ext, levelup=0, copy=True):
 def database_stats(ibtd_df, metadata, modeldata, run_name, outdir):
     """
     Output summary statistics, tables and figure about the Database for reporting.
+
+    In particular, draft (unformatted) tables are ouptut for the Documentation along with
+    a map of all the tracks.
+
+    -"Tracks contributed to the Database by organization"
+    -"Tracks by source of iceberg in the Database"
+    -"Beacon model characteristics and number of tracks"
+    -"Iceberg drift tracks in the Iceberg Beacon Track Database version 1"
 
     Parameters
     ----------
@@ -589,9 +604,10 @@ def main():
                         output_types=["csv", "pt_kml", "ln_kml", "pt_gpkg", "ln_gpkg"],
                         output_plots=["trim", "map", "dist", "time"],
                         interactive=False,  # set to False unless you have nothing better to do today
-                        raw_data=True,  # set to True for database assembly
-                        trim_check=False,  # set to False for database assembly
-                        meta_verbose=True,  # set to False for database assembly
+                        raw_data=True,  # set to True for database collation
+                        trim_check=False,  # set to False for database collation
+                        meta_verbose=True,  # set to True for database collation
+                        meta_export="json",
                     )
 
                     # add track metadata to the dataframe of all metadata

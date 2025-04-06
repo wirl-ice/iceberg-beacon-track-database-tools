@@ -22,9 +22,12 @@ from pathlib import Path
 from ibtd import Track, Meta, Models, nolog
 
 
-def tracklog(beacon_id, path_output, level="DEBUG"):
+def tracklog(beacon_id, path_output, level="INFO"):
     """
-    Set up the logging.
+    Set up logging.
+
+    The level is the standard logging levels with DEBUG being the most verbose, INFO
+    being the recommended level and WARNING capturing only bad news.
 
     Parameters
     ----------
@@ -33,7 +36,7 @@ def tracklog(beacon_id, path_output, level="DEBUG"):
     path_output : str
         path to the output file
     level : str, optional
-        the logging level for the file. The default is "DEBUG".
+        the logging level for the file. The default is "INFO".
 
     Returns
     -------
@@ -41,27 +44,22 @@ def tracklog(beacon_id, path_output, level="DEBUG"):
         An instance of the logger class
 
     """
-
     # create a name for the file
     loggerFileName = f"{beacon_id}.log"
 
     # add full path here so it goes to the right place
     loggerFileName = os.path.join(path_output, loggerFileName)
 
-    # assign the log level here, defaults to DEBUG, note there is no CRITICAL level
+    # assign the log level here, defaults to INFO, note there is no ERROR or CRITICAL level
     match level.lower():
         case "debug":
             loglevel = logging.DEBUG
-        case "info":
-            loglevel = logging.INFO
         case "warning":
             loglevel = logging.WARNING
-        case "error":
-            loglevel = logging.ERROR
         case _:
-            loglevel = logging.DEBUG
+            loglevel = logging.INFO
 
-    # Create a logger instance here - it will be named after the module name
+    # Create a logger instance here
     track_log = logging.getLogger()
 
     # Remove all handlers associated with the logger (avoids duplicates)
@@ -97,18 +95,51 @@ def tracklog(beacon_id, path_output, level="DEBUG"):
 
 def read_args():
     """
-    Read arguments from command line, checks them, reads certain files.
+    Read arguments from command line, checks them, reads some files.
 
     This function facilitates the command line operation of the workflow. Note that most
     of the arguments are not required, since they have defaults. There are some choices:
-        The user can specify the reader, beacon model, track start and end times for trimming,
+        The user can specify the reader, beacon model, trim start and end times (for trimming),
         or leave them blank (which may limit what steps can be accomplished),
-        or provide the path to the metadata file.  If the metdata file is present, the
-        arguments mentioned above will be overwritten.
+        or they can provide the path to the track metadata file. If this file is present, the
+        keywords mentioned above will be overwritten.
 
     Returns
     -------
-    a list of the arguments in order
+    list
+    A list containing the following arguments in order:
+    - data_file : str
+        Path to the track data file.
+    - output_path : str
+        Directory path where output files will be written.
+    - metadata : Meta object or None
+        Metadata object containing track information if provided.
+    - reader : str
+        Name of the reader function to use.
+    - model : str
+        Beacon model name.
+    - specs : Models object or None
+        Object containing model specifications if provided.
+    - trim_start : str or None
+        Timestamp to trim the start of the track in UTC format.
+    - trim_end : str or None
+        Timestamp to trim the end of the track in UTC format.
+    - output_name : str or None
+        Name for the output file.
+    - output_types : list or None
+        List of output file types to produce.
+    - output_plots : list or None
+        List of plot types to generate.
+    - interactive : bool
+        Whether to create interactive plots.
+    - trim_check : bool
+        Whether to check trim points without applying trimming.
+    - raw_data : bool
+        Whether the input is raw data (not standardized).
+    - meta_export : str or None
+        Format for metadata export ('pandas', 'json', or 'both').
+    - quiet : bool
+        Whether to suppress logging output.
 
     """
     prog_description = """Beacon track processing functions
@@ -118,21 +149,22 @@ def read_args():
         - -r (--reader) will be ignored and reader listed in the meta_file will be ignored
         - -m (--model) will be ignored
         - -sf (--spec_file) will be ignored
-        - track can be re-trimmed as required
+        - track can be re-trimmed as required (be sure to add -s and -e values)
         - file and plot outputs can be requested
         
     For reading-in, standardizing and cleaning raw data: 
         - include the -rd (--raw_data) flag 
-        - the reader must be specified (-r or listed in the meta_file -mf)
-        - trimming (trim_start and/or trim_end) must be listed or in meta_file
+        - the reader must be specified (-r or listed in the track metadata file -mf)
+        - trimming (trim_start and/or trim_end) must be listed (-s -e) or track metadata file
         - file and plot outputs can be requested
     
-    Example: read standard data file 2021_300434065868240.csv and output a map in the current directory: 
-        >python track_processing.py 2021_300434065868240.csv . -2011-08-08 13:00:00 2011-08-12 21:00:00 -op map
+    Example: read standard data file 2021_300434065868240.csv, trim it to a 4 day sub-section 
+        and output a map and a csv file in the current directory: 
+        >python track_processing.py 2021_300434065868240.csv . -s '2021-08-22 13:00:00' -e '2021-08-26 21:00:00' -op map -ot
 
-    Example: read standard data file 2011_300234010031950.csv, trim it and output a map, time plot and kml 
-    in the parent directory:     
-        >python track_processing.py 2011_300234010031950.csv .. -s '2011-08-08 13:00:00' -e '2011-08-12 21:00:00' -op map time -ot ln_kml
+    Example: read standard data file 2011_300234010031950.csv, output a map, timeseries 
+    plot and kml in the parent directory:     
+        >python track_processing.py 2011_300234010031950.csv .. -op map time -ot ln_kml
 
     For more info see github readme.
         
@@ -145,6 +177,7 @@ def read_args():
     parser.add_argument(
         "output_path", help="enter the path to write the output file to"
     )
+
     # These keywords are not obligatory.
     parser.add_argument(
         "-r",
@@ -194,25 +227,23 @@ def read_args():
         "--output_name",
         type=str,
         default=None,
-        help="the name of the standardized fully processed track file",
+        help="the name of the standardized fully processed track file: defaults to beacon_id",
     )
     parser.add_argument(
         "-ot",
         "--output_types",
         type=str,
-        default="csv",
         nargs="+",
         choices={"csv", "pt_kml", "ln_kml", "pt_gpkg", "ln_gpkg"},
-        help="list the output types to produce:  ; defaults to producing csv only",
+        help="list the output types to produce",
     )
     parser.add_argument(
         "-op",
         "--output_plots",
         type=str,
-        default="map",
         nargs="+",
         choices={"map", "time", "dist", "trim"},
-        help="list the output plots to produce; defaults to producing map only",
+        help="list the output plots to produce",
     )
     parser.add_argument(
         "-i",
@@ -224,13 +255,20 @@ def read_args():
         "-t",
         "--trim_check",
         action="store_true",
-        help="set -t to check where the trim points _would be_ on the map and trim plot; defaults to false",
+        help="set -t to check where the trim points _would be_ on the map, time and \
+            trim plot; defaults to false",
     )
     parser.add_argument(
         "-rd",
         "--raw_data",
         action="store_true",
-        help="set -rd to work with raw data; defaults to false",
+        help="set -rd to work with raw data (not standard); defaults to false",
+    )
+    parser.add_argument(
+        "-me",
+        "--meta_export",
+        help="Specify whether to export metadata in the current directory in 'pandas' \
+            or 'json' format or 'both'. The default (None) does not export a file.",
     )
     parser.add_argument(
         "-q",
@@ -256,9 +294,11 @@ def read_args():
     interactive = args.interactive
     trim_check = args.trim_check
     raw_data = args.raw_data
+    meta_export = args.meta_export
     quiet = args.quiet
 
     # some attempt at error trapping early on....
+    # TODO use a more elegant approach (assert is a bit abrupt for common errors)
     assert os.path.isfile(
         data_file
     ), f"Data file: {data_file} was not found. Please check and run again"
@@ -308,6 +348,7 @@ def read_args():
         interactive,
         trim_check,
         raw_data,
+        meta_export,
         quiet,
     ]
 
@@ -322,53 +363,58 @@ def track_process(
     trim_start=None,
     trim_end=None,
     output_name=None,
-    output_types=["csv"],
+    output_types=None,
     output_plots=None,
     interactive=False,
     trim_check=False,
     raw_data=False,
+    meta_export=None,
     meta_verbose=False,
 ):
     """
-         Process a raw track: standardize, purge, trim and output.
+    Process a raw track: standardize, purge, trim and output.
 
-        Parameters
-        ----------
-        data_file : str
-            DESCRIPTION.
-        output_path : str
-            DESCRIPTION.
-        metadata : str, optional
-            DESCRIPTION. The default is None.
-        reader : TYPE, optional
-            DESCRIPTION. The default is None.
-        model : TYPE, optional
-            DESCRIPTION. The default is None.
-        specs : TYPE, optional
-            DESCRIPTION. The default is None.
-        trim_start : TYPE, optional
-            DESCRIPTION. The default is None.
-        trim_end : TYPE, optional
-            DESCRIPTION. The default is None.
-        output_name : TYPE, optional
-            DESCRIPTION. The default is None.
-        output_types : TYPE, optional
-            DESCRIPTION. The default is ["csv"].
-        output_plots : TYPE, optional
-            DESCRIPTION. The default is None.
-        interactive : TYPE, optional
-            DESCRIPTION. The default is False.
-        trim_check : TYPE, optional
-            DESCRIPTION. The default is False.
-        raw_data : TYPE, optional
-            DESCRIPTION. The default is False.
+    Parameters
+    ----------
+    data_file : str
+        Path to the track data file to be processed.
+    output_path : str
+        Path where output files will be written.
+    metadata : Meta object, optional
+        Metadata object containing track information. The default is None.
+    reader : str, optional
+        Name of the reader function to use. The default is None.
+    model : str, optional
+        Beacon model name. The default is None.
+    specs : Models object, optional
+        Object containing model specifications. The default is None.
+    trim_start : str, optional
+        Timestamp to trim the start of the track in UTC format. The default is None.
+    trim_end : str, optional
+        Timestamp to trim the end of the track in UTC format. The default is None.
+    output_name : str, optional
+        Name for the output file. The default (None) will result in naming based on beacon_id.
+    output_types : list, optional
+        List of output file types to produce. The default is None.
+    output_plots : list, optional
+        List of plot types to generate. The default is None.
+    interactive : bool, optional
+        Whether to create interactive plots. The default is False.
+    trim_check : bool, optional
+        Whether to check trim points without applying trimming. The default is False.
+    raw_data : bool, optional
+        Whether the input is raw data (not standardized). The default is False.
+    meta_export : str, optional
+        Format for metadata export ('pandas', 'json', or 'both'). The default is None.
+    meta_verbose : bool, optional
+        Whether to include verbose metadata. The default is False.
 
-    TODO add meta output
-        Returns
-        -------
-        None.
-
+    Returns
+    -------
+    trk_meta : pandas Dataframe
+        Track metadata (one row) in a dataframe.
     """
+
     log = logging.getLogger()
     log.info(f"\n~Processing {Path(data_file).stem}....\n")
 
@@ -391,7 +437,7 @@ def track_process(
             data_file,
             reader="standard",
             model=model,
-            trim_start=trim_start,  # TODO not sure what to do here
+            trim_start=trim_start,
             trim_end=trim_end,
             logger=log,
         )  # this is not raw data
@@ -403,6 +449,8 @@ def track_process(
     # note that the steps purge, trim, sort, speed, and speed_limit are for raw data
     # if you have standard data, it is possible to trim it to a specific period, as desired
     # the script runs sort, speed and speed_limit regardless (doesn't take much time/ can't hurt)
+    # if you want to refine the speedlimit, then that can be done by adding a new limit here
+    # like: trk.speed_limit(1.5)
 
     if (
         specs and raw_data
@@ -431,9 +479,9 @@ def track_process(
         if "dist" in output_plots:
             trk.plot_dist(interactive=interactive, path_output=output_path)
 
-    # create a trk_meta object:
+    # create a trk_meta pandas dataframe:
     trk_meta = trk.track_metadata(
-        path_output=output_path, meta_export="json", verbose=meta_verbose
+        path_output=output_path, meta_export=meta_export, verbose=meta_verbose
     )
 
     # complete the run.
@@ -458,6 +506,7 @@ def main():
         interactive,
         raw_data,
         trim_check,
+        meta_export,
         quiet,
     ) = read_args()
 
@@ -481,6 +530,7 @@ def main():
         interactive,
         raw_data,
         trim_check,
+        meta_export,
     )
 
 
