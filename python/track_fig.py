@@ -124,6 +124,32 @@ def plot_map(track, path_output=".", dpi=300, interactive=False, log=None):
         zorder=3,
     )
 
+    # this code will plot data where speed > a threshold in red so it can be visualized
+    # hard-coding and commenting it out
+    # sns.scatterplot(
+    #     x="longitude",
+    #     y="latitude",
+    #     data=track.data.loc[track.data.speed > 2.0],
+    #     linewidth=0.75,
+    #     edgecolor="tab:orange",
+    #     color="tab:orange",
+    #     legend=False,
+    #     transform=ccrs.PlateCarree(),
+    #     zorder=4,
+    # )
+
+    # sns.scatterplot(
+    #     x="longitude",
+    #     y="latitude",
+    #     data=track.data.loc[track.data.speed > 2.5],
+    #     linewidth=0.75,
+    #     edgecolor="red",
+    #     color="red",
+    #     legend=False,
+    #     transform=ccrs.PlateCarree(),
+    #     zorder=5,
+    # )
+
     # plot the line data
     ax.plot(
         track.data["longitude"],
@@ -152,7 +178,7 @@ def plot_map(track, path_output=".", dpi=300, interactive=False, log=None):
                 mfc="lime",
                 mec="k",
                 transform=ccrs.PlateCarree(),
-                zorder=5,
+                zorder=18,
             )
 
         if not pd.isnull(track.trim_end):
@@ -169,7 +195,7 @@ def plot_map(track, path_output=".", dpi=300, interactive=False, log=None):
                 mfc="tab:orange",
                 mec="k",
                 transform=ccrs.PlateCarree(),
-                zorder=6,
+                zorder=19,
             )
 
     # plot the very start of the track
@@ -181,7 +207,7 @@ def plot_map(track, path_output=".", dpi=300, interactive=False, log=None):
         mfc="r",
         mec="k",
         transform=ccrs.PlateCarree(),
-        zorder=4,
+        zorder=100,
     )
 
     fig.suptitle(
