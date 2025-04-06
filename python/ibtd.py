@@ -151,7 +151,7 @@ class Specs:
             An instance of the class Models representing a dataframe of all the model specs.
 
         """
-        self.log.info("Reading model specifications")
+        self.log.debug("Reading model specifications")
 
         default_specs = Models.df.loc[Models.df.model == "Default"]
         beacon_specs = Models.df.loc[Models.df.model == model]
@@ -232,6 +232,8 @@ class Meta:
             logger = nolog()
         self.log = logger
 
+        self.log.debug(f"Initializing Meta instance from {meta_file}")
+
         self.meta_file = meta_file
 
         try:
@@ -256,8 +258,8 @@ class Track:
         data_file,
         reader="standard",
         model=None,
-        track_start=None,
-        track_end=None,
+        trim_start=None,
+        trim_end=None,
         metadata=None,
         raw_data=False,
         logger=None,
@@ -277,10 +279,10 @@ class Track:
             name of the reader function to use. The default is "standard".
         model : str, optional
             name of the beacon model. The default is None.
-        track_start : str, optional
-            Datetime to trim the start of the track. The default is None.
-        track_end : str, optional
-            Datetime to trim the end of the track. The default is None.
+        trim_start : str, optional
+            timestamp to trim the start of the track. The default is None.
+        trim_end : str, optional
+            timestamp to trim the end of the track. The default is None.
         metadata : Meta Class, optional
             An object of the meta class. The default is None.
         raw_data : bool, optional
@@ -297,8 +299,12 @@ class Track:
             logger = nolog()
         self.log = logger  # a log instance is now part of the class
 
+        self.log.debug(f"Initializing track instance from {data_file}")
+
         self.datafile = data_file
         self.beacon_id = Path(self.datafile).stem
+        self.year, self.id = self.beacon_id.split("_")
+        # raw_data flag
         self.raw_data = raw_data
 
         self.log.info(f"~Starting to process beacon {self.beacon_id}......")
@@ -307,8 +313,8 @@ class Track:
         if metadata == None:
             self.reader = reader
             self.model = model
-            self.track_start = track_start
-            self.track_end = track_end
+            self.trim_start = trim_start
+            self.trim_end = trim_end
 
         else:
             self.load_metadata(metadata)
@@ -340,29 +346,70 @@ class Track:
             )
 
         # make sure these datetimes convert ok
-        if self.track_start:
+        if self.trim_start:
             try:
-                self.track_start = pd.to_datetime(self.track_start, utc=True)
+                self.trim_start = pd.to_datetime(self.trim_start, utc=True)
             except:
-                self.log.error("Unrecognized track start format")
-                raise Exception("Check track start value")
-        if self.track_end:
+                self.log.error("Unrecognized trim start format")
+                raise Exception("Check trim start value")
+
+        if self.trim_end:
             try:
-                self.track_end = pd.to_datetime(self.track_end, utc=True)
+                self.trim_end = pd.to_datetime(self.trim_end, utc=True)
             except:
                 self.log.error("Unrecognized track end format")
                 raise Exception("Check track end value")
 
-        # Save these values as a backup.  They need to be preserved for data custody purposes
-        self.requested_track_start = self.track_start
-        self.requested_track_end = self.track_end
-
-        # This captures the data file start and end - it does not necessarily relate to the track start/end.
+        # This captures the data file start and end
+        # note that this value *may* not match the actual file data since some reader functions
+        # remove bad data beforehand
+        # The data_start and _end won't change from here on.
         self.data_start = self.data.datetime_data.min()
         self.data_end = self.data.datetime_data.max()
-        # checks to see that the track_start and track_end are within the data limits
-        self.reset_track_limits()
 
+        # in case the trim_start or trim_end is not set, set it to the widest range possible
+        # report the difference between the data_start/end and the trim_start/end
+        if self.trim_start == None:
+            self.trim_start = self.data.datetime_data.min()
+            self.log.warning(
+                "trim_start not specified, the track_start was set to the time of the first valid data point (data_start)"
+            )
+        else:
+            delta = self.trim_start - self.data.datetime_data.min()
+            if delta.total_seconds() < 0:
+                self.log.info(
+                    f"trim_start was set to {abs(delta)} before the first valid data point (data_start)"
+                )
+            elif delta.total_seconds() == 0:
+                self.log.info(
+                    "trim_start was set exactly to the first valid data point (data_start)"
+                )
+            else:
+                self.log.info(
+                    f"trim_start was set to {delta} after the first valid data point (data_start)"
+                )
+
+        if self.trim_end == None:
+            self.trim_end = self.data.datetime_data.max()
+            self.log.warning(
+                "trim_end not specified, the track_end was set to the time of the last valid data point (data_end)"
+            )
+        else:
+            delta = self.trim_end - self.data.datetime_data.max()
+            if delta.total_seconds() < 0:
+                self.log.info(
+                    f"trim_end was set to {abs(delta)} before the last valid data point (data_end)"
+                )
+            elif delta.total_seconds() == 0:
+                self.log.info(
+                    "trim_end was set exactly to the last valid data point (data_end)"
+                )
+            else:
+                self.log.info(
+                    f"trim_end was set to {delta} after the last valid data point (data_end)"
+                )
+
+        # These will be added later - after track is geod.
         self.trackpoints = None
         self.trackline = None
 
@@ -375,15 +422,16 @@ class Track:
         self.geoed = False
 
         # if the reader is standard then assume this has been done previously.
-        if self.reader == "standard":
+        # if you want to re-process data set the reader to standard and the raw_data to True
+        if self.reader == "standard" and not self.raw_data:
             self.purged = True
             self.sorted = True
             self.speeded = True
             self.speedlimited = True
             self.trimmed = True
 
-        # generate stats
-        self.stats()
+        # refresh track limits and track stats.
+        self.refresh_stats()
 
         # make room for beacon specs that could be associated with this track later
         self.specs = Specs(logger=self.log)
@@ -396,27 +444,60 @@ class Track:
                 f"Standard data read-in with {self.observations} rows of valid data from {self.data_start} to {self.data_end}"
             )
 
-    def stats(self):
+    def refresh_stats(self, speed=True):
         """
-        Calculate key track properties.
+        Refresh track limits, stats, speed calcs and geodata.
 
-        Note that this method should be run after processing steps that may affect the data
+        Do this after any changes in the dataframe. If you are running this after the speed
+        function set speed=False or it will loop forever.
+
+        1) Ensure track_start and track_end represent the current range of valid track data.
+
+        Also, in theory the trim_start should not be << data_start and the trim_end should
+        not be >> data_end.  If that is so, warn about this in the log.
+
+        This could be due to an operator error (trim value for the wrong track for example)
+        But this does not necessarily mean there is an issue! This can happen when the
+        beacon is deployed but not activated or when data at the start or end of the
+        track is deemed non-valid by various cleaning functions.
+
+        2) Rerun the speed method which calculates the speed, distance and bearing between positions
+
+        3) Recreate the geospatial tracklines and trackpoints for the track
+
+        4) Calculate the observations, duration and distance of track
+
+        Be sure to run this after all cleaning steps after sorting the data.
+
+        Parameters
+        ----------
+        speed : bool, optional
+            If true the refresh_stats will recalculate speed. The default is True.
 
         Returns
         -------
         None.
 
         """
+        self.log.debug("Refreshing track stats")
+
+        # now set the track range
+        self.track_start = self.data.datetime_data.min()
+        self.track_end = self.data.datetime_data.max()
+
+        # reset the index
+        self.data.reset_index(drop=True, inplace=True)
+
+        # recalculate the speed and displacement
+        if self.speeded and speed:
+            self.speed()
+        # self.speed_limit() # Assuming this is not needed here but leaving comment to flag this step
+        # if you have geospatial data, it must be recreated
+        if self.geoed:
+            self.geo()
+
         # populate some simple properties that all tracks have
-        # self.beacon_id = self.data.beacon_id.iloc[0]
-        self.year, self.id = self.beacon_id.split("_")
-        if self.trimmed:
-            try:  # this will work if the track_start and track_end are in metadata
-                duration = self.track_end - self.track_start
-            except:  # otherwise this should be ok (standardized data for example)
-                duration = self.data_end - self.data_start
-        else:
-            duration = self.data_end - self.data_start
+        duration = self.track_end - self.track_start
         self.duration = round(duration.days + duration.seconds / (24 * 60 * 60), 2)
         self.observations = len(self.data.index)
 
@@ -437,47 +518,6 @@ class Track:
             self.distance = round(self.data["distance"].sum() / 1000, 2)
         else:
             self.distance = None
-
-    def reset_track_limits(self):
-        """
-        Check to make sure that the track_start and track_end are valid.
-
-        The track_start should not be < data_start and the track_end should not be >
-        data_end.  If that is so, reset the track limits and log the issue.
-
-        This can happen when data at the start or end of the track is rejected by
-        various cleaning functions.
-
-        Run this after all cleaning steps after sorting the data.
-
-        Returns
-        -------
-        None.
-
-        """
-        if self.track_start == None:
-            self.track_start = self.data.datetime_data.min()
-            self.log.warning(
-                "The track_start was set to the time of the earliest good data point"
-            )
-
-        if self.track_end == None:
-            self.track_end = self.data.datetime_data.max()
-            self.log.warning(
-                "The track_end was set to the time of the last good data point"
-            )
-
-        if self.track_start < self.data.datetime_data.min():
-            self.track_start = self.data.datetime_data.min()
-            self.log.warning(
-                "The track_start was reset to the time of the earliest good data point"
-            )
-
-        if self.track_end > self.data.datetime_data.max() or self.track_end == None:
-            self.track_end = self.data.datetime_data.max()
-            self.log.warning(
-                "The track_end was reset to the time of the last good data point"
-            )
 
     def load_model_specs(self, Models):
         """
@@ -509,7 +549,7 @@ class Track:
             An instance of the class Meta representing a dataframe of metadata.
 
         """
-        self.log.info("Reading track metadata from file")
+        self.log.info("Reading track metadata")
         # filter records to find the data for this beacon
         record = Meta.df.loc[Meta.df.beacon_id == self.beacon_id]
 
@@ -531,37 +571,37 @@ class Track:
             self.reader = "standard"
 
         try:
-            self.model = record.model.iloc[
-                0
-            ]  # TODO look at model vs beacon_model for var name
+            self.model = record.model.iloc[0]
         except:
             self.model = "Default"
 
         try:
-            self.track_start = record.track_start.iloc[0]
+            self.trim_start = record.trim_start.iloc[0]
         except:
-            self.track_start = None
+            self.trim_start = None
 
         try:
-            self.track_end = record.track_end.iloc[0]
+            self.trim_end = record.trim_end.iloc[0]
         except:
-            self.track_end = None
+            self.trim_end = None
 
         self.log.info(f"Beacon model: {self.model}")
-        self.log.info(f"Track start: {self.track_start} and end: {self.track_end}")
+        self.log.info(
+            f"trim_start: {self.trim_start} and trim_end: {self.trim_end} are requested"
+        )
 
         # convert to datetime and check for errors
-        if self.track_start:
+        if self.trim_start:
             try:
-                self.track_start = pd.to_datetime(self.track_start, utc=True)
+                self.trim_start = pd.to_datetime(self.trim_start, utc=True)
             except:
                 self.log.error(
                     "Unrecognized track start format - trimming will not work as expected"
                 )
 
-        if self.track_end:
+        if self.trim_end:
             try:
-                self.track_end = pd.to_datetime(self.track_end, utc=True)
+                self.trim_end = pd.to_datetime(self.trim_end, utc=True)
             except:
                 self.log.error(
                     "Unrecognized track end format - trimming will not work as expected"
@@ -569,7 +609,7 @@ class Track:
 
         # next pull in all the remaining available metadata and store it as meta_dict
         record = record.drop(
-            ["beacon_id", "reader", "model", "track_start", "track_end"],
+            ["beacon_id", "reader", "model", "trim_start", "trim_end"],
             axis=1,
             errors="ignore",
         )
@@ -577,7 +617,7 @@ class Track:
 
     def purge(self):
         """Purge bad data by assigning NaN to values that exceed the min/max range."""
-        self.log.info("Purging bad data from track")
+        self.log.debug("Purging bad data from track")
 
         if not self.specs.make:
             self.log.error("No beacon specs are available, no data purging attempted")
@@ -684,17 +724,11 @@ class Track:
             }
         )
 
-        # reset the index
-        self.data.reset_index(drop=True, inplace=True)
-
-        # check to see that the track_start and track_end are within the data limits
-        self.reset_track_limits()
-
-        # recalculate stats here since things may have changed
-        self.stats()
-
         self.purged = True
         self.log.info("Track bad data purged")
+
+        # recalculate stats here since things may have changed
+        self.refresh_stats()
 
     def sort(self):
         """Order the track chronologically and remove redundant entries."""
@@ -720,14 +754,8 @@ class Track:
             "datetime_data"
         ].is_monotonic_increasing, "Issue with timestamps, sort data!"
 
-        # reset the index
-        self.data.reset_index(drop=True, inplace=True)
-
-        # check to see that the track_start and track_end are within the data limits
-        self.reset_track_limits()
-
         # recalculate stats here since things may have changed
-        self.stats()
+        self.refresh_stats()
 
         self.sorted = True
         if self.raw_data:
@@ -782,10 +810,10 @@ class Track:
 
         # set property
         self.speeded = True
-        self.log.info("Calculated displacement, direction and speed for track")
+        self.log.debug("Calculated displacement, direction and speed for track")
 
         # recalculate stats here since things may have changed
-        self.stats()
+        self.refresh_stats(speed=False)
 
     def speed_limit(self, threshold=5):
         """
@@ -818,27 +846,21 @@ class Track:
             )
             self.speed()
         self.log.info(
-            f"\nRemoved {before - len(self.data)} rows due to speed limit violations"
+            f"Removed {before - len(self.data)} rows due to speed limit violations"
         )
-
-        # reset the index
-        self.data.reset_index(drop=True, inplace=True)
-
-        # check to see that the track_start and track_end are within the data limits
-        self.reset_track_limits()
-
-        # recalculate stats here since things may have changed
-        self.stats()
 
         self.speedlimited = True
 
+        # recalculate stats here since things may have changed
+        self.refresh_stats()
+
     def trim(self):
         """
-        Trim a track to a specified start and end time.
+        Trim a track from data_start/end with trim_start/end to yield a track from track_start to _end.
 
-        The track_start and track_end properties are used to determine where to trim
-        These need to be provided intentionally (as an argument or read from metadata)
-        during the initialization of the track
+        The trim_start and trim_end track properties are used to determine where to trim.
+        These need to be provided intentionally (as an argument or read from track metadata)
+        during the initialization of the track or they will be set to data_start and data_end
 
         Note that you will want to AFTER running the speed and speed limit, since the
         track_start and track_end will automatically be moved if bad data are found
@@ -849,34 +871,32 @@ class Track:
         None.
 
         """
-        if self.track_start:
+        # TODO - is it possible to get here without having a trim_start or end?
+        if self.trim_start:
             self.data.drop(
-                self.data[self.data["datetime_data"] < self.track_start].index,
+                self.data[self.data["datetime_data"] < self.trim_start].index,
                 inplace=True,
             )
             self.log.info(
-                f"Track start trimmed from {self.data_start} to at or just before {self.track_start}"
+                f"Values at the start of the track from {self.data_start} up to {self.trim_start} were trimmed"
             )
             self.trimmed_start = True
 
-        if self.track_end:
+        if self.trim_end:
             self.data.drop(
-                self.data[self.data["datetime_data"] > self.track_end].index,
+                self.data[self.data["datetime_data"] > self.trim_end].index,
                 inplace=True,
             )
             self.log.info(
-                f"Track end trimmed from {self.data_end} to at or just after {self.track_end}"
+                f"Values at the end of the track following {self.trim_end} to {self.data_end} were trimmed"
             )
             self.trimmed_end = True
-
-        # reset the index
-        self.data.reset_index(drop=True, inplace=True)
 
         # Also flag that general trimming was done here.
         self.trimmed = True
 
         # recalculate stats here since things may have changed
-        self.stats()
+        self.refresh_stats()
 
     def geo(self):
         """Add a geodataframe of track points and a track line to the track object."""
@@ -1084,37 +1104,8 @@ class Track:
 
         self.data = sdf_.drop(["u", "v"], axis=1)
 
-        # check to see that the track_start and track_end are within the data limits
-        self.reset_track_limits()
-
         # after doing the resampling it will be important to run:
-        self.refresh()
-
-    def refresh(self):
-        """
-        Refresh all the stats and speed calcs, etc.
-
-        Do this after you change anything in the dataframe
-        track.data = track.data[track.data.loc_accuracy < 2]
-
-        Returns
-        -------
-        None.
-        """
-        # reset the index, which copies the
-        self.data.reset_index(inplace=True)
-
-        # recalculate the speed and displacement
-        self.speed()
-        # self.speed_limit() # Assuming this is not needed here but leaving comment to flag this step
-        # if you have geospatial data, it must be recreated
-        if self.geoed:
-            self.geo()
-
-        # check to see that the track_start and track_end are within the data limits
-        self.reset_track_limits()
-
-        self.stats()
+        self.refresh_stats()
 
     def track_metadata(self, path_output=".", meta_export=None, verbose=False):
         """

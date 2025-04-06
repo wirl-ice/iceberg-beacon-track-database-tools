@@ -137,14 +137,14 @@ def plot_map(track, path_output=".", dpi=300, interactive=False, log=None):
     # green dot is the first good value, orange dot is the last good value
 
     if not track.trimmed:
-        if not pd.isnull(track.track_start):
+        if not pd.isnull(track.trim_start):
             ax.plot(
                 # you only want the first one...
                 track.data.longitude.loc[
-                    track.data.datetime_data <= track.track_start
+                    track.data.datetime_data <= track.trim_start
                 ].iloc[-1],
                 track.data.latitude.loc[
-                    track.data.datetime_data <= track.track_start
+                    track.data.datetime_data <= track.trim_start
                 ].iloc[-1],
                 marker="o",
                 ms=8,
@@ -154,14 +154,14 @@ def plot_map(track, path_output=".", dpi=300, interactive=False, log=None):
                 zorder=5,
             )
 
-        if not pd.isnull(track.track_end):
+        if not pd.isnull(track.trim_end):
             ax.plot(
                 # you only want the last one...
                 track.data.longitude.loc[
-                    track.data.datetime_data >= track.track_end
+                    track.data.datetime_data >= track.trim_end
                 ].iloc[0],
                 track.data.latitude.loc[
-                    track.data.datetime_data >= track.track_end
+                    track.data.datetime_data >= track.trim_end
                 ].iloc[0],
                 marker="o",
                 ms=8,
@@ -439,19 +439,19 @@ def plot_trim(track, path_output=".", dpi=300, interactive=False, log=None):
 
     # plot the track trimming points so it can be verified before trimming. zorder >> big
     if not track.trimmed:
-        if not pd.isnull(track.track_start):
-            t.axvline(track.track_start, linestyle="dashdot", color="lime", zorder=100)
-            r.axvline(track.track_start, linestyle="dashdot", color="lime", zorder=100)
-            v.axvline(track.track_start, linestyle="dashdot", color="lime", zorder=100)
-        if not pd.isnull(track.track_end):
+        if not pd.isnull(track.trim_start):
+            t.axvline(track.trim_start, linestyle="dashdot", color="lime", zorder=100)
+            r.axvline(track.trim_start, linestyle="dashdot", color="lime", zorder=100)
+            v.axvline(track.trim_start, linestyle="dashdot", color="lime", zorder=100)
+        if not pd.isnull(track.trim_end):
             t.axvline(
-                track.track_end, linestyle="dashdot", color="tab:orange", zorder=100
+                track.trim_end, linestyle="dashdot", color="tab:orange", zorder=100
             )
             r.axvline(
-                track.track_end, linestyle="dashdot", color="tab:orange", zorder=100
+                track.trim_end, linestyle="dashdot", color="tab:orange", zorder=100
             )
             v.axvline(
-                track.track_end, linestyle="dashdot", color="tab:orange", zorder=100
+                track.trim_end, linestyle="dashdot", color="tab:orange", zorder=100
             )
 
     fig.suptitle(
@@ -769,14 +769,14 @@ def plot_time(track, path_output=".", dpi=300, interactive=False, log=None):
 
     # plot the track trimming points so it can be verified before trimming.
     if not track.trimmed:
-        if not pd.isnull(track.track_start):
-            t.axvline(track.track_start, linestyle="dashdot", color="lime")
-            d.axvline(track.track_start, linestyle="dashdot", color="lime")
-            q.axvline(track.track_start, linestyle="dashdot", color="lime")
-        if not pd.isnull(track.track_end):
-            t.axvline(track.track_end, linestyle="dashdot", color="tab:orange")
-            d.axvline(track.track_end, linestyle="dashdot", color="tab:orange")
-            q.axvline(track.track_end, linestyle="dashdot", color="tab:orange")
+        if not pd.isnull(track.trim_start):
+            t.axvline(track.trim_start, linestyle="dashdot", color="lime")
+            d.axvline(track.trim_start, linestyle="dashdot", color="lime")
+            q.axvline(track.trim_start, linestyle="dashdot", color="lime")
+        if not pd.isnull(track.trim_end):
+            t.axvline(track.trim_end, linestyle="dashdot", color="tab:orange")
+            d.axvline(track.trim_end, linestyle="dashdot", color="tab:orange")
+            q.axvline(track.trim_end, linestyle="dashdot", color="tab:orange")
 
     if interactive:
         plt.show()

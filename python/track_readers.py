@@ -1220,7 +1220,7 @@ def metocean(raw_data_file, log=None):
     # Only use data that is current.  GPSDELAY tells you how stale the GPS data are
     if "GPSDELAY" in rdf.columns:
         log.info(
-            f'Removing {len(rdf[rdf["GPSDELAY"] == 0])} positions where the GPS data is old'
+            f'Removing {len(rdf[rdf["GPSDELAY"] == 0])} positions where the GNSS data is old'
         )
         rdf = rdf[rdf["GPSDELAY"] == 0].reset_index()
 

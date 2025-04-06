@@ -124,7 +124,7 @@ def read_args():
     For reading-in, standardizing and cleaning raw data: 
         - include the -rd (--raw_data) flag 
         - the reader must be specified (-r or listed in the meta_file -mf)
-        - trimming (track_start and/or track_end) must be listed or in meta_file
+        - trimming (trim_start and/or trim_end) must be listed or in meta_file
         - file and plot outputs can be requested
     
     Example: read standard data file 2021_300434065868240.csv and output a map in the current directory: 
@@ -169,17 +169,17 @@ def read_args():
     )
     parser.add_argument(
         "-s",
-        "--track_start",
+        "--trim_start",
         type=str,
         default=None,
-        help="the date-time of the track start in UTC (format: yyyy-mm-dd HH:MM:SS) for trimming",
+        help="timestamp to trim the start of the track in UTC (format: yyyy-mm-dd HH:MM:SS)",
     )
     parser.add_argument(
         "-e",
-        "--track_end",
+        "--trim_end",
         type=str,
         default=None,
-        help="the date-time of the track end in UTC (format: yyyy-mm-dd HH:MM:SS) for trimming",
+        help="timestamp to trim the end of the track in UTC (format: yyyy-mm-dd HH:MM:SS)",
     )
     parser.add_argument(
         "-mf",
@@ -187,7 +187,7 @@ def read_args():
         type=str,
         default=None,
         help="the path/name of the metadata csv file. Note that the script will OVERWRITE \
-            arguments reader, model, track_start, track_end with values in this file",
+            arguments reader, model, trim_start, trim_end with values in this file",
     )
     parser.add_argument(
         "-of",
@@ -247,8 +247,8 @@ def read_args():
     reader = args.reader
     model = args.model
     spec_file = args.spec_file
-    track_start = args.track_start
-    track_end = args.track_end
+    trim_start = args.trim_start
+    trim_end = args.trim_end
     meta_file = args.meta_file
     output_file = args.output_file
     output_types = args.output_types
@@ -300,8 +300,8 @@ def read_args():
         reader,
         model,
         specs,
-        track_start,
-        track_end,
+        trim_start,
+        trim_end,
         output_file,
         output_types,
         output_plots,
@@ -319,8 +319,8 @@ def track_process(
     reader=None,
     model=None,
     specs=None,
-    track_start=None,
-    track_end=None,
+    trim_start=None,
+    trim_end=None,
     output_file=None,
     output_types=["csv"],
     output_plots=None,
@@ -346,9 +346,9 @@ def track_process(
             DESCRIPTION. The default is None.
         specs : TYPE, optional
             DESCRIPTION. The default is None.
-        track_start : TYPE, optional
+        trim_start : TYPE, optional
             DESCRIPTION. The default is None.
-        track_end : TYPE, optional
+        trim_end : TYPE, optional
             DESCRIPTION. The default is None.
         output_file : TYPE, optional
             DESCRIPTION. The default is None.
@@ -381,8 +381,8 @@ def track_process(
             data_file,
             reader=reader,
             model=model,
-            track_start=track_start,
-            track_end=track_end,
+            trim_start=trim_start,
+            trim_end=trim_end,
             raw_data=raw_data,
             logger=log,
         )  # get reader from user
@@ -391,8 +391,8 @@ def track_process(
             data_file,
             reader="standard",
             model=model,
-            track_start=track_start,
-            track_end=track_end,
+            trim_start=trim_start,  # TODO not sure what to do here
+            trim_end=trim_end,
             logger=log,
         )  # this is not raw data
     else:
@@ -450,8 +450,8 @@ def main():
         reader,
         model,
         specs,
-        track_start,
-        track_end,
+        trim_start,
+        trim_end,
         output_file,
         output_types,
         output_plots,
@@ -473,8 +473,8 @@ def main():
         reader,
         model,
         specs,
-        track_start,
-        track_end,
+        trim_start,
+        trim_end,
         output_file,
         output_types,
         output_plots,
