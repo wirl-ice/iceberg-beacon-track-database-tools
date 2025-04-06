@@ -568,7 +568,7 @@ def main():
                         os.path.join(outdir, root[prefix:]),
                         metadata=metadata,
                         specs=modeldata,
-                        output_file=None,
+                        output_name=None,
                         output_types=["csv", "pt_kml", "ln_kml", "pt_gpkg", "ln_gpkg"],
                         output_plots=["trim", "map", "dist", "time"],
                         interactive=False,  # set to False unless you have nothing better to do today

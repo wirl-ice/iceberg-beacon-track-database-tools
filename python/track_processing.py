@@ -191,7 +191,7 @@ def read_args():
     )
     parser.add_argument(
         "-of",
-        "--output_file",
+        "--output_name",
         type=str,
         default=None,
         help="the name of the standardized fully processed track file",
@@ -250,7 +250,7 @@ def read_args():
     trim_start = args.trim_start
     trim_end = args.trim_end
     meta_file = args.meta_file
-    output_file = args.output_file
+    output_name = args.output_name
     output_types = args.output_types
     output_plots = args.output_plots
     interactive = args.interactive
@@ -274,7 +274,7 @@ def read_args():
             meta_file
         ), f"Meta file: {meta_file} was not found. Please check and run again"
 
-    if os.path.basename(data_file) == output_file:
+    if os.path.basename(data_file) == output_name:
         if Path(data_file).parent == output_path:
             print(
                 "The output file you specified will overwrite the raw data file, please fix and re-run"
@@ -302,7 +302,7 @@ def read_args():
         specs,
         trim_start,
         trim_end,
-        output_file,
+        output_name,
         output_types,
         output_plots,
         interactive,
@@ -321,7 +321,7 @@ def track_process(
     specs=None,
     trim_start=None,
     trim_end=None,
-    output_file=None,
+    output_name=None,
     output_types=["csv"],
     output_plots=None,
     interactive=False,
@@ -350,7 +350,7 @@ def track_process(
             DESCRIPTION. The default is None.
         trim_end : TYPE, optional
             DESCRIPTION. The default is None.
-        output_file : TYPE, optional
+        output_name : TYPE, optional
             DESCRIPTION. The default is None.
         output_types : TYPE, optional
             DESCRIPTION. The default is ["csv"].
@@ -418,7 +418,7 @@ def track_process(
         trk.trim()
 
     # output the track files
-    trk.output(output_types, path_output=output_path, file_output=output_file)
+    trk.output(output_types, path_output=output_path, file_output=output_name)
 
     # generate figures
     if output_plots:
@@ -452,7 +452,7 @@ def main():
         specs,
         trim_start,
         trim_end,
-        output_file,
+        output_name,
         output_types,
         output_plots,
         interactive,
@@ -475,7 +475,7 @@ def main():
         specs,
         trim_start,
         trim_end,
-        output_file,
+        output_name,
         output_types,
         output_plots,
         interactive,
