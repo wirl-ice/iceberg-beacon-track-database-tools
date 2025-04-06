@@ -104,6 +104,7 @@ def plot_map(track, path_output=".", dpi=300, interactive=False, log=None):
         linestyle="dotted",
         x_inline=False,
         y_inline=False,
+        zorder=20,
     )
     gl.rotate_labels = False
     gl.top_labels = False
@@ -297,7 +298,7 @@ def plot_trim(track, path_output=".", dpi=300, interactive=False, log=None):
     )
 
     # Temperature plot  = t
-    t.grid(ls="dotted")
+    t.grid(ls="dotted", zorder=20)
     sns.lineplot(
         ax=t,
         x="datetime_data",
@@ -319,7 +320,7 @@ def plot_trim(track, path_output=".", dpi=300, interactive=False, log=None):
             ax=t2,
             x="datetime_data",
             y="pressure",
-            label="pressure",
+            label="Pressure",
             data=track.data,
             errorbar=None,
             color="r",
@@ -333,7 +334,7 @@ def plot_trim(track, path_output=".", dpi=300, interactive=False, log=None):
         )  # This position avoids overlap with beginning and end of track
 
     # Rolling temperature mean/std plot = r
-    r.grid(ls="dotted")
+    r.grid(ls="dotted", zorder=20)
     sns.lineplot(
         ax=r,
         x="datetime_data",
@@ -390,13 +391,13 @@ def plot_trim(track, path_output=".", dpi=300, interactive=False, log=None):
     )  # This position avoids overlap with beginning and end of track
 
     # Voltage plot = v
-    v.grid(ls="dotted")
+    v.grid(ls="dotted", zorder=20)
     sns.lineplot(
         ax=v,
         x="datetime_data",
         y="voltage",
         data=track.data,
-        label="battery",
+        label="Battery",
         errorbar=None,
         color="g",
     )
@@ -413,7 +414,7 @@ def plot_trim(track, path_output=".", dpi=300, interactive=False, log=None):
             ax=v2,
             x="datetime_data",
             y="pitch",
-            label="pitch",
+            label="Pitch",
             data=track.data,
             errorbar=None,
             color="m",
@@ -422,7 +423,7 @@ def plot_trim(track, path_output=".", dpi=300, interactive=False, log=None):
             ax=v2,
             x="datetime_data",
             y="roll",
-            label="roll",
+            label="Roll",
             data=track.data,
             errorbar=None,
             color="c",
@@ -598,7 +599,7 @@ def plot_dist(track, path_output=".", dpi=300, interactive=False, log=None):
         markeredgecolor="k",
         linestyle="None",
     )
-    p.grid(True)
+    p.grid(True, zorder=20)
     p.set_theta_direction(-1)  # turn clockwise
     p.set_theta_zero_location("N")  # north up
     p.set_rlabel_position(200.5)  # Move radial labels away from plotted line
@@ -689,7 +690,7 @@ def plot_time(track, path_output=".", dpi=300, interactive=False, log=None):
     )
 
     # Temperature plot
-    t.grid(ls="dotted")
+    t.grid(ls="dotted", zorder=20)
     sns.lineplot(
         ax=t,
         x="datetime_data",
@@ -703,7 +704,7 @@ def plot_time(track, path_output=".", dpi=300, interactive=False, log=None):
         t.set(xlabel=None, ylabel="No temperature available (°C)")
 
     # Distance plot
-    d.grid(ls="dotted")
+    d.grid(ls="dotted", zorder=20)
     sns.lineplot(
         ax=d, x="datetime_data", y="distance", data=track.data, errorbar=None, color="r"
     )
@@ -713,7 +714,7 @@ def plot_time(track, path_output=".", dpi=300, interactive=False, log=None):
         track.data.distance.quantile(0.99),
     )
     # quiver plot
-    q.grid(ls="dotted")
+    q.grid(ls="dotted", zorder=20)
     u = track.data.speed * np.sin(np.radians(track.data.direction))
     v = track.data.speed * np.cos(np.radians(track.data.direction))
 

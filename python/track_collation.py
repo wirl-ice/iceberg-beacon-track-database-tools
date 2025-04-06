@@ -201,7 +201,7 @@ def database_stats(ibtd_df, metadata, modeldata, run_name, outdir):
     # check to see if the file you need is there:
     if not os.path.isfile(f"{Path(outdir) / run_name}_ln.gpkg"):
         print("\nYou need to run the combine_data function to create a trackline file")
-        print("\nMake sure to use the same values fro run_name and outdir")
+        print("\nMake sure to use the same values for run_name and outdir")
         sys.exit(1)
 
     # First print out some generic info about the database
@@ -401,7 +401,7 @@ def database_stats(ibtd_df, metadata, modeldata, run_name, outdir):
     Figure for report.  "Iceberg drift tracks in the Iceberg Beacon Track Database version 1"
    
     """
-    tracks = gpd.read_file(f"{Path(outdir) / run_name}_ln.gpkg")
+
     coast = cfeature.NaturalEarthFeature(
         "physical", "land", "10m", edgecolor="black", facecolor="lightgray", lw=0.5
     )
@@ -409,33 +409,49 @@ def database_stats(ibtd_df, metadata, modeldata, run_name, outdir):
     # make a figure - square shape
     fig = plt.figure(figsize=(5, 5), constrained_layout=True)
 
-    # using polar stereo - generic - Canada up.
-    ax = fig.add_subplot(1, 1, 1, projection=ccrs.NorthPolarStereo(-100))
-
-    # plot all tracks w/ one colour
-    # tracks.plot(ax=ax, transform=ccrs.PlateCarree())
-
+    # polar stereo - generic - Canada up.
+    # ax = fig.add_subplot(1, 1, 1, projection=ccrs.NorthPolarStereo(-100))
+    # Orthographic centred on data
+    ax = fig.add_subplot(
+        1,
+        1,
+        1,
+        projection=ccrs.Orthographic(
+            ibtd_df["longitude"].median(), ibtd_df["latitude"].median()
+        ),
+    )
     # plot the tracks, one at a time, with different colours
-    for i, track in tracks.iterrows():
-        gdf_track = gpd.GeoDataFrame(geometry=[track.geometry], crs=tracks.crs)
-        gdf_track.plot(ax=ax, transform=ccrs.PlateCarree(), color=f"C{i % 10}", lw=0.3)
+    i = 0  # counter for colour
+    for track, trackdata in ibtd_df.groupby("beacon_id"):
+        # print(f"{track}, index {i}, colour C{i % 10}")
+
+        # plot the line data
+        ax.plot(
+            trackdata["longitude"],
+            trackdata["latitude"],
+            color=f"C{i % 10}",
+            lw=0.3,
+            transform=ccrs.PlateCarree(),
+            zorder=1,
+        )
+        i += 1  # counter add
 
     # set the extent to the data
     ax.set_extent(
         [
-            tracks.total_bounds[0],
-            tracks.total_bounds[2],
-            tracks.total_bounds[1],
-            tracks.total_bounds[3],
+            ibtd_df["longitude"].min(),
+            ibtd_df["longitude"].max(),
+            ibtd_df["latitude"].min(),
+            ibtd_df["latitude"].max(),
         ],
         ccrs.PlateCarree(),
     )
 
     # add coast
-    ax.add_feature(coast)
+    ax.add_feature(coast, zorder=2)
 
     # this is needed to make the map centred and not too narrow and tall
-    ax.set_aspect("equal")  # try auto too?
+    # ax.set_aspect("equal")  # try auto too?
 
     # add grid
     gl = ax.gridlines(
@@ -446,6 +462,7 @@ def database_stats(ibtd_df, metadata, modeldata, run_name, outdir):
         linestyle="dotted",
         x_inline=False,
         y_inline=False,
+        zorder=3,
     )
     gl.rotate_labels = False
     gl.top_labels = False
@@ -475,22 +492,22 @@ def main():
     # Complete this to set up runtime parameters (all hard coded)
 
     # The run name will determine the folder name and the base name of the log and metadata files
-    run_name = "20250324"
+    run_name = "20250405"
 
     # path to the metadata file
-    meta_file = "/ibtd/database/metadata.ods"
+    meta_file = "/ibtd/metadata/track_metadata_raw.ods"
 
     # path to the model specs file
-    spec_file = "/ibtd/database/models.ods"
+    spec_file = "/ibtd/metadata/beacon_specs.ods"
 
     # directory to look through for raw data
-    scandir = "/ibtd/raw_data1"
+    scandir = "/ibtd/raw_data"
 
     # put the output data here
     outdir = "/ibtd/" + run_name
 
     # if true, the log file will be sent to the raw data folder, it will go to the outdir otherwise
-    log2raw = False
+    log2raw = True
 
     level = 2  # set to level 2, if you are working out of the raw data folder (files are 2 levels below the raw_data dir)
 
@@ -573,7 +590,7 @@ def main():
                         output_plots=["trim", "map", "dist", "time"],
                         interactive=False,  # set to False unless you have nothing better to do today
                         raw_data=True,  # set to True for database assembly
-                        trim_check=True,  # set to False for database assembly
+                        trim_check=False,  # set to False for database assembly
                         meta_verbose=True,  # set to False for database assembly
                     )
 
