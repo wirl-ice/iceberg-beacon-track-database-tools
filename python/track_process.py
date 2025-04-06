@@ -160,13 +160,13 @@ def read_args():
     
     Example: read standard data file 2021_300434065868240.csv, trim it to a 4 day sub-section 
         and output a map and a csv file in the current directory: 
-        >python track_processing.py 2021_300434065868240.csv . -s '2021-08-22 13:00:00' -e '2021-08-26 21:00:00' -op map -ot
+        >python track_process.py 2021_300434065868240.csv . -s '2021-08-22 13:00:00' -e '2021-08-26 21:00:00' -op map -ot
 
     Example: read standard data file 2011_300234010031950.csv, output a map, timeseries 
     plot and kml in the parent directory:     
-        >python track_processing.py 2011_300234010031950.csv .. -op map time -ot ln_kml
+        >python track_process.py 2011_300234010031950.csv .. -op map time -ot ln_kml
 
-    For more info see github readme.
+    For more information see github. 
         
     """
 
@@ -353,7 +353,7 @@ def read_args():
     ]
 
 
-def track_process(
+def process(
     data_file,
     output_path,
     metadata=None,
@@ -407,14 +407,16 @@ def track_process(
     meta_export : str, optional
         Format for metadata export ('pandas', 'json', or 'both'). The default is None.
     meta_verbose : bool, optional
-        Whether to include verbose metadata. The default is False.
+        Whether to include all available metadata fields in the track metadata. If True,
+        metadata categories like processing details and valid range information are included.
+        The default is False.
 
     Returns
     -------
     trk_meta : pandas Dataframe
         Track metadata (one row) in a dataframe.
-    """
 
+    """
     log = logging.getLogger()
     log.info(f"\n~Processing {Path(data_file).stem}....\n")
 
@@ -515,7 +517,7 @@ def main():
     else:
         log = tracklog(Path(data_file).stem, output_path, level="INFO")
 
-    track_process(
+    process(
         data_file,
         output_path,
         metadata,

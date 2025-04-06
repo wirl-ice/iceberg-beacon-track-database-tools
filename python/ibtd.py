@@ -4,10 +4,14 @@ ibtd.py
 
 Main module for the Iceberg Beacon Track Database (IBTD).
 
-Defines the class 'Track' containing an individual iceberg track along with methods and properties.
-Defines the class 'Meta' containing the track metadata
-Defines the class 'Models' containing beacon model specifications, read in from a table
-Defines the class 'Specs' containing a single beacon model specifications, used for purging bad data
+Defines the class:
+    'Track' containing an individual iceberg track along with methods and properties.
+
+    'Meta' containing the track metadata
+
+    'Models' containing beacon model specifications, read in from a table
+
+    'Specs' containing a single beacon model specifications, used for purging bad data
 
 Note that creating an instance of a Track that _is_ in the standard format assumes the track
  has been processed, which means all the steps in a workflow for cleaning, standardizing
@@ -16,7 +20,7 @@ Note that creating an instance of a Track that _is_ in the standard format assum
 The functions to read the various raw_data formats and define the standard format are in track_readers.py
 The functions to plot figures are in track_fig.py
 
-The Database itself is created using this code-base.  To (re-)create the Database use track_collation.py
+The Database itself is created using this code base.  To (re-)create the Database use track_collate.py
 
 Author: Derek Mueller Jul 2024-Apr 2025, with contribution from Adam Garbo's code
 """
@@ -459,11 +463,13 @@ class Track:
         beacon is deployed but not activated or when data at the start or end of the
         track is deemed non-valid by various cleaning functions.
 
-        2) Rerun the speed method which calculates the speed, distance and bearing between positions
+        2) Rerun the speed method which calculates the speed, distance and bearing
+            between positions.
 
-        3) Recreate the geospatial tracklines and trackpoints for the track
+        3) Recreate the geospatial tracklines and trackpoints for the track.
 
-        4) Calculate the observations, duration and distance of track
+        4) Calculate track stats, whcih includes the observations, duration and distance
+            of the track, as well as the starting and ending latitude and longitude.
 
         Be sure to run this after all cleaning steps after sorting the data.
 
