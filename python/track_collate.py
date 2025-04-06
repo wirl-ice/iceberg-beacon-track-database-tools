@@ -507,7 +507,7 @@ def main():
     # Complete this to set up runtime parameters (all hard coded)
 
     # The run name will determine the folder name and the base name of the log and metadata files
-    run_name = "20250405"
+    run_name = "20250406"
 
     # path to the metadata file
     meta_file = "/ibtd/metadata/track_metadata_raw.ods"
