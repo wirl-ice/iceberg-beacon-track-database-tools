@@ -14,7 +14,7 @@ Defines the class:
     'Specs' containing a single beacon model specifications, used for purging bad data
 
 Note that creating an instance of a Track that _is_ in the standard format assumes the track
- has been processed, which means all the steps in a workflow for cleaning, standardizing
+ has been processed, which means all the steps in a workflow for standardizing, purging, filtering
  and adding derived data are complete.
 
 The functions to read the various raw_data formats and define the standard format are in track_readers.py
@@ -251,7 +251,7 @@ class Track:
     This track could be a raw data file or a track that has been processed into a
     the standard format.
 
-    Tracks have many properties and methods for data cleaning and inspection.
+    Tracks have many properties and methods for data purging, filtering, inspection and analysis.
     """
 
     def __init__(
@@ -332,7 +332,7 @@ class Track:
         reader_function = getattr(track_readers, self.reader)
         self.data = reader_function(self.datafile, self.log)
 
-        # at a minimum this cleaning step should be taken since a track must have all 3 of these
+        # at a minimum this step should be taken since a track must have all 3 of these
         # Drop all rows where datetime_data, latitude or longitude is nan
         self.data.dropna(
             subset=["datetime_data", "latitude", "longitude"], inplace=True
@@ -461,7 +461,7 @@ class Track:
         This could be due to an operator error (trim value for the wrong track for example)
         But this does not necessarily mean there is an issue! This can happen when the
         beacon is deployed but not activated or when data at the start or end of the
-        track is deemed non-valid by various cleaning functions.
+        track is deemed non-valid by various purging/filtering functions.
 
         2) Rerun the speed method which calculates the speed, distance and bearing
             between positions.
@@ -471,7 +471,7 @@ class Track:
         4) Calculate track stats, whcih includes the observations, duration and distance
             of the track, as well as the starting and ending latitude and longitude.
 
-        Be sure to run this after all cleaning steps after sorting the data.
+        Be sure to run this after all purging/filtering steps after sorting the data.
 
         Parameters
         ----------
@@ -934,7 +934,7 @@ class Track:
         self.geoed = True
         self.log.info("Track geospatial data created")
 
-    def output(self, types=["csv"], path_output=".", file_output=None):
+    def output(self, types=["csv"], path_output=".", file_name=None):
         """
         Output the track to a file.
 
@@ -960,7 +960,7 @@ class Track:
         types : list of output types to generate ['csv', 'pt_kml', 'ln_kml', 'pt_gpkg','ln_gpkg']. The default is 'csv'.
         path_output : str, optional
             Path to put the output. The default is the current directory
-        file_output : str, optional
+        file_name : str, optional
             filename of output. The default is None, which will autogenerate on the beacon_id
 
         Returns
@@ -968,8 +968,11 @@ class Track:
         None.
 
         """
-        if not file_output:
-            file_output = self.beacon_id
+        if not file_name:
+            file_name = self.beacon_id
+
+        if types is None:
+            return
 
         # test if the geo method was run or not.
         if not self.geoed:
@@ -978,9 +981,9 @@ class Track:
         # output part
         if "csv" in types:
             # Write CSV file without index column
-            if not os.path.isfile(f"{os.path.join(path_output, file_output)}.csv"):
+            if not os.path.isfile(f"{os.path.join(path_output, file_name)}.csv"):
                 self.data.to_csv(
-                    f"{os.path.join(path_output, file_output)}.csv",
+                    f"{os.path.join(path_output, file_name)}.csv",
                     index=False,
                     # date_format='%Y-%m-%d %H:%M:%S', # easy to read natively with Excel/Libre
                     # date_format="%Y-%m-%dT%H:%M:%SZ", # one ISO8601 format
@@ -992,9 +995,9 @@ class Track:
                 self.log.error("File already exists, writing as csv failed!")
 
         if "pt_gpkg" in types:
-            if not os.path.isfile(f"{os.path.join(path_output, file_output)}_pt.gpkg"):
+            if not os.path.isfile(f"{os.path.join(path_output, file_name)}_pt.gpkg"):
                 self.trackpoints.to_file(
-                    f"{os.path.join(path_output, file_output)}_pt.gpkg", driver="GPKG"
+                    f"{os.path.join(path_output, file_name)}_pt.gpkg", driver="GPKG"
                 )
                 self.log.info("Track output as trackpoint gpkg file")
             else:
@@ -1003,28 +1006,28 @@ class Track:
                 )
 
         if "ln_gpkg" in types:
-            if not os.path.isfile(f"{os.path.join(path_output, file_output)}_ln.gpkg"):
+            if not os.path.isfile(f"{os.path.join(path_output, file_name)}_ln.gpkg"):
                 self.trackline.to_file(
-                    f"{os.path.join(path_output, file_output)}_ln.gpkg", driver="GPKG"
+                    f"{os.path.join(path_output, file_name)}_ln.gpkg", driver="GPKG"
                 )
                 self.log.info("Track output as trackline gpkg file")
             else:
                 self.log.error("File already exists, writing as trackline gpkg failed!")
 
         if "pt_kml" in types:
-            if not os.path.isfile(f"{os.path.join(path_output, file_output)}_pt.kml"):
+            if not os.path.isfile(f"{os.path.join(path_output, file_name)}_pt.kml"):
                 # note the name will be the beacon id and the description will be the timestamp.
                 self.trackpoints[["beacon_id", "datetime_data", "geometry"]].to_file(
-                    f"{os.path.join(path_output, file_output)}_pt.kml", driver="KML"
+                    f"{os.path.join(path_output, file_name)}_pt.kml", driver="KML"
                 )
                 self.log.info("Track output as trackpoint kml file")
             else:
                 self.log.error("File already exists, writing as trackpoint kml failed!")
 
         if "ln_kml" in types:
-            if not os.path.isfile(f"{os.path.join(path_output, file_output)}_ln.kml"):
+            if not os.path.isfile(f"{os.path.join(path_output, file_name)}_ln.kml"):
                 self.trackline.to_file(
-                    f"{os.path.join(path_output, file_output)}_ln.kml", driver="KML"
+                    f"{os.path.join(path_output, file_name)}_ln.kml", driver="KML"
                 )
                 self.log.info("Track output as trackline kml file")
             else:

@@ -152,7 +152,7 @@ def read_args():
         - track can be re-trimmed as required (be sure to add -s and -e values)
         - file and plot outputs can be requested
         
-    For reading-in, standardizing and cleaning raw data: 
+    For reading-in, standardizing and processing raw data: 
         - include the -rd (--raw_data) flag 
         - the reader must be specified (-r or listed in the track metadata file -mf)
         - trimming (trim_start and/or trim_end) must be listed (-s -e) or track metadata file
@@ -184,7 +184,7 @@ def read_args():
         "--reader",
         type=str,
         default="standard",
-        help="provide the name of the reader function (default is 'standard' clean data)",
+        help="provide the name of the reader function (default is 'standard', which is used with processed data)",
     )
     parser.add_argument(
         "-m",
@@ -468,7 +468,7 @@ def process(
         trk.trim()
 
     # output the track files
-    trk.output(output_types, path_output=output_path, file_output=output_name)
+    trk.output(output_types, path_output=output_path, file_name=output_name)
 
     # generate figures
     if output_plots:

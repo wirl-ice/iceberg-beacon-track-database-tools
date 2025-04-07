@@ -4,7 +4,7 @@
 track_fig.py
 
 Functions to produce visualizations of beacon data after it
-has been ingested, cleaned, and standardized.
+has been ingested, purgred/filtered, and standardized.
 
 Visualizations include:
     map - a map of the iceberg track

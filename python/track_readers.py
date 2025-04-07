@@ -257,7 +257,7 @@ def calib_argos(raw_data_file, log=None):
     Returns
     -------
     sdf : Pandas DataFrame
-        Standardized Pandas dataframe ready for cleaning.
+        Standardized Pandas dataframe ready for processing.
 
     Raw data format
     ----------------------------------
@@ -464,7 +464,7 @@ def canatec(raw_data_file, log=None):
     Returns
     -------
     sdf : Pandas DataFrame
-        Standardized Pandas dataframe ready for cleaning.
+        Standardized Pandas dataframe ready for processing.
 
     Raw data format
     ----------------------------------
@@ -543,7 +543,7 @@ def pathfinder_ccore(raw_data_file, log=None):
     Returns
     -------
     sdf : Pandas DataFrame
-        Standardized Pandas dataframe ready for cleaning.
+        Standardized Pandas dataframe ready for processing.
 
     Raw data format
     ----------------------------------
@@ -597,7 +597,7 @@ def cryologger(raw_data_file, log=None):
     Returns
     -------
     sdf : Pandas DataFrame
-        Standardized Pandas dataframe ready for cleaning.
+        Standardized Pandas dataframe ready for processing.
 
     Raw data format
     ----------------------------------
@@ -695,7 +695,7 @@ def iabp(raw_data_file, log=None):
     Returns
     -------
     sdf : Pandas DataFrame
-        Standardized Pandas dataframe ready for cleaning.
+        Standardized Pandas dataframe ready for processing.
 
     Raw data format
     ----------------------------------
@@ -770,7 +770,7 @@ def globalstar(raw_data_file, log=None):
     Returns
     -------
     sdf : Pandas DataFrame
-        Standardized Pandas dataframe ready for cleaning.
+        Standardized Pandas dataframe ready for processing.
 
     Raw data format
     ----------------------------------
@@ -845,7 +845,7 @@ def oceanetic(raw_data_file, log=None):
     Returns
     -------
     sdf : Pandas DataFrame
-        Standardized Pandas dataframe ready for cleaning.
+        Standardized Pandas dataframe ready for processing.
 
     Raw data format
     ----------------------------------
@@ -905,7 +905,7 @@ def ceos(raw_data_file, log=None):
     Returns
     -------
     sdf : Pandas DataFrame
-        Standardized Pandas dataframe ready for cleaning.
+        Standardized Pandas dataframe ready for processing.
 
     Raw data format
     ----------------------------------
@@ -965,7 +965,7 @@ def wirl_sbd(raw_data_file, log=None):
     Returns
     -------
     sdf : Pandas DataFrame
-        Standardized Pandas dataframe ready for cleaning.
+        Standardized Pandas dataframe ready for processing.
 
     Raw data format
     ----------------------------------
@@ -1044,7 +1044,7 @@ def rockstar(raw_data_file, log=None):
     Returns
     -------
     sdf : Pandas DataFrame
-        Standardized Pandas dataframe ready for cleaning.
+        Standardized Pandas dataframe ready for processing.
 
     Raw data format
     ----------------------------------
@@ -1132,7 +1132,7 @@ def solara(raw_data_file, log=None):
     Returns
     -------
     sdf : Pandas DataFrame
-        Standardized Pandas dataframe ready for cleaning.
+        Standardized Pandas dataframe ready for processing.
 
     Raw data format
     ----------------------------------
@@ -1195,7 +1195,7 @@ def metocean(raw_data_file, log=None):
     Returns
     -------
     sdf : Pandas DataFrame
-        Standardized Pandas dataframe ready for cleaning.
+        Standardized Pandas dataframe ready for processing.
 
     Raw data format
     ---------------
@@ -1235,7 +1235,7 @@ def metocean(raw_data_file, log=None):
         raw_data_file, index_col=False, skipinitialspace=True, encoding_errors="replace"
     )
 
-    # cleaning steps before copying into the sdf
+    # filtering steps before copying into the sdf
 
     # Only use data that is current.  GPSDELAY tells you how stale the GPS data are
     if "GPSDELAY" in rdf.columns:
@@ -1354,7 +1354,7 @@ def bio(raw_data_file, log=None):
     Returns
     -------
     sdf : Pandas DataFrame
-        Standardized Pandas dataframe ready for cleaning.
+        Standardized Pandas dataframe ready for processing.
 
     Raw data format
     ----------------------------------
@@ -1417,7 +1417,7 @@ def navidatum(raw_data_file, log=None):
     Returns
     -------
     sdf : Pandas DataFrame
-        Standardized Pandas dataframe ready for cleaning.
+        Standardized Pandas dataframe ready for processing.
 
     Raw data format
     -----------------------------------
@@ -1469,7 +1469,7 @@ def fn_template(raw_data_file, log=None):
     Returns
     -------
     sdf : Pandas DataFrame
-        Standardized Pandas dataframe ready for cleaning.
+        Standardized Pandas dataframe ready for processing.
 
     Raw data format
     ----------------------------------

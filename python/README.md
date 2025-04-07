@@ -8,16 +8,16 @@ Release 1.0
 Date: 2025-04-06
 
 ## Introduction
-This Python code ingests raw tracking beacon data, standardizes it to a common format, peforms a number of data cleaning steps and outputs visualization and data products.
+This Python code ingests raw tracking beacon data, standardizes it to a common format, peforms a number of data processing steps and outputs visualization and data products.
 
 ## Python Code
-`track_processing.py`
+`track_process.py`
 * Script that contains functions to process raw and standardized beacon track data
   * Works on a single track to 
   * Can run at the command line on 
   * Selects appropriate conversion function
   * Standardizes data columns
-  * Cleans data according to minimum/maximum values
+  * Purges data according to minimum/maximum values
   * Calculates velocity
   * Creates output files
 
@@ -62,7 +62,7 @@ This file contains key information on each track, including:
 
 **2. Beacon Spec CSV file**
 
-This file contains the valid ranges of the data, used for cleaning
+This file contains the valid ranges of the data, used for purging
 
 ## Usage
 
