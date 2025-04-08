@@ -176,7 +176,11 @@ def plot_map(track, path_output=".", dpi=300, interactive=False, log=None):
     # green dot is the first good value, orange dot is the last good value
 
     if not track.trimmed:
-        if not pd.isnull(track.trim_start):
+        if (
+            not pd.isnull(track.trim_start)
+            and (track.data.datetime_data <= track.trim_start).any()
+        ):
+
             ax.plot(
                 # you only want the first one...
                 track.data.longitude.loc[
@@ -193,7 +197,10 @@ def plot_map(track, path_output=".", dpi=300, interactive=False, log=None):
                 zorder=18,
             )
 
-        if not pd.isnull(track.trim_end):
+        if (
+            not pd.isnull(track.trim_end)
+            and (track.data.datetime_data >= track.trim_end).any()
+        ):
             ax.plot(
                 # you only want the last one...
                 track.data.longitude.loc[
