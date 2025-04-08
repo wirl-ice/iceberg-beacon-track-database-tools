@@ -727,7 +727,10 @@ def iabp(raw_data_file, log=None):
     sdf["beacon_id"] = Path(raw_data_file).stem
 
     try:
-        # use the position doy for the timestamp (along with year)
+        import pdb
+
+        pdb.set_trace()
+        # use the position doy for the timestamp (along with year) - subtract 1 to make Jan 1 = 0
         sdf["datetime_data"] = pd.to_datetime(rdf["Year"], format="%Y", utc=True) + rdf[
             "POS_DOY"
         ].sub(1).apply(pd.Timedelta, unit="D")
@@ -1183,7 +1186,11 @@ def metocean(raw_data_file, log=None):
     - SVP-I-BXGSA-L-AD beacons have BP, GPS, SST, AT, lithium battery and are
         designed for air deployment in Arctic regions
 
-    Note that variable names are slightly different so lots of if/else blocks
+    Note that variable names are slightly different so lots of if/elif or finding columns
+    from a list of options or regex.
+
+    Watch out for data vs transmission timestamps.  If in doubt, build them from
+    year, month, day, hour, minute.
 
     Parameters
     ----------
@@ -1203,7 +1210,7 @@ def metocean(raw_data_file, log=None):
         Asset Name / Asset.Name
         Asset Id  / Asset.Id / Modem ID
         Data Date (UTC) / DataDate_UTC  / Date(GMT)
-        Received Date (UTC)
+        Received Date (UTC) / Date (GMT)
         LATITUDE / LAT  # this is in dd.dddd format / GPS LATITUDE (DEGREES) # dd mm.mmmmmm
         LONGITUDE / LON # this is in dd.dddd format / GPS LONGITUDE (DEGREES) # dd mm.mmmmmm
         FMTID / FORMAT ID
@@ -1266,17 +1273,54 @@ def metocean(raw_data_file, log=None):
 
     try:
 
-        # Data timestamp  - these options cover different output formats from Linc.
+        # Data timestamp  - these options cover different output formats from Joubeh/Linc.
+        # the first few are data timestamps:
+        timestamp_cols1 = ["DATA DATE (UTC)", "Data Date (UTC)", "DataDate_UTC"]
+        for col in timestamp_cols1:  # if there is a match, it will assign the datetime
+            if col in rdf:
+                sdf["datetime_data"] = pd.to_datetime(rdf[col], utc=True)
+                break
+        timestamp_cols2 = [
+            "Date(GMT)",
+            "Date (GMT)",
+        ]  # These are not necessarily data timestamps
+        for col in timestamp_cols2:  # if there is a match, it will assign the datetime
+            if col in rdf:
+                sdf["datetime_data"] = pd.to_datetime(rdf[col], utc=True)
+                break
+
         if "DATA DATE (UTC)" in rdf:
             sdf["datetime_data"] = pd.to_datetime(rdf["DATA DATE (UTC)"], utc=True)
         elif "Data Date (UTC)" in rdf:
             sdf["datetime_data"] = pd.to_datetime(rdf["Data Date (UTC)"], utc=True)
         elif "DataDate_UTC" in rdf:
             sdf["datetime_data"] = pd.to_datetime(rdf["DataDate_UTC"], utc=True)
-        elif "Date(GMT)" in rdf:
-            sdf["datetime_data"] = pd.to_datetime(rdf["Date(GMT)"], utc=True)
-        elif "Date (GMT)" in rdf:
-            sdf["datetime_data"] = pd.to_datetime(rdf["Date (GMT)"], utc=True)
+        elif (
+            "Date(GMT)" in rdf or "Date (GMT)" in rdf
+        ):  # this is potentially a transmission timestamp
+            if "JHOUR" in rdf:
+                sdf["datetime_data"] = pd.to_datetime(
+                    rdf["YEAR"], format="%Y", utc=True
+                ) + rdf["JHOUR"].apply(pd.Timedelta, unit="h")
+            else:
+                # Since there are various forms, rename columns accordingly.
+                rdf.rename(
+                    columns={rdf.filter(regex=r"^DAY.*").columns[0]: "DAY"},
+                    inplace=True,
+                )
+                rdf.rename(
+                    columns={rdf.filter(regex=r"^HOUR.*").columns[0]: "HOUR"},
+                    inplace=True,
+                )
+                rdf.rename(
+                    columns={rdf.filter(regex=r"^MINUTE.*").columns[0]: "MINUTE"},
+                    inplace=True,
+                )
+                # build a timestamp
+                sdf["datetime_data"] = pd.to_datetime(
+                    rdf[["YEAR", "MONTH", "DAY", "HOUR", "MINUTE"]], utc=True
+                )
+
         else:
             log.error("Timestamp missing or not recognized")
             # raise

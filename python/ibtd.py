@@ -812,9 +812,9 @@ class Track:
         # Round columns
         # to assess whether there are consecutive duplicate positions, comment these lines
 
-        # self.data["distance"] = self.data["distance"].round(0)
-        # self.data["direction"] = self.data["direction"].round(0)
-        # self.data["speed"] = self.data["speed"].round(3)
+        self.data["distance"] = self.data["distance"].round(0)
+        self.data["direction"] = self.data["direction"].round(0)
+        self.data["speed"] = self.data["speed"].round(3)
 
         # set property
         self.speeded = True
