@@ -141,7 +141,7 @@ def plot_map(track, path_output=".", dpi=300, interactive=False, log=None):
     # sns.scatterplot(
     #     x="longitude",
     #     y="latitude",
-    #     data=track.data.loc[track.data.speed > 2.0],
+    #     data=track.data.loc[track.data.platform_speed_wrt_ground > 2.0],
     #     linewidth=0.75,
     #     edgecolor="tab:orange",
     #     color="tab:orange",
@@ -153,7 +153,7 @@ def plot_map(track, path_output=".", dpi=300, interactive=False, log=None):
     # sns.scatterplot(
     #     x="longitude",
     #     y="latitude",
-    #     data=track.data.loc[track.data.speed > 2.5],
+    #     data=track.data.loc[track.data.platform_speed_wrt_ground > 2.5],
     #     linewidth=0.75,
     #     edgecolor="red",
     #     color="red",
@@ -178,17 +178,17 @@ def plot_map(track, path_output=".", dpi=300, interactive=False, log=None):
     if not track.trimmed:
         if (
             not pd.isnull(track.trim_start)
-            and (track.data.datetime_data <= track.trim_start).any()
+            and (track.data.timestamp <= track.trim_start).any()
         ):
 
             ax.plot(
                 # you only want the first one...
-                track.data.longitude.loc[
-                    track.data.datetime_data <= track.trim_start
-                ].iloc[-1],
-                track.data.latitude.loc[
-                    track.data.datetime_data <= track.trim_start
-                ].iloc[-1],
+                track.data.longitude.loc[track.data.timestamp <= track.trim_start].iloc[
+                    -1
+                ],
+                track.data.latitude.loc[track.data.timestamp <= track.trim_start].iloc[
+                    -1
+                ],
                 marker="o",
                 ms=8,
                 mfc="lime",
@@ -199,16 +199,14 @@ def plot_map(track, path_output=".", dpi=300, interactive=False, log=None):
 
         if (
             not pd.isnull(track.trim_end)
-            and (track.data.datetime_data >= track.trim_end).any()
+            and (track.data.timestamp >= track.trim_end).any()
         ):
             ax.plot(
                 # you only want the last one...
-                track.data.longitude.loc[
-                    track.data.datetime_data >= track.trim_end
-                ].iloc[0],
-                track.data.latitude.loc[
-                    track.data.datetime_data >= track.trim_end
-                ].iloc[0],
+                track.data.longitude.loc[track.data.timestamp >= track.trim_end].iloc[
+                    0
+                ],
+                track.data.latitude.loc[track.data.timestamp >= track.trim_end].iloc[0],
                 marker="o",
                 ms=8,
                 mfc="tab:orange",
@@ -230,14 +228,14 @@ def plot_map(track, path_output=".", dpi=300, interactive=False, log=None):
     )
 
     fig.suptitle(
-        f"{track.beacon_id} map", fontweight="bold", fontsize=18
+        f"{track.platform_id} map", fontweight="bold", fontsize=18
     )  # note use y= to adjust
 
     ax.text(
         0,
         -0.09,
         f"Start (*): {track.data_start:%Y-%m-%d %H:%M:%S} UTC, End: {track.data_end:%Y-%m-%d %H:%M:%S} UTC\n  \
-        Duration: {track.duration:.2f} days, Distance: {track.distance:,.2f} km, Observations: {track.observations:,}",
+        Duration: {track.duration:.2f} days, Distance: {track.distance_travelled:,.2f} km, Observations: {track.observations:,}",
         transform=ax.transAxes,
         color="black",
         fontsize=12,
@@ -249,7 +247,7 @@ def plot_map(track, path_output=".", dpi=300, interactive=False, log=None):
 
     else:
         plt.savefig(
-            os.path.join(path_output, f"{track.beacon_id}_map.png"),
+            os.path.join(path_output, f"{track.platform_id}_map.png"),
             dpi=dpi,
             transparent=False,
             bbox_inches="tight",
@@ -274,7 +272,7 @@ def plot_trim(track, path_output=".", dpi=300, interactive=False, log=None):
     When beacons fall off their target into the water, the standard deviation of temperature should
             decrease. Temperature should approach water temperature at the same time
             (typically decreasing).  The rolling average and std are optimized for
-            determining trim_end, not trim_start (the window is on the left). When beacons
+            determining trim_end, not trim_start (the window is left-aligned). When beacons
             are deployed, they may still be acclimatizing to ambient conditions. In this
             scenario, the rolling mean and std are less helpful because their windows are
             positioned on the left to capture a sudden change as it occurs.
@@ -314,40 +312,44 @@ def plot_trim(track, path_output=".", dpi=300, interactive=False, log=None):
     log.info("Plotting trim")
 
     # get the temperature
-    track.data["temperature"] = track.data["temperature_air"]
+    track.data["temperature"] = track.data["air_temperature"] - 273.15  # plot Celsius
     temp_type = "Air"
-    if track.data["temperature_air"].isnull().all():
+    if track.data["air_temperature"].isnull().all():
         temp_type = "Surface"
-        track.data["temperature"] = track.data["temperature_surface"]
-        if track.data["temperature_surface"].isnull().all():
+        track.data["temperature"] = (
+            track.data["surface_temperature"] - 273.15
+        )  # plot Celsius
+        if track.data["surface_temperature"].isnull().all():
             temp_type = "Internal"
-            track.data["temperature"] = track.data["temperature_internal"]
-            if track.data["temperature_internal"].isnull().all():
+            track.data["temperature"] = (
+                track.data["internal_temperature"] - 273.15
+            )  # plot Celsius
+            if track.data["internal_temperature"].isnull().all():
                 temp_type = "No"
-                track.data["temperature"] = 0
+                track.data["temperature"] = np.nan
 
     # the following makes a left aligned window which should match well with any event
     # reverse the series, run the rolling operation and reverse again. Center false
     # keeps the window index on the right, reversing sets this to the left.
     track.data["Tmean5"] = (
         track.data[::-1]
-        .rolling(window="5d", on="datetime_data", center=False)
+        .rolling(window="5d", on="timestamp", center=False)
         .temperature.mean()[::-1]
     )
     track.data["Tmean3"] = (
         track.data[::-1]
-        .rolling(window="3d", on="datetime_data", center=False)
+        .rolling(window="3d", on="timestamp", center=False)
         .temperature.mean()[::-1]
     )
 
     track.data["Tstd5"] = (
         track.data[::-1]
-        .rolling(window="5d", on="datetime_data", center=False)
+        .rolling(window="5d", on="timestamp", center=False)
         .temperature.std()[::-1]
     )
     track.data["Tstd3"] = (
         track.data[::-1]
-        .rolling(window="3d", on="datetime_data", center=False)
+        .rolling(window="3d", on="timestamp", center=False)
         .temperature.std()[::-1]
     )
 
@@ -360,8 +362,8 @@ def plot_trim(track, path_output=".", dpi=300, interactive=False, log=None):
     t.grid(ls="dotted", zorder=20)
     sns.lineplot(
         ax=t,
-        x="datetime_data",
-        y="temperature",
+        x="timestamp",
+        y=track.data["temperature"],
         label=f"{temp_type} temperature",
         data=track.data,
         errorbar=None,
@@ -370,15 +372,15 @@ def plot_trim(track, path_output=".", dpi=300, interactive=False, log=None):
     t.set(xlabel=None, ylabel=f"{temp_type} temperature (°C)")
     t.get_legend().remove()
 
-    if track.data["pressure"].notna().any():
+    if track.data["air_pressure"].notna().any():
         # plot pressure on y axis - only if there is data...
         t2 = t.twinx()
         t2.set_ylabel("Air pressure (hPa)", color="black", rotation=270, labelpad=15)
 
         sns.lineplot(
             ax=t2,
-            x="datetime_data",
-            y="pressure",
+            x="timestamp",
+            y=track.data["air_pressure"] / 100,  # in hPa (mb) for display
             label="Pressure",
             data=track.data,
             errorbar=None,
@@ -396,7 +398,7 @@ def plot_trim(track, path_output=".", dpi=300, interactive=False, log=None):
     r.grid(ls="dotted", zorder=20)
     sns.lineplot(
         ax=r,
-        x="datetime_data",
+        x="timestamp",
         y="Tmean5",
         label="5 day mean",
         data=track.data,
@@ -406,7 +408,7 @@ def plot_trim(track, path_output=".", dpi=300, interactive=False, log=None):
     )
     sns.lineplot(
         ax=r,
-        x="datetime_data",
+        x="timestamp",
         y="Tmean3",
         label="3 day mean",
         data=track.data,
@@ -423,7 +425,7 @@ def plot_trim(track, path_output=".", dpi=300, interactive=False, log=None):
 
     sns.lineplot(
         ax=r2,
-        x="datetime_data",
+        x="timestamp",
         y="Tstd5",
         label="5 day std",
         data=track.data,
@@ -433,7 +435,7 @@ def plot_trim(track, path_output=".", dpi=300, interactive=False, log=None):
     )
     sns.lineplot(
         ax=r2,
-        x="datetime_data",
+        x="timestamp",
         y="Tstd3",
         label="3 day std",
         data=track.data,
@@ -453,8 +455,8 @@ def plot_trim(track, path_output=".", dpi=300, interactive=False, log=None):
     v.grid(ls="dotted", zorder=20)
     sns.lineplot(
         ax=v,
-        x="datetime_data",
-        y="voltage",
+        x="timestamp",
+        y="voltage_battery_volts",
         data=track.data,
         label="Battery",
         errorbar=None,
@@ -464,15 +466,15 @@ def plot_trim(track, path_output=".", dpi=300, interactive=False, log=None):
 
     v.get_legend().remove()
 
-    if track.data.pitch.notna().any():
+    if track.data.platform_pitch.notna().any():
         # plot pitch and roll on y axis - only if there is data...
         v2 = v.twinx()
 
         v2.set_ylabel("Tilt (degrees)", color="black", rotation=270, labelpad=15)
         sns.lineplot(
             ax=v2,
-            x="datetime_data",
-            y="pitch",
+            x="timestamp",
+            y="platform_pitch",
             label="Pitch",
             data=track.data,
             errorbar=None,
@@ -480,8 +482,8 @@ def plot_trim(track, path_output=".", dpi=300, interactive=False, log=None):
         )
         sns.lineplot(
             ax=v2,
-            x="datetime_data",
-            y="roll",
+            x="timestamp",
+            y="platform_roll",
             label="Roll",
             data=track.data,
             errorbar=None,
@@ -515,7 +517,7 @@ def plot_trim(track, path_output=".", dpi=300, interactive=False, log=None):
             )
 
     fig.suptitle(
-        f"{track.beacon_id} trim plot",
+        f"{track.platform_id} trim plot",
         fontweight="bold",
         fontsize=18,
     )
@@ -526,7 +528,7 @@ def plot_trim(track, path_output=".", dpi=300, interactive=False, log=None):
         0,
         -0.61,
         f"Start (*): {track.data_start:%Y-%m-%d %H:%M:%S} UTC, End: {track.data_end:%Y-%m-%d %H:%M:%S} UTC\n  \
-        Duration: {track.duration:.2f} days, Distance: {track.distance:,.2f} km, Observations: {track.observations:,}",
+        Duration: {track.duration:.2f} days, Distance: {track.distance_travelled:,.2f} km, Observations: {track.observations:,}",
         transform=v.transAxes,
         color="black",
         fontsize=12,
@@ -540,7 +542,7 @@ def plot_trim(track, path_output=".", dpi=300, interactive=False, log=None):
 
     else:
         plt.savefig(
-            os.path.join(path_output, f"{track.beacon_id}_trim.png"),
+            os.path.join(path_output, f"{track.platform_id}_trim.png"),
             dpi=dpi,
             transparent=False,
             bbox_inches="tight",
@@ -605,7 +607,7 @@ def plot_dist(track, path_output=".", dpi=300, interactive=False, log=None):
     Dalton's fastest was 2.3 m/s
     # code to remove data
     track.data.replace([np.inf, -np.inf], np.nan, inplace=True)
-    track.data.loc[track.data["speed"] > 5] = np.nan  # there is no way an iceberg moves faster than 5 m/s
+    track.data.loc[track.data["platform_speed_wrt_ground"] > 5] = np.nan  # there is no way an iceberg moves faster than 5 m/s
 
     Create histogram
     here we are scaling under the assumption that there will not be any speeds greater 
@@ -623,12 +625,18 @@ def plot_dist(track, path_output=".", dpi=300, interactive=False, log=None):
 
     # calcuate bins and values
     values, bins = np.histogram(
-        track.data.speed[~np.isnan(track.data.speed)],
+        track.data.platform_speed_wrt_ground[
+            ~np.isnan(track.data.platform_speed_wrt_ground)
+        ],
         range=(xlowerlim, xupperlim),
         bins=nbins,
     )
     # convert to fraction of all obs
-    frac = values / len(track.data.speed[~np.isnan(track.data.speed)])
+    frac = values / len(
+        track.data.platform_speed_wrt_ground[
+            ~np.isnan(track.data.platform_speed_wrt_ground)
+        ]
+    )
     cumfrac = np.cumsum(frac)
 
     # here we set the y axis (left) limits - they represent fraction of obs within each bin
@@ -658,7 +666,7 @@ def plot_dist(track, path_output=".", dpi=300, interactive=False, log=None):
     h2.set_ylim([ylowerlim, yupperlim * 1.01])
 
     # Calculate the number of observations to right edge to the histogram and print that
-    out_of_range = sum(track.data.speed > xupperlim)
+    out_of_range = sum(track.data.platform_speed_wrt_ground > xupperlim)
     if out_of_range > 0:
         plt.text(
             0.4,
@@ -668,8 +676,8 @@ def plot_dist(track, path_output=".", dpi=300, interactive=False, log=None):
 
     # Polar plot of speed and direction
     p.plot(
-        np.deg2rad(track.data.direction),
-        track.data.speed,
+        np.deg2rad(track.data.platform_course),
+        track.data.platform_speed_wrt_ground,
         marker="o",
         markerfacecolor="b",
         markeredgecolor="k",
@@ -681,13 +689,15 @@ def plot_dist(track, path_output=".", dpi=300, interactive=False, log=None):
     p.set_rlabel_position(200.5)  # Move radial labels away from plotted line
     plt.text(0.05, -0.05, "Speed (m/s)", transform=p.transAxes)
 
-    fig.suptitle(f"{track.beacon_id} distribution plot", fontweight="bold", fontsize=18)
+    fig.suptitle(
+        f"{track.platform_id} distribution plot", fontweight="bold", fontsize=18
+    )
 
     h.text(
         0.0,
         -0.275,
         f"Start (*): {track.data_start:%Y-%m-%d %H:%M:%S} UTC, End: {track.data_end:%Y-%m-%d %H:%M:%S} UTC\n  \
-        Duration: {track.duration:.2f} days, Distance: {track.distance:,.2f} km, Observations: {track.observations:,}",
+        Duration: {track.duration:.2f} days, Distance: {track.distance_travelled:,.2f} km, Observations: {track.observations:,}",
         transform=h.transAxes,
         color="black",
         fontsize=12,
@@ -701,7 +711,7 @@ def plot_dist(track, path_output=".", dpi=300, interactive=False, log=None):
 
     else:
         plt.savefig(
-            os.path.join(path_output, f"{track.beacon_id}_dist.png"),
+            os.path.join(path_output, f"{track.platform_id}_dist.png"),
             dpi=dpi,
             transparent=False,
             bbox_inches="tight",
@@ -761,15 +771,19 @@ def plot_time(track, path_output=".", dpi=300, interactive=False, log=None):
     log.info("Plotting timeseries")
 
     # get the temperature
-    track.data["temperature"] = track.data["temperature_air"]
+    track.data["temperature"] = track.data["air_temperature"] - 273.15  # plot Celsius
     temp_type = "Air"
-    if track.data["temperature_air"].isnull().all():
+    if track.data["air_temperature"].isnull().all():
         temp_type = "Surface"
-        track.data["temperature"] = track.data["temperature_surface"]
-        if track.data["temperature_surface"].isnull().all():
+        track.data["temperature"] = (
+            track.data["surface_temperature"] - 273.15
+        )  # plot Celsius
+        if track.data["surface_temperature"].isnull().all():
             temp_type = "Internal"
-            track.data["temperature"] = track.data["temperature_internal"]
-            if track.data["temperature_internal"].isnull().all():
+            track.data["temperature"] = (
+                track.data["internal_temperature"] - 273.15
+            )  # plot Celsius
+            if track.data["internal_temperature"].isnull().all():
                 temp_type = "No"
                 track.data["temperature"] = 0
 
@@ -782,7 +796,7 @@ def plot_time(track, path_output=".", dpi=300, interactive=False, log=None):
     t.grid(ls="dotted", zorder=20)
     sns.lineplot(
         ax=t,
-        x="datetime_data",
+        x="timestamp",
         y="temperature",
         data=track.data,
         errorbar=None,
@@ -795,19 +809,28 @@ def plot_time(track, path_output=".", dpi=300, interactive=False, log=None):
     # Distance plot
     d.grid(ls="dotted", zorder=20)
     sns.lineplot(
-        ax=d, x="datetime_data", y="distance", data=track.data, errorbar=None, color="r"
+        ax=d,
+        x="timestamp",
+        y="platform_displacement",
+        data=track.data,
+        errorbar=None,
+        color="r",
     )
     d.set(xlabel=None, ylabel="Displacement (m)")
     d.set_ylim(
         0,
-        track.data.distance.quantile(0.99),
+        track.data.platform_displacement.quantile(0.99),
     )
     # quiver plot
     q.grid(ls="dotted", zorder=20)
-    u = track.data.speed * np.sin(np.radians(track.data.direction))
-    v = track.data.speed * np.cos(np.radians(track.data.direction))
+    u = track.data.platform_speed_wrt_ground * np.sin(
+        np.radians(track.data.platform_course)
+    )
+    v = track.data.platform_speed_wrt_ground * np.cos(
+        np.radians(track.data.platform_course)
+    )
 
-    time_numeric = mdates.date2num(track.data["datetime_data"])
+    time_numeric = mdates.date2num(track.data["timestamp"])
     q_ax = q.quiver(
         time_numeric,
         np.zeros_like(time_numeric),
@@ -820,16 +843,19 @@ def plot_time(track, path_output=".", dpi=300, interactive=False, log=None):
     )
     # this sets the y axis limits and therefore the scale of the arrows
     # setting this to 90th percentile
-    q.set_ylim(-1 * track.data.speed.quantile(0.99), track.data.speed.quantile(0.99))
+    q.set_ylim(
+        -1 * track.data.platform_speed_wrt_ground.quantile(0.99),
+        track.data.platform_speed_wrt_ground.quantile(0.99),
+    )
 
     q.set(xlabel=None, ylabel="Velocity (m/s)")
 
     # 2 reference arrows
-    if track.data.speed.quantile(0.99) >= 1:
+    if track.data.platform_speed_wrt_ground.quantile(0.99) >= 1:
         ref_arrow = 0.2
-    if track.data.speed.quantile(0.99) < 1:
+    if track.data.platform_speed_wrt_ground.quantile(0.99) < 1:
         ref_arrow = 0.1
-    if track.data.speed.quantile(0.99) < 0.1:
+    if track.data.platform_speed_wrt_ground.quantile(0.99) < 0.1:
         ref_arrow = 0.02
     q.quiverkey(
         q_ax,
@@ -844,13 +870,13 @@ def plot_time(track, path_output=".", dpi=300, interactive=False, log=None):
     fig.align_ylabels()
     plt.xticks(rotation=45, horizontalalignment="center")
 
-    fig.suptitle(f"{track.beacon_id} time plot", fontweight="bold", fontsize=18)
+    fig.suptitle(f"{track.platform_id} time plot", fontweight="bold", fontsize=18)
 
     q.text(
         0,
         -0.61,
         f"Start (*): {track.data_start:%Y-%m-%d %H:%M:%S} UTC, End: {track.data_end:%Y-%m-%d %H:%M:%S} UTC\n  \
-        Duration: {track.duration:.2f} days, Distance: {track.distance:,.2f} km, Observations: {track.observations:,}",
+        Duration: {track.duration:.2f} days, Distance: {track.distance_travelled:,.2f} km, Observations: {track.observations:,}",
         transform=q.transAxes,
         color="black",
         fontsize=12,
@@ -873,7 +899,7 @@ def plot_time(track, path_output=".", dpi=300, interactive=False, log=None):
 
     else:
         plt.savefig(
-            os.path.join(path_output, f"{track.beacon_id}_time.png"),
+            os.path.join(path_output, f"{track.platform_id}_time.png"),
             dpi=dpi,
             transparent=False,
             bbox_inches="tight",
@@ -952,10 +978,10 @@ if __name__ == "__main__":
 # here is some pseudocode:
 def plot(track, *other_tracks):
     fig, ax = plt.subplots()
-    ax.plot(track.data, label=track.beacon_id)
+    ax.plot(track.data, label=track.platform_id)
     
     for track in other_tracks:
-        ax.plot(track.data, label=track.beacon_id)
+        ax.plot(track.data, label=track.platform_id)
 
 this will use matplotlibs colours to plot each one as a different colour
 need to deal with the title and text.

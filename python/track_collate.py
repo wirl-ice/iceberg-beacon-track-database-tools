@@ -102,7 +102,7 @@ def combine_data(indir, outdir, run_name):
     trackpoints.crs = "EPSG:4326"
 
     # Convert to line
-    tracklines = trackpoints.groupby(["beacon_id"])["geometry"].apply(
+    tracklines = trackpoints.groupby(["platform_id"])["geometry"].apply(
         lambda x: LineString(x.tolist())
     )
     # Set CRS
@@ -223,11 +223,9 @@ def database_stats(ibtd_df, metadata, modeldata, run_name, outdir):
 
     # number of tracks and
     print(
-        f"The IBTD contains {len(ibtd_df.beacon_id.unique()):,} tracks comprised of a total of {len(ibtd_df):,} positions"
+        f"The IBTD contains {len(ibtd_df.platform_id.unique()):,} tracks comprised of a total of {len(ibtd_df):,} positions"
     )
-    print(
-        f"Data span from {ibtd_df.datetime_data.min()} to {ibtd_df.datetime_data.max()}"
-    )
+    print(f"Data span from {ibtd_df.timestamp.min()} to {ibtd_df.timestamp.max()}")
 
     # number of groups and projects
     print(
@@ -248,7 +246,7 @@ def database_stats(ibtd_df, metadata, modeldata, run_name, outdir):
 
     # table data contributor, number of beacons
     track_count = (
-        metadata.df.groupby("data_contributor").agg("beacon_id").count().reset_index()
+        metadata.df.groupby("data_contributor").agg("platform_id").count().reset_index()
     )
     # table data contributor, list years
     unique_years = (
@@ -294,7 +292,7 @@ def database_stats(ibtd_df, metadata, modeldata, run_name, outdir):
         .agg(
             years=("year", list),
             iceberg_name=("iceberg_name", list),
-            tracks=("beacon_id", "count"),
+            tracks=("platform_id", "count"),
         )
         .reset_index()
     )
@@ -329,25 +327,21 @@ def database_stats(ibtd_df, metadata, modeldata, run_name, outdir):
     # work on a copy to be sure
     df = modeldata.df.copy()
 
-    # set the deployment by air column
-    df["Air deployable"] = 0.0
-    df.loc[df["deployment"].str.contains("by air"), "Air deployable"] = 1.0
-
     # select columns
     cols = [
         "make",
         "model",
         "transmitter",
-        "Air deployable",
+        "air_deployable",
         "buoyant",
-        "temperature_int",
-        "temperature_surface",
-        "temperature_air",
-        "voltage",
-        "pressure",
-        "pitch",
-        "roll",
-        "heading",
+        "has_internal_temperature",
+        "has_surface_temperature",
+        "has_air_temperature",
+        "has_voltage_battery_volts",
+        "has_air_pressure",
+        "has_platform_pitch",
+        "has_platform_roll",
+        "has_platform_orientation",
     ]
     df = df[cols]
 
@@ -359,7 +353,7 @@ def database_stats(ibtd_df, metadata, modeldata, run_name, outdir):
     df = df.replace("0.0", "")
 
     # get the number of tracks per beacon model
-    model_df = metadata.df.groupby("model").agg(number=("beacon_id", "count"))
+    model_df = metadata.df.groupby("model").agg(number=("platform_id", "count"))
 
     # prepare for merge
     model_df.reset_index(inplace=True)
@@ -389,7 +383,7 @@ def database_stats(ibtd_df, metadata, modeldata, run_name, outdir):
         "Tracks",
     ]
 
-    # sort columns
+    # column order
     df = df[
         [
             "Make",
@@ -437,7 +431,7 @@ def database_stats(ibtd_df, metadata, modeldata, run_name, outdir):
     )
     # plot the tracks, one at a time, with different colours
     i = 0  # counter for colour
-    for track, trackdata in ibtd_df.groupby("beacon_id"):
+    for track, trackdata in ibtd_df.groupby("platform_id"):
         # print(f"{track}, index {i}, colour C{i % 10}")
 
         # plot the line data
@@ -507,22 +501,22 @@ def main():
     # Complete this to set up runtime parameters (all hard coded)
 
     # The run name will determine the folder name and the base name of the log and metadata files
-    run_name = "20250406"
+    run_name = "20250412_tc"
 
     # path to the metadata file
-    meta_file = "/ibtd/metadata/track_metadata_raw.ods"
+    meta_file = "/ibtd/raw_data/track_metadata_raw.ods"
 
     # path to the model specs file
-    spec_file = "/ibtd/metadata/beacon_specs.ods"
+    spec_file = "/ibtd/beacon_models/beacon_specs.ods"
 
     # directory to look through for raw data
     scandir = "/ibtd/raw_data"
 
     # put the output data here
-    outdir = "/ibtd/" + run_name
+    outdir = "/ibtd/output/" + run_name
 
     # if true, the log file will be sent to the raw data folder, it will go to the outdir otherwise
-    log2raw = True
+    log2raw = False
 
     level = 2  # set to level 2, if you are working out of the raw data folder (files are 2 levels below the raw_data dir)
 
@@ -576,7 +570,7 @@ def main():
 
             else:
                 # if this condition is met, the file is assumed to be data... proceed...
-                if Path(f).stem in metadata.df.beacon_id.values:
+                if Path(f).stem in metadata.df.platform_id.values:
                     print(f"\n\n......{f}.......")
 
                     # set up a log file for this track either in the outdir or the raw data folder
@@ -605,7 +599,7 @@ def main():
                         output_plots=["trim", "map", "dist", "time"],
                         interactive=False,  # set to False unless you have nothing better to do today
                         raw_data=True,  # set to True for database collation
-                        trim_check=False,  # set to False for database collation
+                        trim_check=True,  # set to False for database collation
                         meta_verbose=True,  # set to True for database collation
                         meta_export="json",
                     )
@@ -626,6 +620,7 @@ def main():
     # output summary stats
     database_stats(alldata, metadata, modeldata, run_name, outdir)
 
+    # copy/move files around
     file_mover(outdir, Path(outdir).parent / (run_name + "_data"), "csv", levelup=level)
     file_mover(
         outdir,
@@ -662,5 +657,5 @@ def main():
     )
 
 
-if "__name__" == "__main__":
+if __name__ == "__main__":
     main()

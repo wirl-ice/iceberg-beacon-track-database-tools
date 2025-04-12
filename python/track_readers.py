@@ -72,43 +72,41 @@ def create_sdf(nrows):
     """
     # define the column names
     columns = [
-        "beacon_id",
-        "datetime_data",
-        "datetime_transmit",
+        "platform_id",
+        "timestamp",
         "latitude",
         "longitude",
-        "temperature_air",
-        "temperature_internal",
-        "temperature_surface",
-        "pressure",
-        "pitch",
-        "roll",
-        "heading",
-        "voltage",
-        "loc_accuracy",
-        "distance",
-        "speed",
-        "direction",
+        "air_temperature",  # in Kelvin
+        "internal_temperature",  # in Kelvin
+        "surface_temperature",  # in Kelvin
+        "air_pressure",  # in Pascals
+        "platform_pitch",
+        "platform_roll",
+        "platform_orientation",
+        "voltage_battery_volts",
+        "argo_position_accuracy",
+        "platform_displacement",
+        "platform_speed_wrt_ground",
+        "platform_course",
     ]
 
     col_dtypes = {
-        "beacon_id": str,
-        "datetime_data": np.dtype("datetime64[ns]"),
-        "datetime_transmit": np.dtype("datetime64[ns]"),
+        "platform_id": str,
+        "timestamp": np.dtype("datetime64[ns]"),
         "latitude": float,
         "longitude": float,
-        "temperature_air": float,
-        "temperature_internal": float,
-        "temperature_surface": float,
-        "pressure": float,
-        "pitch": float,
-        "roll": float,
-        "heading": float,
-        "voltage": float,
-        # "loc_accuracy": int,
-        "distance": float,
-        "speed": float,
-        "direction": float,
+        "air_temperature": float,
+        "internal_temperature": float,
+        "surface_temperature": float,
+        "air_pressure": float,
+        "platform_pitch": float,
+        "platform_roll": float,
+        "platform_orientation": float,
+        "voltage_battery_volts": float,
+        # "argo_position_accuracy": int,
+        "platform_displacement": float,
+        "platform_speed_wrt_ground": float,
+        "platform_course": float,
     }
 
     # define sdf as dtype Int64 (which can contain NA)
@@ -120,8 +118,7 @@ def create_sdf(nrows):
     sdf = sdf.astype(col_dtypes)
 
     # explicitly set these as UTC (tz aware)
-    sdf.datetime_data = pd.to_datetime(sdf.datetime_data, utc=True)
-    sdf.datetime_transmit = pd.to_datetime(sdf.datetime_transmit, utc=True)
+    sdf.timestamp = pd.to_datetime(sdf.timestamp, utc=True)
 
     return sdf
 
@@ -214,27 +211,25 @@ def standard(raw_data_file, log=None):
     sdf = create_sdf(len(rdf))
 
     # Unique beacon identifier
-    sdf["beacon_id"] = Path(raw_data_file).stem
+    sdf["platform_id"] = Path(raw_data_file).stem
 
     try:
-        sdf["datetime_data"] = pd.to_datetime(rdf["datetime_data"], utc=True)
-
+        sdf["timestamp"] = pd.to_datetime(rdf["timestamp"], utc=True)
         sdf["latitude"] = rdf["latitude"]
         sdf["longitude"] = rdf["longitude"]
 
-        sdf["datetime_transmit"] = pd.to_datetime(rdf["datetime_transmit"], utc=True)
-        sdf["temperature_air"] = rdf["temperature_air"]
-        sdf["temperature_internal"] = rdf["temperature_internal"]
-        sdf["temperature_surface"] = rdf["temperature_surface"]
-        sdf["pressure"] = rdf["pressure"]
-        sdf["pitch"] = rdf["pitch"]
-        sdf["roll"] = rdf["roll"]
-        sdf["heading"] = rdf["heading"]
-        sdf["voltage"] = rdf["voltage"]
-        sdf["loc_accuracy"] = rdf["loc_accuracy"]
-        sdf["distance"] = rdf["distance"]
-        sdf["speed"] = rdf["speed"]
-        sdf["direction"] = rdf["direction"]
+        sdf["air_temperature"] = rdf["air_temperature"]
+        sdf["internal_temperature"] = rdf["internal_temperature"]
+        sdf["surface_temperature"] = rdf["surface_temperature"]
+        sdf["air_pressure"] = rdf["air_pressure"]
+        sdf["platform_pitch"] = rdf["platform_pitch"]
+        sdf["platform_roll"] = rdf["platform_roll"]
+        sdf["platform_orientation"] = rdf["platform_orientation"]
+        sdf["voltage_battery_volts"] = rdf["voltage_battery_volts"]
+        sdf["argo_position_accuracy"] = rdf["argo_position_accuracy"]
+        sdf["platform_displacement"] = rdf["platform_displacement"]
+        sdf["platform_speed_wrt_ground"] = rdf["platform_speed_wrt_ground"]
+        sdf["platform_course"] = rdf["platform_course"]
 
     except:
         log.error(f"Problem with standard data file {raw_data_file}, check formatting")
@@ -288,11 +283,11 @@ def calib_argos(raw_data_file, log=None):
         longitude = []
         loc_accuracy = []
         datetime_transmit = []
-        datetime_data = []
+        timestamp = []
         message_index = []
         pressure = []
         voltage = []
-        temperature_internal = []
+        internal_temperature = []
         comments = []
 
         # obs1 and 2 hold the index for each one of the 2 data lines
@@ -360,7 +355,7 @@ def calib_argos(raw_data_file, log=None):
 
                 # data time is position time
                 if data_time[0] == "?":
-                    datetime_data.append(np.nan)
+                    timestamp.append(np.nan)
                 else:
 
                     # There is no year recorded in the data, only DOY
@@ -371,7 +366,7 @@ def calib_argos(raw_data_file, log=None):
                     if data_doy > 350 and int(data_time.split("/")[0]) < 15:
                         data_year = str(int(data_year) + 1)
                     data_doy = int(data_time.split("/")[0])
-                    datetime_data.append(
+                    timestamp.append(
                         dt.datetime.strptime(f"{data_year}-{data_time}", "%Y-%j/%H%M")
                     )
 
@@ -418,25 +413,28 @@ def calib_argos(raw_data_file, log=None):
 
                 # temperature
                 if "E+" in fields[3] or "E-" in fields[3]:
-                    temperature_internal.append(float(fields[3]))
+                    internal_temperature.append(float(fields[3]))
                 else:
                     if len(fields[3]) == 3:
-                        temperature_internal.append(int(fields[3]) * 0.3 - 50)
+                        internal_temperature.append(int(fields[3]) * 0.3 - 50)
                     else:
-                        temperature_internal.append(int(fields[3], 16) * 0.3 - 50)
+                        internal_temperature.append(int(fields[3], 16) * 0.3 - 50)
 
         # create an empty standard data frame - sdf - filled with NAs
         sdf = create_sdf(len(latitude))
 
-        sdf["beacon_id"] = Path(raw_data_file).stem
-        sdf["datetime_data"] = pd.to_datetime(datetime_data, utc=True)
-        sdf["datetime_transmit"] = pd.to_datetime(datetime_transmit, utc=True)
+        sdf["platform_id"] = Path(raw_data_file).stem
+        sdf["timestamp"] = pd.to_datetime(timestamp, utc=True)
         sdf["latitude"] = latitude
         sdf["longitude"] = longitude
-        sdf["temperature_internal"] = temperature_internal
-        sdf["pressure"] = pressure
-        sdf["voltage"] = voltage
-        sdf["loc_accuracy"] = loc_accuracy
+        sdf["internal_temperature"] = internal_temperature
+        sdf["internal_temperature"] = (
+            sdf["internal_temperature"] + 273.15
+        )  # from Celsius to Kelvin
+        sdf["air_pressure"] = pressure
+        sdf["air_pressure"] = sdf["air_pressure"] * 100  # from hPa to Pa
+        sdf["voltage_battery_volts"] = voltage
+        sdf["argo_position_accuracy"] = loc_accuracy
 
         if len(comments) > 0:
             log.info("Start of comments from raw ARGOS file:")
@@ -501,26 +499,26 @@ def canatec(raw_data_file, log=None):
     sdf = create_sdf(len(rdf))
 
     # Unique beacon identifier
-    sdf["beacon_id"] = Path(raw_data_file).stem
+    sdf["platform_id"] = Path(raw_data_file).stem
 
     try:
-        sdf["datetime_data"] = pd.to_datetime(
+        sdf["timestamp"] = pd.to_datetime(
             rdf["ReadingDate"], utc=True, yearfirst="True"
         )
         sdf["latitude"] = rdf["Latitude"]
         sdf["longitude"] = rdf["Longitude"]
 
         if "TempExternal" in rdf:
-            sdf["temperature_air"] = rdf["TempExternal"]
+            sdf["air_temperature"] = rdf["TempExternal"] + 273.15  # to Kelvin
 
         if "TempInternal" in rdf:
-            sdf["temperature_internal"] = rdf["TempInternal"]
+            sdf["internal_temperature"] = rdf["TempInternal"] + 273.15  # to Kelvin
 
         if "Pressure" in rdf:
-            sdf["pressure"] = rdf["Pressure"]
+            sdf["air_pressure"] = rdf["Pressure"] * 100  # from hPa to Pa
 
         if "BatteryVoltage" in rdf:
-            sdf["voltage"] = rdf["BatteryVoltage"]
+            sdf["voltage_battery_volts"] = rdf["BatteryVoltage"]
 
     except:
         log.error(f"Problem with raw data file {raw_data_file}, check formatting")
@@ -567,10 +565,10 @@ def pathfinder_ccore(raw_data_file, log=None):
     sdf = create_sdf(len(rdf))
 
     # Unique beacon identifier
-    sdf["beacon_id"] = Path(raw_data_file).stem
+    sdf["platform_id"] = Path(raw_data_file).stem
 
     try:
-        sdf["datetime_data"] = pd.to_datetime(
+        sdf["timestamp"] = pd.to_datetime(
             rdf["Time"], format="%Y %b %d %H:%M:%S UTC", utc=True
         )
         sdf["latitude"] = rdf["Latitude"]
@@ -615,7 +613,7 @@ def cryologger(raw_data_file, log=None):
         temperature_int
         humidity_int
         pressure_int
-        pitch
+        platform_pitch
         roll
         heading
         latitude
@@ -637,40 +635,36 @@ def cryologger(raw_data_file, log=None):
     sdf = create_sdf(len(rdf))
 
     # Unique beacon identifier
-    sdf["beacon_id"] = Path(raw_data_file).stem
+    sdf["platform_id"] = Path(raw_data_file).stem
 
     try:
-        sdf["datetime_data"] = pd.to_datetime(rdf["unixtime"], unit="s", utc=True)
+        sdf["timestamp"] = pd.to_datetime(rdf["unixtime"], unit="s", utc=True)
         sdf["latitude"] = rdf["latitude"]
         sdf["longitude"] = rdf["longitude"]
 
-        #  Data transmission timestamp (UTC)
-        if "transmit_time" in rdf:
-            sdf["datetime_transmit"] = pd.to_datetime(rdf["transmit_time"])
-
         #  Battery voltage
         if "voltage" in rdf:
-            sdf["voltage"] = rdf["voltage"]
+            sdf["voltage_battery_volts"] = rdf["voltage"]
 
         # Internal temperature
         if "temperature_int" in rdf:
-            sdf["temperature_internal"] = rdf["temperature_int"]
+            sdf["internal_temperature"] = rdf["temperature_int"] + 273.15  # to Kelvin
 
         #  Barometric pressure
         if "pressure_int" in rdf:
-            sdf["pressure"] = rdf["pressure_int"]
+            sdf["air_pressure"] = rdf["pressure_int"] * 100  # from hPa to Pa
 
         # Pitch
         if "pitch" in rdf:
-            sdf["pitch"] = rdf["pitch"]
+            sdf["platform_pitch"] = rdf["pitch"]
 
         # Roll
         if "roll" in rdf:
-            sdf["roll"] = rdf["roll"]
+            sdf["platform_roll"] = rdf["roll"]
 
         # Tilt-compensated heading
         if "heading" in rdf:
-            sdf["heading"] = rdf["heading"]
+            sdf["platform_orientation"] = rdf["heading"]
 
     except:
         log.error(f"Problem with raw data file {raw_data_file}, check formatting")
@@ -724,33 +718,31 @@ def iabp(raw_data_file, log=None):
     sdf = create_sdf(len(rdf))
 
     # Unique beacon identifier
-    sdf["beacon_id"] = Path(raw_data_file).stem
+    sdf["platform_id"] = Path(raw_data_file).stem
 
     try:
-        import pdb
 
-        pdb.set_trace()
         # use the position doy for the timestamp (along with year) - subtract 1 to make Jan 1 = 0
-        sdf["datetime_data"] = pd.to_datetime(rdf["Year"], format="%Y", utc=True) + rdf[
+        sdf["timestamp"] = pd.to_datetime(rdf["Year"], format="%Y", utc=True) + rdf[
             "POS_DOY"
         ].sub(1).apply(pd.Timedelta, unit="D")
         # round to the nearest second
-        sdf["datetime_data"] = sdf["datetime_data"].dt.round(freq="s")
+        sdf["timestamp"] = sdf["timestamp"].dt.round(freq="s")
 
         sdf["latitude"] = rdf["Lat"]
         sdf["longitude"] = rdf["Lon"]
 
         # Air temperature
         if "Ta" in rdf:
-            sdf["temperature_air"] = rdf["Ta"]
+            sdf["air_temperature"] = rdf["Ta"] + 273.15  # to Kelvin
 
         # Surface temperature
         if "Ts" in rdf:
-            sdf["temperature_surface"] = rdf["Ts"]
+            sdf["surface_temperature"] = rdf["Ts"] + 273.15  # to Kelvin
 
         # Pressure
         if "BP" in rdf:
-            sdf["pressure"] = rdf["BP"]
+            sdf["air_pressure"] = rdf["BP"] * 100  # from hPa to Pa
 
     except:
         log.error(f"Problem with raw data file {raw_data_file}, check formatting")
@@ -802,11 +794,11 @@ def globalstar(raw_data_file, log=None):
     sdf = create_sdf(len(rdf))
 
     # Unique beacon identifier
-    sdf["beacon_id"] = Path(raw_data_file).stem
+    sdf["platform_id"] = Path(raw_data_file).stem
 
     try:
         # This is the C-CORE format
-        sdf["datetime_data"] = pd.to_datetime(
+        sdf["timestamp"] = pd.to_datetime(
             rdf["DT_TAG_POS_UTC"], format="%Y-%m-%dT%H:%MUTC", utc=True
         )
 
@@ -819,7 +811,7 @@ def globalstar(raw_data_file, log=None):
         # This is the IIP format
         try:
 
-            sdf["datetime_data"] = pd.to_datetime(
+            sdf["timestamp"] = pd.to_datetime(
                 rdf["DATETIME"], format="%Y-%m-%dT%H:%MUTC", utc=True
             )
 
@@ -869,7 +861,7 @@ def oceanetic(raw_data_file, log=None):
     sdf = create_sdf(len(rdf))
 
     # Unique beacon identifier
-    sdf["beacon_id"] = Path(raw_data_file).stem
+    sdf["platform_id"] = Path(raw_data_file).stem
 
     try:
 
@@ -877,7 +869,7 @@ def oceanetic(raw_data_file, log=None):
             columns={"yr": "year", "mm": "month", "dd": "day", "hr": "hour"},
             inplace=True,
         )
-        sdf["datetime_data"] = pd.to_datetime(
+        sdf["timestamp"] = pd.to_datetime(
             rdf[["year", "month", "day", "hour"]], utc=True
         )
 
@@ -934,10 +926,10 @@ def ceos(raw_data_file, log=None):
     sdf = create_sdf(len(rdf))
 
     # Unique beacon identifier
-    sdf["beacon_id"] = Path(raw_data_file).stem
+    sdf["platform_id"] = Path(raw_data_file).stem
 
     try:
-        sdf["datetime_data"] = pd.to_datetime(
+        sdf["timestamp"] = pd.to_datetime(
             rdf["date"].str.cat(rdf["time"], sep=" "), utc=True
         )
 
@@ -998,12 +990,12 @@ def wirl_sbd(raw_data_file, log=None):
     sdf = create_sdf(len(rdf))
 
     # Unique beacon identifier
-    sdf["beacon_id"] = Path(raw_data_file).stem
+    sdf["platform_id"] = Path(raw_data_file).stem
 
     try:
 
         if "Year" in rdf:
-            sdf["datetime_data"] = pd.to_datetime(
+            sdf["timestamp"] = pd.to_datetime(
                 rdf[["Year", "Month", "Day", "Hour", "Minute"]], utc=True
             )
 
@@ -1016,15 +1008,16 @@ def wirl_sbd(raw_data_file, log=None):
             sdf["longitude"] = rdf["Longitude"]
 
         if "Temperature" in rdf:
-            sdf["temperature_internal"] = rdf["Temperature"]
-            sdf.loc[sdf["temperature_internal"] == -99, "temperature_internal"] = np.nan
+            sdf["internal_temperature"] = rdf["Temperature"] + 273.15  # to Kelvin
+            sdf.loc[sdf["internal_temperature"] == -99, "internal_temperature"] = np.nan
 
         if "AtmPress" in rdf:
-            sdf["pressure"] = rdf["AtmPress"]
-            sdf.loc[sdf["pressure"] == -99, "pressure"] = np.nan
+            sdf["air_pressure"] = rdf["AtmPress"] * 100  # from hPa to Pa
+            # convert to nan
+            sdf.loc[sdf["air_pressure"] == -99 * 100, "air_pressure"] = np.nan
 
         if "Voltage Battery" in rdf:
-            sdf["voltage"] = rdf["Voltage Battery"]
+            sdf["voltage_battery_volts"] = rdf["Voltage Battery"]
 
     except:
         log.error(f"Problem with raw data file {raw_data_file}, check formatting")
@@ -1100,11 +1093,11 @@ def rockstar(raw_data_file, log=None):
     sdf = create_sdf(len(rdf))
 
     # Unique beacon identifier
-    sdf["beacon_id"] = Path(raw_data_file).stem
+    sdf["platform_id"] = Path(raw_data_file).stem
 
     try:
         # there are 2 columns with the same label.  they seem to be always the same...
-        sdf["datetime_data"] = pd.to_datetime(
+        sdf["timestamp"] = pd.to_datetime(
             rdf["GPS Time (UTC)"], dayfirst=True, utc=True
         )
 
@@ -1112,7 +1105,7 @@ def rockstar(raw_data_file, log=None):
         sdf["longitude"] = rdf["Longitude"]
 
         if "Temperature" in rdf:
-            sdf["temperature_internal"] = rdf["Temperature"]
+            sdf["internal_temperature"] = rdf["Temperature"] + 273.15  # to Kelvin
 
     except:
         log.error(f"Problem with raw data file {raw_data_file}, check formatting")
@@ -1160,11 +1153,11 @@ def solara(raw_data_file, log=None):
     sdf = create_sdf(len(rdf))
 
     # Unique beacon identifier
-    sdf["beacon_id"] = Path(raw_data_file).stem
+    sdf["platform_id"] = Path(raw_data_file).stem
 
     try:
 
-        sdf["datetime_data"] = pd.to_datetime(rdf["timestamp"], utc=True)
+        sdf["timestamp"] = pd.to_datetime(rdf["timestamp"], utc=True)
         sdf["latitude"] = rdf["lat"]
         sdf["longitude"] = rdf["long"]
 
@@ -1269,7 +1262,7 @@ def metocean(raw_data_file, log=None):
     sdf = create_sdf(len(rdf))
 
     # Unique beacon identifier
-    sdf["beacon_id"] = Path(raw_data_file).stem
+    sdf["platform_id"] = Path(raw_data_file).stem
 
     try:
 
@@ -1278,7 +1271,7 @@ def metocean(raw_data_file, log=None):
         timestamp_cols1 = ["DATA DATE (UTC)", "Data Date (UTC)", "DataDate_UTC"]
         for col in timestamp_cols1:  # if there is a match, it will assign the datetime
             if col in rdf:
-                sdf["datetime_data"] = pd.to_datetime(rdf[col], utc=True)
+                sdf["timestamp"] = pd.to_datetime(rdf[col], utc=True)
                 break
         timestamp_cols2 = [
             "Date(GMT)",
@@ -1286,20 +1279,20 @@ def metocean(raw_data_file, log=None):
         ]  # These are not necessarily data timestamps
         for col in timestamp_cols2:  # if there is a match, it will assign the datetime
             if col in rdf:
-                sdf["datetime_data"] = pd.to_datetime(rdf[col], utc=True)
+                sdf["timestamp"] = pd.to_datetime(rdf[col], utc=True)
                 break
 
         if "DATA DATE (UTC)" in rdf:
-            sdf["datetime_data"] = pd.to_datetime(rdf["DATA DATE (UTC)"], utc=True)
+            sdf["timestamp"] = pd.to_datetime(rdf["DATA DATE (UTC)"], utc=True)
         elif "Data Date (UTC)" in rdf:
-            sdf["datetime_data"] = pd.to_datetime(rdf["Data Date (UTC)"], utc=True)
+            sdf["timestamp"] = pd.to_datetime(rdf["Data Date (UTC)"], utc=True)
         elif "DataDate_UTC" in rdf:
-            sdf["datetime_data"] = pd.to_datetime(rdf["DataDate_UTC"], utc=True)
+            sdf["timestamp"] = pd.to_datetime(rdf["DataDate_UTC"], utc=True)
         elif (
             "Date(GMT)" in rdf or "Date (GMT)" in rdf
         ):  # this is potentially a transmission timestamp
             if "JHOUR" in rdf:
-                sdf["datetime_data"] = pd.to_datetime(
+                sdf["timestamp"] = pd.to_datetime(
                     rdf["YEAR"], format="%Y", utc=True
                 ) + rdf["JHOUR"].apply(pd.Timedelta, unit="h")
             else:
@@ -1317,23 +1310,23 @@ def metocean(raw_data_file, log=None):
                     inplace=True,
                 )
                 # build a timestamp
-                sdf["datetime_data"] = pd.to_datetime(
+                sdf["timestamp"] = pd.to_datetime(
                     rdf[["YEAR", "MONTH", "DAY", "HOUR", "MINUTE"]], utc=True
                 )
 
         else:
             log.error("Timestamp missing or not recognized")
-            # raise
+            raise
 
         # Data transmission timestamp
-        if "RECEIVED DATE (UTC)" in rdf:
-            sdf["datetime_transmit"] = pd.to_datetime(
-                rdf["RECEIVED DATE (UTC)"], utc=True
-            )
-        elif "Received Date (UTC)" in rdf:
-            sdf["datetime_transmit"] = pd.to_datetime(
-                rdf["Received Date (UTC)"], utc=True
-            )
+        # if "RECEIVED DATE (UTC)" in rdf:
+        #     sdf["datetime_transmit"] = pd.to_datetime(
+        #         rdf["RECEIVED DATE (UTC)"], utc=True
+        #     )
+        # elif "Received Date (UTC)" in rdf:
+        #     sdf["datetime_transmit"] = pd.to_datetime(
+        #         rdf["Received Date (UTC)"], utc=True
+        #     )
 
         if "GPS LATITUDE (DEGREES)" in rdf:
             sdf["latitude"] = rdf["GPS LATITUDE (DEGREES)"].apply(dms2dd)
@@ -1355,27 +1348,29 @@ def metocean(raw_data_file, log=None):
 
         # Air temperature
         if "AT" in rdf:
-            sdf["temperature_air"] = rdf["AT"]
+            sdf["air_temperature"] = rdf["AT"] + 273.15  # to Kelvin
 
         # Surface temperature
         if "SST" in rdf:
-            sdf["temperature_surface"] = rdf["SST"]
+            sdf["surface_temperature"] = rdf["SST"] + 273.15  # to Kelvin
         if "Sea Surface Temperature (�C)" in rdf:
-            sdf["temperature_surface"] = rdf["Sea Surface Temperature (�C)"]
+            sdf["surface_temperature"] = rdf["Sea Surface Temperature (�C)"]
 
         # Barometric pressure
         if "BP" in rdf:
-            sdf["pressure"] = rdf["BP"]
+            sdf["air_pressure"] = rdf["BP"] * 100  # from hPa to Pa
         if "Barometric Pressure (mbar)" in rdf:
-            sdf["pressure"] = rdf["Barometric Pressure (mbar)"]
+            sdf["air_pressure"] = (
+                rdf["Barometric Pressure (mbar)"] * 100
+            )  # from hPa to Pa
         if "Ref Pressure" in rdf:
-            sdf["pressure"] = rdf["Ref Pressure"]
+            sdf["air_pressure"] = rdf["Ref Pressure"] * 100  # from hPa to Pa
 
         # Battery voltage
         if "VBAT" in rdf:
-            sdf["voltage"] = rdf["VBAT"]
+            sdf["voltage_battery_volts"] = rdf["VBAT"]
         if "Battery Voltage (V)" in rdf:
-            sdf["voltage"] = rdf["Battery Voltage (V)"]
+            sdf["voltage_battery_volts"] = rdf["Battery Voltage (V)"]
 
     except:
         log.error(f"Problem with raw data file {raw_data_file}, check formatting")
@@ -1420,11 +1415,11 @@ def bio(raw_data_file, log=None):
     sdf = create_sdf(len(rdf))
 
     # Unique beacon identifier
-    sdf["beacon_id"] = Path(raw_data_file).stem
+    sdf["platform_id"] = Path(raw_data_file).stem
 
     # transfer the data from rdf to sdf
     try:
-        sdf["datetime_data"] = pd.to_datetime(
+        sdf["timestamp"] = pd.to_datetime(
             rdf["GPS_DATE"], format="%Y-%m-%d %H:%M:%S.%f", errors="coerce", utc=True
         ).fillna(
             pd.to_datetime(
@@ -1438,7 +1433,7 @@ def bio(raw_data_file, log=None):
         sdf["longitude"] = rdf["LONGITUDE"]
 
         if "VOLTAGE" in rdf:
-            sdf["voltage"] = rdf["VOLTAGE"]
+            sdf["voltage_battery_volts"] = rdf["VOLTAGE"]
 
     except:
         log.error(f"Problem with raw data file {raw_data_file}, check formatting")
@@ -1481,10 +1476,10 @@ def navidatum(raw_data_file, log=None):
     sdf = create_sdf(len(rdf))
 
     # Unique beacon identifier
-    sdf["beacon_id"] = Path(raw_data_file).stem
+    sdf["platform_id"] = Path(raw_data_file).stem
 
     try:
-        sdf["datetime_data"] = pd.to_datetime(
+        sdf["timestamp"] = pd.to_datetime(
             rdf["Date"], format="%d/%m/%Y %H:%M", utc=True
         )
 
@@ -1530,7 +1525,7 @@ def fn_template(raw_data_file, log=None):
     sdf = create_sdf(len(rdf))
 
     # Unique beacon identifier
-    sdf["beacon_id"] = Path(raw_data_file).stem
+    sdf["platform_id"] = Path(raw_data_file).stem
 
     try:
         1 + 1  # placeholder - remove to use template

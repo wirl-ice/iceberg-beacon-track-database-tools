@@ -34,7 +34,7 @@ This Python code ingests raw tracking beacon data, standardizes it to a common f
 * Code to visualize beacon tracks and data. It reads a standardized csv and produces: 
   * a map of the iceberg track: `*_map.png`
   * a graph of variables over time - temperature, displacement and velocity: `*_time.png`
-  * a graph of statistical distributions - polar plot of direction, histogram of speed: `*_dist.png`
+  * a graph of statistical distributions - polar plot of course bearing, histogram of speed: `*_dist.png`
   * a graph of temperature changes (used for checking if beacon is still on target): `*_temp.png`
 * This script can be run at the command line and takes the following arguments: 
   * `std_file` : full path to the standard data file
@@ -74,23 +74,21 @@ A CSV will be produced with the following column headings:
 
 | Variable | Unit |
 | --- | ---  |
-| beacon_id |   |
-| datetime_data | YYYY-MM-DD hh:mm:ss |
-| datetime_transmit | YYYY-MM-DD hh:mm:ss  |
+| platform_id |   |
+| timestamp | YYYY-MM-DD hh:mm:ss |
 | latitude | DD  |
 | longitude | DD |
-| temperature_air | °C  |
-| temperature_internal | °C  |
-| temperature_surface | °C |
-| pressure | hPa |
-| pitch | ° |
-| roll | ° |
-| heading | ° |
-| satellites | # |
-| voltage | V  |
-| loc_accuarcy |   |
-| distance | m |
-| speed | m/s |
+| air_temperature | K |
+| internal_temperature | K  |
+| surface_temperature | K |
+| air_pressure | Pa |
+| platform_pitch | ° |
+| platform_roll | ° |
+| platform_orientation | ° |
+| voltage_battery_volts | V  |
+| argo_position_accuracy |   |
+| platform_displacement | m |
+| platform_speed_wrt_ground | m/s |
 
 **2. Geospatial outputs:**
 * Track point files (*_pt.*)
@@ -103,7 +101,7 @@ A CSV will be produced with the following column headings:
 **3. Visualization plots:**
   * a map of the iceberg track: `*_map.png`
   * a graph of variables over time - temperature, displacement and velocity: `*_time.png`
-  * a graph of statistical distributions - polar plot of direction, histogram of speed: `*_dist.png`
+  * a graph of statistical distributions - polar plot of course direction, histogram of speed: `*_dist.png`
   * a graph of temperature changes (used for checking if beacon is still on target): `*_temp.png`
 
 **4. Debug log**

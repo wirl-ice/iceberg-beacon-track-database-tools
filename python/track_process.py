@@ -22,7 +22,7 @@ from pathlib import Path
 from ibtd import Track, Meta, Models, nolog
 
 
-def tracklog(beacon_id, path_output, level="INFO"):
+def tracklog(platform_id, path_output, level="INFO"):
     """
     Set up logging.
 
@@ -31,7 +31,7 @@ def tracklog(beacon_id, path_output, level="INFO"):
 
     Parameters
     ----------
-    beacon_id : str
+    platform_id : str
         the beacon id - used for naming log
     path_output : str
         path to the output file
@@ -45,8 +45,7 @@ def tracklog(beacon_id, path_output, level="INFO"):
 
     """
     # create a name for the file
-    loggerFileName = f"{beacon_id}.log"
-
+    loggerFileName = f"{platform_id}.log"
     # add full path here so it goes to the right place
     loggerFileName = os.path.join(path_output, loggerFileName)
 
@@ -227,7 +226,7 @@ def read_args():
         "--output_name",
         type=str,
         default=None,
-        help="the name of the standardized fully processed track file: defaults to beacon_id",
+        help="the name of the standardized fully processed track file: defaults to platform_id",
     )
     parser.add_argument(
         "-ot",
@@ -393,7 +392,7 @@ def process(
     trim_end : str, optional
         Timestamp to trim the end of the track in UTC format. The default is None.
     output_name : str, optional
-        Name for the output file. The default (None) will result in naming based on beacon_id.
+        Name for the output file. The default (None) will result in naming based on platform_id.
     output_types : list, optional
         List of output file types to produce. The default is None.
     output_plots : list, optional
@@ -417,6 +416,7 @@ def process(
         Track metadata (one row) in a dataframe.
 
     """
+
     log = logging.getLogger()
     log.info(f"\n~Processing {Path(data_file).stem}....\n")
 

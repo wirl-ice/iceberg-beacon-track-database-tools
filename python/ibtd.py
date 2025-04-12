@@ -170,7 +170,7 @@ class Specs:
                 f"Unkown model {model}, check spelling -or- duplicate model retrieved"
             )
 
-        # find which specs are undefined (=?) and replace with default
+        # find which specs are meant to be 'default'and replace with default
         beacon_specs_ind = beacon_specs.loc[:].values == "?"
         beacon_specs_ind = np.argwhere(beacon_specs_ind.flatten()).tolist()
         beacon_specs_ind = [i for row in beacon_specs_ind for i in row]
@@ -180,27 +180,32 @@ class Specs:
         beacon_specs = beacon_specs.drop(columns=["notes", "model"])
 
         # set to boolean
-        beacon_specs["temperature_int"] = beacon_specs["temperature_int"].astype(bool)
-        beacon_specs["temperature_surface"] = beacon_specs[
-            "temperature_surface"
-        ].astype(bool)
-        beacon_specs["temperature_air"] = beacon_specs["temperature_air"].astype(bool)
-        beacon_specs["voltage"] = beacon_specs["voltage"].astype(bool)
-        beacon_specs["pressure"] = beacon_specs["pressure"].astype(bool)
-        beacon_specs["pitch"] = beacon_specs["pitch"].astype(bool)
-        beacon_specs["roll"] = beacon_specs["roll"].astype(bool)
-        beacon_specs["heading"] = beacon_specs["heading"].astype(bool)
-        beacon_specs["buoyant"] = beacon_specs["buoyant"].astype(bool)
+        beacon_specs = beacon_specs.astype(
+            {
+                "air_deployable": bool,
+                "buoyant": bool,
+                "has_internal_temperature": bool,
+                "has_surface_temperature": bool,
+                "has_air_temperature": bool,
+                "has_air_pressure": bool,
+                "has_platform_pitch": bool,
+                "has_platform_roll": bool,
+                "has_platform_course": bool,
+                "has_voltage_battery_volts": bool,
+            }
+        )
 
         for column in beacon_specs.columns:
             setattr(self, column, beacon_specs[column].iloc[0])
 
-        # now coerce the data to floats, loc_accuracy are really integers, so try, but skip if NA
+        # now coerce the data to floats, argo_position_accuracy are really integers, so try, but skip if NA
         specs = beacon_specs.filter(regex="_max|_min")
         specs = specs.astype(float)
 
         try:
-            specs = specs.astype({"loc_accuracy_max": int, "loc_accuracy_min": int})
+            specs = specs.astype(
+                {"argo_position_accuracy_max": int, "argo_position_accuracy_min": int}
+            )
         except:
             pass
         # overwrite the properties above but with proper data types
@@ -303,13 +308,13 @@ class Track:
         self.log.debug(f"Initializing track instance from {data_file}")
 
         self.datafile = data_file
-        self.beacon_id = Path(self.datafile).stem
-        self.year, self.id = self.beacon_id.split("_")
+        self.platform_id = Path(self.datafile).stem
+        self.year, self.id = self.platform_id.split("_")
 
         # raw_data flag
         self.raw_data = raw_data
 
-        self.log.info(f"~Starting to process beacon {self.beacon_id}......")
+        self.log.info(f"~Starting to process beacon {self.platform_id}......")
 
         # if metadata is not given then set properties
         if metadata == None:
@@ -333,10 +338,8 @@ class Track:
         self.data = reader_function(self.datafile, self.log)
 
         # at a minimum this step should be taken since a track must have all 3 of these
-        # Drop all rows where datetime_data, latitude or longitude is nan
-        self.data.dropna(
-            subset=["datetime_data", "latitude", "longitude"], inplace=True
-        )
+        # Drop all rows where timestamp, latitude or longitude is nan
+        self.data.dropna(subset=["timestamp", "latitude", "longitude"], inplace=True)
 
         # check here to see if there are any data in the track.
         if len(self.data) < 1:
@@ -366,18 +369,18 @@ class Track:
         # note that this value *may* not match the actual file data since some reader functions
         # remove bad data beforehand
         # The data_start and _end won't change from here on.
-        self.data_start = self.data.datetime_data.min()
-        self.data_end = self.data.datetime_data.max()
+        self.data_start = self.data.timestamp.min()
+        self.data_end = self.data.timestamp.max()
 
         # in case the trim_start or trim_end is not set, set it to the widest range possible
         # report the difference between the data_start/end and the trim_start/end
         if self.trim_start == None:
-            self.trim_start = self.data.datetime_data.min()
+            self.trim_start = self.data.timestamp.min()
             self.log.warning(
                 "trim_start not specified, the track_start was set to the time of the first valid data point (data_start)"
             )
         else:
-            delta = self.trim_start - self.data.datetime_data.min()
+            delta = self.trim_start - self.data.timestamp.min()
             if delta.total_seconds() < 0:
                 self.log.info(
                     f"trim_start was set to {abs(delta)} before the first valid data point (data_start)"
@@ -392,12 +395,12 @@ class Track:
                 )
 
         if self.trim_end == None:
-            self.trim_end = self.data.datetime_data.max()
+            self.trim_end = self.data.timestamp.max()
             self.log.warning(
                 "trim_end not specified, the track_end was set to the time of the last valid data point (data_end)"
             )
         else:
-            delta = self.trim_end - self.data.datetime_data.max()
+            delta = self.trim_end - self.data.timestamp.max()
             if delta.total_seconds() < 0:
                 self.log.info(
                     f"trim_end was set to {abs(delta)} before the last valid data point (data_end)"
@@ -463,13 +466,13 @@ class Track:
         beacon is deployed but not activated or when data at the start or end of the
         track is deemed non-valid by various purging/filtering functions.
 
-        2) Rerun the speed method which calculates the speed, distance and bearing
+        2) Rerun the speed method which calculates the speed_wrt_ground, displacement and course
             between positions.
 
         3) Recreate the geospatial tracklines and trackpoints for the track.
 
-        4) Calculate track stats, whcih includes the observations, duration and distance
-            of the track, as well as the starting and ending latitude and longitude.
+        4) Calculate track stats, whcih includes the observations, duration and distance travelled
+            for the track, as well as the starting and ending latitude and longitude.
 
         Be sure to run this after all purging/filtering steps after sorting the data.
 
@@ -486,8 +489,8 @@ class Track:
         self.log.debug("Refreshing track stats")
 
         # now set the track range
-        self.track_start = self.data.datetime_data.min()
-        self.track_end = self.data.datetime_data.max()
+        self.track_start = self.data.timestamp.min()
+        self.track_end = self.data.timestamp.max()
 
         # reset the index
         self.data.reset_index(drop=True, inplace=True)
@@ -502,6 +505,7 @@ class Track:
 
         # populate some simple properties that all tracks have
         duration = self.track_end - self.track_start
+
         self.duration = round(duration.days + duration.seconds / (24 * 60 * 60), 2)
         self.observations = len(self.data.index)
 
@@ -519,9 +523,11 @@ class Track:
             self.longitude_end = None
 
         if self.speeded:
-            self.distance = round(self.data["distance"].sum() / 1000, 2)
+            self.distance_travelled = round(
+                self.data["platform_displacement"].sum() / 1000, 2
+            )
         else:
-            self.distance = None
+            self.distance_travelled = None
 
     def load_model_specs(self, Models):
         """
@@ -555,17 +561,17 @@ class Track:
         """
         self.log.info("Reading track metadata")
         # filter records to find the data for this beacon
-        record = Meta.df.loc[Meta.df.beacon_id == self.beacon_id]
+        record = Meta.df.loc[Meta.df.platform_id == self.platform_id]
 
         # check that one and only one record is returned
         if len(record) == 0:
             self.log.error("metadata not found, exiting....")
-            raise Exception(f"The metadata for beacon {self.beacon_id} was not found")
+            raise Exception(f"The metadata for beacon {self.platform_id} was not found")
 
         if len(record) > 1:
             self.log.error("beacon metadata duplicated, exiting....")
             raise Exception(
-                f"The metadata search for beacon {self.beacon_id} returned duplicate records"
+                f"The metadata search for beacon {self.platform_id} returned duplicate records"
             )
 
         # load properties
@@ -613,7 +619,7 @@ class Track:
 
         # next pull in all the remaining available metadata and store it as meta_dict
         record = record.drop(
-            ["beacon_id", "reader", "model", "trim_start", "trim_end"],
+            ["platform_id", "reader", "model", "trim_start", "trim_end"],
             axis=1,
             errors="ignore",
         )
@@ -644,87 +650,94 @@ class Track:
 
         # Air temperature
         self.data.loc[
-            (self.data["temperature_air"] > self.specs.temperature_air_max)
-            | (self.data["temperature_air"] < self.specs.temperature_air_min),
-            "temperature_air",
+            (self.data["air_temperature"] > self.specs.air_temperature_max)
+            | (self.data["air_temperature"] < self.specs.air_temperature_min),
+            "air_temperature",
         ] = np.nan
 
         # Internal temperature
         self.data.loc[
-            (self.data["temperature_internal"] > self.specs.temperature_internal_max)
-            | (self.data["temperature_internal"] < self.specs.temperature_internal_min),
-            "temperature_internal",
+            (self.data["internal_temperature"] > self.specs.internal_temperature_max)
+            | (self.data["internal_temperature"] < self.specs.internal_temperature_min),
+            "internal_temperature",
         ] = np.nan
 
         # Surface temperature
         self.data.loc[
-            (self.data["temperature_surface"] > self.specs.temperature_surface_max)
-            | (self.data["temperature_surface"] < self.specs.temperature_surface_min),
-            "temperature_surface",
+            (self.data["surface_temperature"] > self.specs.surface_temperature_max)
+            | (self.data["surface_temperature"] < self.specs.surface_temperature_min),
+            "surface_temperature",
         ] = np.nan
 
         # Pressure
         self.data.loc[
-            (self.data["pressure"] > self.specs.pressure_max)
-            | (self.data["pressure"] < self.specs.pressure_min),
-            "pressure",
+            (self.data["air_pressure"] > self.specs.air_pressure_max)
+            | (self.data["air_pressure"] < self.specs.air_pressure_min),
+            "air_pressure",
         ] = np.nan
 
         # Pitch
         self.data.loc[
-            (self.data["pitch"] > self.specs.pitch_max)
-            | (self.data["pitch"] < self.specs.pitch_min),
-            "pitch",
+            (self.data["platform_pitch"] > self.specs.platform_pitch_max)
+            | (self.data["platform_pitch"] < self.specs.platform_pitch_min),
+            "platform_pitch",
         ] = np.nan
 
         # Roll
         self.data.loc[
-            (self.data["roll"] > self.specs.roll_max)
-            | (self.data["roll"] < self.specs.roll_min),
-            "roll",
+            (self.data["platform_roll"] > self.specs.platform_roll_max)
+            | (self.data["platform_roll"] < self.specs.platform_roll_min),
+            "platform_roll",
         ] = np.nan
 
         # Heading
         self.data.loc[
-            (self.data["heading"] > self.specs.heading_max)
-            | (self.data["heading"] < self.specs.heading_min),
-            "heading",
+            (self.data["platform_orientation"] > self.specs.platform_orientation_max)
+            | (self.data["platform_orientation"] < self.specs.platform_orientation_min),
+            "platform_orientation",
         ] = np.nan
 
         # Battery voltage
         self.data.loc[
-            (self.data["voltage"] > self.specs.voltage_max)
-            | (self.data["voltage"] < self.specs.voltage_min),
-            "voltage",
+            (self.data["voltage_battery_volts"] > self.specs.voltage_battery_volts_max)
+            | (
+                self.data["voltage_battery_volts"]
+                < self.specs.voltage_battery_volts_min
+            ),
+            "voltage_battery_volts",
         ] = np.nan
 
         # Drop data with poor accuracy (as specified in the specs)
         drop_index = self.data[
-            (self.data["loc_accuracy"] > self.specs.loc_accuracy_max)
-            | (self.data["loc_accuracy"] < self.specs.loc_accuracy_min)
+            (
+                self.data["argo_position_accuracy"]
+                > self.specs.argo_position_accuracy_max
+            )
+            | (
+                self.data["argo_position_accuracy"]
+                < self.specs.argo_position_accuracy_min
+            )
         ].index
 
         if len(drop_index) > 0:
             self.data.drop(drop_index, inplace=True)
             self.log.info(
-                f"{len(drop_index)} records ({len(drop_index)/len(self.data):.1%}) removed due to unacceptable loc_accuracy."
+                f"{len(drop_index)} records ({len(drop_index)/len(self.data):.1%}) removed due to unacceptable argo_position_accuracy."
             )
 
-        # Drop all rows where datetime_data, latitude or longitude is nan
-        self.data.dropna(
-            subset=["datetime_data", "latitude", "longitude"], inplace=True
-        )
+        # Drop all rows where timestamp, latitude or longitude is nan
+        self.data.dropna(subset=["timestamp", "latitude", "longitude"], inplace=True)
 
         self.data = self.data.round(
             {
-                "temperature_air": 2,
-                "temperature_internal": 2,
-                "temperature_surface": 2,
-                "pressure": 2,
-                "pitch": 2,
-                "roll": 2,
-                "heading": 2,
-                "voltage": 2,
+                "air_temperature": 2,
+                "internal_temperature": 2,
+                "surface_temperature": 2,
+                "air_pressure": 2,
+                "platform_pitch": 2,
+                "platform_roll": 2,
+                "platform_orientation": 2,
+                "voltage_battery_volts": 2,
             }
         )
 
@@ -742,24 +755,24 @@ class Track:
         This function takes care of these issues.
 
         """
-        # sort by datetime_data, and loc_accuracy if available. The best loc_accuracy is the highest number
-        self.data.sort_values(["datetime_data", "loc_accuracy"], inplace=True)
+        # sort by timestamp, and argo_position_accuracy if available. The best argo_position_accuracy is the highest number
+        self.data.sort_values(["timestamp", "argo_position_accuracy"], inplace=True)
         # look for repeated values
-        # sdf_dup = self.data.loc[self.data.duplicated(subset=["datetime_data"], keep=False)] # all lines
+        # sdf_dup = self.data.loc[self.data.duplicated(subset=["timestamp"], keep=False)] # all lines
         sdf_dup = self.data.loc[
-            self.data.duplicated(subset=["datetime_data"], keep="last")
+            self.data.duplicated(subset=["timestamp"], keep="last")
         ]  # keep last dup
         if self.raw_data:
             self.log.info(f"{len(sdf_dup)} rows with duplicate timestamps were removed")
 
         # remove all rows with duplicate times, prefer the one with best location accuracy
         self.data.drop_duplicates(
-            subset=["datetime_data"], keep="last", inplace=True, ignore_index=True
+            subset=["timestamp"], keep="last", inplace=True, ignore_index=True
         )
 
         # this should be true (check!)
         assert self.data[
-            "datetime_data"
+            "timestamp"
         ].is_monotonic_increasing, "Issue with timestamps, sort data!"
 
         # recalculate stats here since things may have changed
@@ -772,7 +785,11 @@ class Track:
             )
 
     def speed(self):
-        """Calculate speed, direction, distance between iceberg positions.
+        """Calculate displacement, speed and course bearing between iceberg positions.
+
+        - platform_displacement : Distance from previous to current track position
+        - platform_speed_wrt_ground : Speed from previous to current track position
+        - platform_course :	Azimuth relative to true north from previous to current track position
 
         The speed is rounded to 3 decimal places and direction and distance are rounded
         to 0 decimal places which is plenty for sig figs. Since they are floating point values, they
@@ -781,40 +798,50 @@ class Track:
         """
         # Ensure rows are sorted by datetime.
         assert self.data[
-            "datetime_data"
+            "timestamp"
         ].is_monotonic_increasing, "Issue with timestamps, sort data!"
 
         # Initialize pyproj with appropriate ellipsoid
         geodesic = pyproj.Geod(ellps="WGS84")
 
         # Calculate forward azimuth and great circle distance between modelled coordinates
-        self.data["direction"], backaz, self.data["distance"] = geodesic.inv(
-            self.data["longitude"].shift().tolist(),
-            self.data["latitude"].shift().tolist(),
-            self.data["longitude"].tolist(),
-            self.data["latitude"].tolist(),
+        self.data["platform_course"], backaz, self.data["platform_displacement"] = (
+            geodesic.inv(
+                self.data["longitude"].shift().tolist(),
+                self.data["latitude"].shift().tolist(),
+                self.data["longitude"].tolist(),
+                self.data["latitude"].tolist(),
+            )
         )
 
         # Convert azimuth from (-180° to 180°) to (0° to 360°)
-        self.data["direction"] = ((self.data["direction"] + 360) % 360).round(2)
+        self.data["platform_course"] = (
+            (self.data["platform_course"] + 360) % 360
+        ).round(2)
 
-        ## Note here that no displacement (same lat/lon repeated) yields direction 180
-        ## and distance 0 in the NH.  In SH it is direction 0 and distance 0 which might
+        ## Note here that no displacement (same lat/lon repeated) yields platform_course 180
+        ## and displacement 0 in the NH.  In SH it is course 0 and displacement 0 which might
         ## need to be considered if there is SH data.
-        self.data.loc[self.data["distance"] == 0, "direction"] = np.nan
+        self.data.loc[self.data["platform_displacement"] == 0, "platform_course"] = (
+            np.nan
+        )
 
         # Calculate time delta between rows (in seconds)
-        time_delta = self.data["datetime_data"].diff().dt.total_seconds()
+        time_delta = self.data["timestamp"].diff().dt.total_seconds()
 
         # Calculate speed in m/s
-        self.data["speed"] = self.data["distance"] / time_delta
+        self.data["platform_speed_wrt_ground"] = (
+            self.data["platform_displacement"] / time_delta
+        )
 
         # Round columns
         # to assess whether there are consecutive duplicate positions, comment these lines
 
-        self.data["distance"] = self.data["distance"].round(0)
-        self.data["direction"] = self.data["direction"].round(0)
-        self.data["speed"] = self.data["speed"].round(3)
+        self.data["platform_displacement"] = self.data["platform_displacement"].round(0)
+        self.data["platform_course"] = self.data["platform_course"].round(0)
+        self.data["platform_speed_wrt_ground"] = self.data[
+            "platform_speed_wrt_ground"
+        ].round(3)
 
         # set property
         self.speeded = True
@@ -846,12 +873,13 @@ class Track:
         """
         # needs to be in a loop since if there is a fly-away point, you have going out and coming back
         before = len(self.data)
-        while (self.data["speed"] > threshold).any():
+        while (self.data["platform_speed_wrt_ground"] > threshold).any():
             self.log.info(
-                f'Removing position at {self.data.loc[self.data["speed"] > threshold, "datetime_data"].iloc[0]} due to speed limit violations'
+                f'Removing position at {self.data.loc[self.data["platform_speed_wrt_ground"] > threshold, "timestamp"].iloc[0]} due to speed limit violations'
             )
             self.data.drop(
-                self.data[self.data["speed"] > threshold].index[0], inplace=True
+                self.data[self.data["platform_speed_wrt_ground"] > threshold].index[0],
+                inplace=True,
             )
             self.speed()
         self.log.info(
@@ -882,7 +910,7 @@ class Track:
         """
         if self.trim_start:
             self.data.drop(
-                self.data[self.data["datetime_data"] < self.trim_start].index,
+                self.data[self.data["timestamp"] < self.trim_start].index,
                 inplace=True,
             )
             self.log.info(
@@ -892,7 +920,7 @@ class Track:
 
         if self.trim_end:
             self.data.drop(
-                self.data[self.data["datetime_data"] > self.trim_end].index,
+                self.data[self.data["timestamp"] > self.trim_end].index,
                 inplace=True,
             )
             self.log.info(
@@ -925,7 +953,7 @@ class Track:
         self.trackpoints.crs = "EPSG:4326"
 
         # Convert to line
-        self.trackline = self.trackpoints.groupby(["beacon_id"])["geometry"].apply(
+        self.trackline = self.trackpoints.groupby(["platform_id"])["geometry"].apply(
             lambda x: LineString(x.tolist())
         )
 
@@ -952,7 +980,7 @@ class Track:
               file, it seemed like a good idea to keep _ln and _pt data separate.
             - the kml _ln and _pt files are meant for a quick look only (convienient to view):
                 - there is no fancy symbology in the kml output.
-                - the kml_pt output is restricted to beacon_id and the timestamp.
+                - the kml_pt output is restricted to platform_id and the timestamp.
                 - sometimes the kml_pt file loads slowly.
 
         Parameters
@@ -961,7 +989,7 @@ class Track:
         path_output : str, optional
             Path to put the output. The default is the current directory
         file_name : str, optional
-            filename of output. The default is None, which will autogenerate on the beacon_id
+            filename of output. The default is None, which will autogenerate on the platform_id
 
         Returns
         -------
@@ -969,7 +997,7 @@ class Track:
 
         """
         if not file_name:
-            file_name = self.beacon_id
+            file_name = self.platform_id
 
         if types is None:
             return
@@ -1017,7 +1045,7 @@ class Track:
         if "pt_kml" in types:
             if not os.path.isfile(f"{os.path.join(path_output, file_name)}_pt.kml"):
                 # note the name will be the beacon id and the description will be the timestamp.
-                self.trackpoints[["beacon_id", "datetime_data", "geometry"]].to_file(
+                self.trackpoints[["platform_id", "timestamp", "geometry"]].to_file(
                     f"{os.path.join(path_output, file_name)}_pt.kml", driver="KML"
                 )
                 self.log.info("Track output as trackpoint kml file")
@@ -1067,9 +1095,9 @@ class Track:
         """
         sdf = self.data
         # need to have a datetime index or use the 'on' keyword
-        sdf = sdf.set_index("datetime_data")
-        sdf["u"] = np.sin(np.radians(sdf.heading))
-        sdf["v"] = np.cos(np.radians(sdf.heading))
+        sdf = sdf.set_index("timestamp")
+        sdf["u"] = np.sin(np.radians(sdf.platform_orientation))
+        sdf["v"] = np.cos(np.radians(sdf.platform_orientation))
 
         # https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.resample.html
         # Note that you can control whether bin intervals are closed on left or right
@@ -1102,24 +1130,25 @@ class Track:
 
         # with mixed data types the way you aggregate needs to be controlled for each column
         sdf_ = sdf.resample(timestep).agg(
-            beacon_id=("beacon_id", string_f),
-            datetime_transmit=("datetime_transmit", number_f),
+            platform_id=("platform_id", string_f),
             latitude=("latitude", number_f),
             longitude=("longitude", number_f),
-            temperature_air=("temperature_air", number_f),
-            temperature_internal=("temperature_internal", number_f),
-            temperature_surface=("temperature_surface", number_f),
-            pressure=("pressure", number_f),
-            pitch=("pitch", number_f),
-            roll=("roll", number_f),
-            heading=("heading", string_f),
-            voltage=("voltage", number_f),
-            loc_accuracy=("loc_accuracy", number_f),
+            air_temperature=("air_temperature", number_f),
+            internal_temperature=("internal_temperature", number_f),
+            surface_temperature=("surface_temperature", number_f),
+            air_pressure=("air_pressure", number_f),
+            platform_pitch=("platform_pitch", number_f),
+            platform_roll=("platform_roll", number_f),
+            platform_orientation=("platform_orientation", string_f),
+            voltage_battery_volts=("voltage_battery_volts", number_f),
+            argo_position_accuracy=("argo_position_accuracy", number_f),
             u=("u", number_f),
             v=("v", number_f),
         )
 
-        sdf_["heading"] = (360 + np.rad2deg(np.atan2(sdf_.u, sdf_.v))) % 360
+        sdf_["platform_orientation"] = (
+            360 + np.rad2deg(np.atan2(sdf_.u, sdf_.v))
+        ) % 360
 
         self.data = sdf_.drop(["u", "v"], axis=1)
 
@@ -1169,14 +1198,13 @@ class Track:
             "meta_dict",
             "trackpoints",
             "trackline",
-            "deployment",
         ]
         for key in remove_keys:
             t_meta.pop(key, None)  # Use pop to avoid KeyError if key doesn't exist
 
         # now parse out the metadata fields based on what categories are defined:
         identifier_metadata = [
-            "beacon_id",
+            "platform_id",
             "year",
             "id",
             "wmo",
@@ -1189,18 +1217,21 @@ class Track:
         comments_metadata = ["comments"]
 
         track_metadata = [
-            "observations",
-            "duration",
-            "distance",
             "track_start",
             "track_end",
-            "trim_status",
             "data_start",
             "data_end",
+            "trim_start",
+            "trim_end",
+            "trim_start_flag",
+            "trim_end_flag",
             "latitude_start",
             "longitude_start",
             "latitude_end",
             "longitude_end",
+            "observations",
+            "duration",
+            "distance_travelled",
         ]
 
         project_metadata = [
@@ -1214,7 +1245,6 @@ class Track:
             "deployed_by",
             "deployment_method",
             "deployment_platform",
-            "photo_comments",
             "photo_credit",
         ]
 
@@ -1233,22 +1263,22 @@ class Track:
             "thickness_flag",
             "draft",
             "draft_flag",
-            "satellite_imagery",
         ]
 
         beacon_metadata = [
             "model",
             "make",
             "transmitter",
-            "temperature_int",
-            "temperature_surface",
-            "temperature_air",
-            "voltage",
-            "pressure",
-            "pitch",
-            "roll",
-            "heading",
+            "air_deployable",
             "buoyant",
+            "has_internal_temperature",
+            "has_surface_temperature",
+            "has_air_temperature",
+            "has_voltage_battery_volts",
+            "has_air_pressure",
+            "has_platform_pitch",
+            "has_platform_roll",
+            "has_platform_orientation",
         ]
 
         valid_range_metadata = [
@@ -1256,24 +1286,24 @@ class Track:
             "latitude_max",
             "longitude_min",
             "longitude_max",
-            "temperature_air_min",
-            "temperature_air_max",
-            "temperature_internal_min",
-            "temperature_internal_max",
-            "temperature_surface_min",
-            "temperature_surface_max",
-            "pressure_min",
-            "pressure_max",
-            "pitch_min",
-            "pitch_max",
-            "roll_min",
-            "roll_max",
-            "heading_min",
-            "heading_max",
-            "voltage_min",
-            "voltage_max",
-            "loc_accuracy_min",
-            "loc_accuracy_max",
+            "air_temperature_min",
+            "air_temperature_max",
+            "internal_temperature_min",
+            "internal_temperature_max",
+            "surface_temperature_min",
+            "surface_temperature_max",
+            "air_pressure_min",
+            "air_pressure_max",
+            "platform_pitch_min",
+            "platform_pitch_max",
+            "platform_roll_min",
+            "platform_roll_max",
+            "platform_orientation_min",
+            "platform_orientation_max",
+            "voltage_battery_volts_min",
+            "voltage_battery_volts_max",
+            "argo_position_accuracy_min",
+            "argo_position_accuracy_max",
         ]
 
         process_metadata = [
@@ -1386,13 +1416,15 @@ class Track:
                 track_meta_dict, indent=4, default=json_serialize
             )
             with open(
-                f"{Path(path_output)/self.beacon_id}_meta.json", "w"
+                f"{Path(path_output)/self.platform_id}_meta.json", "w"
             ) as file_export:
                 file_export.write(track_meta_json)
 
         if meta_export == "pandas" or meta_export == "both":
             track_meta_df.to_csv(
-                f"{Path(path_output)/self.beacon_id}_meta.csv", index=False, na_rep="NA"
+                f"{Path(path_output)/self.platform_id}_meta.csv",
+                index=False,
+                na_rep="NA",
             )
 
         return track_meta_df
@@ -1451,7 +1483,9 @@ class Track:
         """
         # call the function in track_fig.py
         plot_trim(
-            self,
+            copy.deepcopy(
+                self
+            ),  # since the function modifies the track, work with copy
             path_output=path_output,
             dpi=dpi,
             interactive=interactive,
@@ -1509,7 +1543,9 @@ class Track:
         """
         # call the function in track_fig.py
         plot_time(
-            self,
+            copy.deepcopy(
+                self
+            ),  # since the function modifies the track, work with copy
             path_output=path_output,
             dpi=dpi,
             interactive=interactive,
