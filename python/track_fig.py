@@ -254,7 +254,7 @@ def plot_map(track, path_output=".", dpi=300, interactive=False, log=None):
         )
         plt.close()
 
-    log.info("Plotting map complete")
+    log.debug("Plotting map complete")
 
 
 def plot_trim(track, path_output=".", dpi=300, interactive=False, log=None):
@@ -549,7 +549,7 @@ def plot_trim(track, path_output=".", dpi=300, interactive=False, log=None):
         )
         plt.close()
 
-        log.info("Plotting trim complete")
+        log.debug("Plotting trim complete")
 
 
 def plot_dist(track, path_output=".", dpi=300, interactive=False, log=None):
@@ -719,7 +719,7 @@ def plot_dist(track, path_output=".", dpi=300, interactive=False, log=None):
 
         plt.close()
 
-    log.info("Plotting dist complete")
+    log.debug("Plotting dist complete")
 
 
 def plot_time(track, path_output=".", dpi=300, interactive=False, log=None):
@@ -906,7 +906,7 @@ def plot_time(track, path_output=".", dpi=300, interactive=False, log=None):
         )
         plt.close()
 
-    log.info("Plotting timeseries complete")
+    log.debug("Plotting timeseries complete")
 
 
 """

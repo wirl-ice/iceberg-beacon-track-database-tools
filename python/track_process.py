@@ -44,10 +44,13 @@ def tracklog(platform_id, path_output, level="INFO"):
         An instance of the logger class
 
     """
-    # create a name for the file
-    loggerFileName = f"{platform_id}.log"
-    # add full path here so it goes to the right place
-    loggerFileName = os.path.join(path_output, loggerFileName)
+    # name the logger after the platform_id
+    track_log = logging.getLogger(platform_id)
+
+    if not track_log.handlers:
+        # Create a name for the file
+        loggerFileName = f"{platform_id}.log"
+        loggerFileName = os.path.join(path_output, loggerFileName)
 
     # assign the log level here, defaults to INFO, note there is no ERROR or CRITICAL level
     match level.lower():
@@ -57,9 +60,6 @@ def tracklog(platform_id, path_output, level="INFO"):
             loglevel = logging.WARNING
         case _:
             loglevel = logging.INFO
-
-    # Create a logger instance here
-    track_log = logging.getLogger()
 
     # Remove all handlers associated with the logger (avoids duplicates)
     if track_log.hasHandlers():
@@ -81,13 +81,18 @@ def tracklog(platform_id, path_output, level="INFO"):
 
     # Create formatters and add them to handlers - this gives control over output
     c_format = logging.Formatter("%(message)s")
-    f_format = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    f_format = logging.Formatter(
+        "%(asctime)s - %(module)s - %(levelname)s - %(name)s - %(message)s"
+    )
     c_handler.setFormatter(c_format)
     f_handler.setFormatter(f_format)
 
     # Add handlers to the logger
     track_log.addHandler(c_handler)
     track_log.addHandler(f_handler)
+
+    # Prevent propagation to avoid duplicate logs
+    track_log.propagate = False
 
     return track_log
 
@@ -135,7 +140,7 @@ def read_args():
         Whether to check trim points without applying trimming.
     - raw_data : bool
         Whether the input is raw data (not standardized).
-    - meta_export : str or None
+    - meta_export : str
         Format for metadata export ('pandas', 'json', or 'both').
     - quiet : bool
         Whether to suppress logging output.
@@ -296,49 +301,13 @@ def read_args():
     meta_export = args.meta_export
     quiet = args.quiet
 
-    # some attempt at error trapping early on....
-    # TODO use a more elegant approach (assert is a bit abrupt for common errors)
-    assert os.path.isfile(
-        data_file
-    ), f"Data file: {data_file} was not found. Please check and run again"
-    assert os.path.isdir(
-        output_path
-    ), f"Output path: {output_path} was not found. Please check and run again"
-    if spec_file:
-        assert os.path.isfile(
-            spec_file
-        ), f"Spec file: {spec_file} was not found. Please check and run again"
-    if meta_file:
-        assert os.path.isfile(
-            meta_file
-        ), f"Meta file: {meta_file} was not found. Please check and run again"
-
-    if os.path.basename(data_file) == output_name:
-        if Path(data_file).parent == output_path:
-            print(
-                "The output file you specified will overwrite the raw data file, please fix and re-run"
-            )
-            sys.exit(1)
-
-    # if there is a meta_file, then open it and replace the following parameters
-    if meta_file:
-        metadata = Meta(meta_file)
-    else:
-        metadata = None
-
-    # read in the spec file
-    if spec_file:
-        specs = Models(spec_file)
-    else:
-        specs = None
-
     return [
         data_file,
         output_path,
-        metadata,
+        meta_file,
         reader,
         model,
-        specs,
+        spec_file,
         trim_start,
         trim_end,
         output_name,
@@ -350,6 +319,83 @@ def read_args():
         meta_export,
         quiet,
     ]
+
+
+def prep_run(data_file, output_path, output_name, spec_file, meta_file, log=None):
+    """
+    Prepare for processing run by validating some inputs and reading files.
+
+    Looks to see if key files and folders are present. Quits if not.
+    Reads in the metadata and specs files
+
+    Parameters
+    ----------
+    data_file : str
+        Path to the track data file to be processed.
+    output_path : str
+        Path where output files will be written.
+    output_name : str, optional
+        Name for the output file. The default (None) will result in naming based on platform_id.
+    spec_file : str
+        Full path to the beacon_specs file.
+    meta_file : str
+        Full path to the track_metadata file.
+    log : logger instance
+        A logger instance.  The default is None.
+
+    Returns
+    -------
+    metadata : Meta object, optional
+        Metadata object containing track information. The default is None.
+    specs : Models object, optional
+        Object containing model specifications. The default is None.
+
+    """
+    # some attempt at error trapping early on....
+    if not os.path.isfile(data_file):
+        log.error(f"Data file: {data_file} was not found. Please check and run again")
+        sys.exit(1)
+
+    if not os.path.isdir(output_path):
+        log.error(
+            f"Output path: {output_path} was not found. Please check and run again"
+        )
+        sys.exit(1)
+
+    if spec_file:
+        if not os.path.isfile(spec_file):
+            log.error(
+                f"Spec file: {spec_file} was not found. Please check and run again"
+            )
+            sys.exit(1)
+
+    if meta_file:
+        if not os.path.isfile(meta_file):
+            log.error(
+                f"Meta file: {meta_file} was not found. Please check and run again"
+            )
+            sys.exit(1)
+
+    if os.path.basename(data_file) == output_name:
+        if Path(data_file).parent == output_path:
+            log.error(
+                "The output file you specified will overwrite the raw data file, please fix and re-run"
+            )
+            sys.exit(1)
+
+    # if there is a meta_file, then open it and replace the following parameters
+    if meta_file:
+        metadata = Meta(meta_file, log)
+    else:
+        metadata = None
+
+    # read in the spec file
+    if spec_file:
+        specs = Models(spec_file, log)
+    else:
+        specs = None
+
+    return metadata, specs
 
 
 def process(
@@ -369,6 +415,7 @@ def process(
     raw_data=False,
     meta_export=None,
     meta_verbose=False,
+    log=None,
 ):
     """
     Process a raw track: standardize, purge, trim and output.
@@ -409,6 +456,8 @@ def process(
         Whether to include all available metadata fields in the track metadata. If True,
         metadata categories like processing details and valid range information are included.
         The default is False.
+    log : logger instance
+        A logger instance.  The default is None.
 
     Returns
     -------
@@ -416,9 +465,32 @@ def process(
         Track metadata (one row) in a dataframe.
 
     """
+    log.info(f"~Processing {Path(data_file).stem}....")
 
-    log = logging.getLogger()
-    log.info(f"\n~Processing {Path(data_file).stem}....\n")
+    log.debug(f"Data file: {data_file}")
+    log.debug(f"Output path: {output_path}")
+    if metadata:
+        log.debug("Metadata file read-in")
+    else:
+        log.debug("No metadata file")
+        log.debug("Reader: {reader}")
+        log.debug("Model: {model}")
+
+    if specs:
+        log.debug("Beacon specs read-in")
+    else:
+        log.debug("No beacon specs available")
+
+    log.debug(f"Trim start: {trim_start}")
+    log.debug(f"Trim end: {trim_end}")
+    log.debug(f"Output name: {output_name}")
+    log.debug(f"Output types: {output_types}")
+    log.debug(f"Output plots: {output_plots}")
+    log.debug(f"Interactive: {interactive}")
+    log.debug(f"Trim check: {trim_check}")
+    log.debug(f"Raw data: {raw_data}")
+    log.debug(f"Meta export: {meta_export}")
+    log.debug(f"Meta verbose: {meta_verbose}")
 
     if metadata and raw_data:
         trk = Track(
@@ -448,7 +520,7 @@ def process(
             "You must specify a valid metadata object or reader function to read a raw data track"
         )
 
-    # note that the steps purge, trim, sort, speed, and speed_limit are for raw data
+    # note that the steps purge, sort, speed, speed_limit and trim are for processing raw data
     # if you have standard data, it is possible to trim it to a specific period, as desired
     # the script runs sort, speed and speed_limit regardless (doesn't take much time/ can't hurt)
     # if you want to refine the speedlimit, then that can be done by adding a new limit here
@@ -496,18 +568,18 @@ def main():
     (
         data_file,
         output_path,
-        metadata,
+        meta_file,
         reader,
         model,
-        specs,
+        spec_file,
         trim_start,
         trim_end,
         output_name,
         output_types,
         output_plots,
         interactive,
-        raw_data,
         trim_check,
+        raw_data,
         meta_export,
         quiet,
     ) = read_args()
@@ -517,22 +589,27 @@ def main():
     else:
         log = tracklog(Path(data_file).stem, output_path, level="INFO")
 
+    metadata, specs = prep_run(
+        data_file, output_path, output_name, spec_file, meta_file, log
+    )
+
     process(
         data_file,
         output_path,
-        metadata,
-        reader,
-        model,
-        specs,
-        trim_start,
-        trim_end,
-        output_name,
-        output_types,
-        output_plots,
-        interactive,
-        raw_data,
-        trim_check,
-        meta_export,
+        metadata=metadata,
+        reader=reader,
+        model=model,
+        specs=specs,
+        trim_start=trim_start,
+        trim_end=trim_end,
+        output_name=output_name,
+        output_types=output_types,
+        output_plots=output_plots,
+        interactive=interactive,
+        raw_data=raw_data,
+        trim_check=trim_check,
+        meta_export=meta_export,
+        log=log,
     )
 
 

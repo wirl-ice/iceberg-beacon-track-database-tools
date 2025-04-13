@@ -116,9 +116,9 @@ class Models:
 
         except:
             pass
-            self.log.error(f"Model specifications file {self.model_file} read error")
+            self.log.error(f"Beacon specifications file {self.model_file} read error")
         self.df = df
-        self.log.info(f"Model specifications file {self.model_file} read")
+        self.log.debug(f"specifications file {self.model_file} read")
 
 
 class Specs:
@@ -314,8 +314,6 @@ class Track:
         # raw_data flag
         self.raw_data = raw_data
 
-        self.log.info(f"~Starting to process beacon {self.platform_id}......")
-
         # if metadata is not given then set properties
         if metadata == None:
             self.reader = reader
@@ -337,9 +335,16 @@ class Track:
         reader_function = getattr(track_readers, self.reader)
         self.data = reader_function(self.datafile, self.log)
 
+        self.log.info(f"Track rows: {len(self.data)} - after data file read")
+
         # at a minimum this step should be taken since a track must have all 3 of these
         # Drop all rows where timestamp, latitude or longitude is nan
+        self.log.info(
+            f'Track rows: {self.data[["timestamp", "latitude", "longitude"]].isnull().sum().sum()} rows removed. NAs found in timestamp or position'
+        )
         self.data.dropna(subset=["timestamp", "latitude", "longitude"], inplace=True)
+
+        self.log.info(f"Track rows: {len(self.data)} - after NAs removed")
 
         # check here to see if there are any data in the track.
         if len(self.data) < 1:
@@ -764,7 +769,6 @@ class Track:
         ]  # keep last dup
         if self.raw_data:
             self.log.info(f"{len(sdf_dup)} rows with duplicate timestamps were removed")
-
         # remove all rows with duplicate times, prefer the one with best location accuracy
         self.data.drop_duplicates(
             subset=["timestamp"], keep="last", inplace=True, ignore_index=True
@@ -874,7 +878,7 @@ class Track:
         # needs to be in a loop since if there is a fly-away point, you have going out and coming back
         before = len(self.data)
         while (self.data["platform_speed_wrt_ground"] > threshold).any():
-            self.log.info(
+            self.log.debug(
                 f'Removing position at {self.data.loc[self.data["platform_speed_wrt_ground"] > threshold, "timestamp"].iloc[0]} due to speed limit violations'
             )
             self.data.drop(
@@ -883,8 +887,9 @@ class Track:
             )
             self.speed()
         self.log.info(
-            f"Removed {before - len(self.data)} rows due to speed limit violations"
+            f"Track rows: {before - len(self.data)} rows removed due to speeds > {threshold} m/s"
         )
+        self.log.info(f"Track rows: {len(self.data)} - after speed filter")
 
         self.speedlimited = True
 
@@ -933,6 +938,7 @@ class Track:
 
         # recalculate stats here since things may have changed
         self.refresh_stats()
+        self.log.info(f"Track rows: {len(self.data)} after trim")
 
     def geo(self):
         """

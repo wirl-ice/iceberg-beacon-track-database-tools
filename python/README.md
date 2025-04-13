@@ -1,11 +1,10 @@
 # Iceberg Beacon Track Database: Tools for Track Standardization, Visualization and Database Collation 
 
-Authors: Derek Mueller, Adam Garbo, Jill Rajewicz and Anna Crawford
-
+Authors: Derek Mueller, Adam Garbo, with contributions from Jill Rajewicz and Anna Crawford
 
 Release 1.0 
 
-Date: 2025-04-06
+Date: 2025-04-12
 
 ## Introduction
 This Python code ingests raw tracking beacon data, standardizes it to a common format, peforms a number of data processing steps and outputs visualization and data products.
