@@ -818,13 +818,19 @@ class Track:
         Note the intent here is to remove only the very worst rows from datasets.  It is
         a very crude way to cut down on _clearly wrong_ position data.  Note high speeds are
         often due to inaccurate positions, but also inprecise positions over short periods
-        of time.
+        of time. (eg., an Argos position 1-2 min apart may exceed a threshold even if
+        the precision is relatively good).
 
         It is important to be careful not to cut out good data.
 
         The default value here is 5 m/s or 18 kph or 432 km/d (this is very conservative
         to avoid throwing away data - especially for ARGOS beacons. It could easily be set
         lower for GNSS-based systems - likely 2 m/s would be fine)
+
+        Note, if the speed limit is higher than allowed from point 1 to point 2 then it
+        is implicitly assumed that the 2nd point is invalid, from the way the script works.
+        This may not be true but finding out, is challenging. If this situation arises,
+        a warning will be set.
 
         Parameters
         ----------
@@ -843,41 +849,6 @@ class Track:
                 self.log.warning(
                     "Track rows: Bad position might be the first row (rerun w/ debug log to see"
                 )
-                # To figure out whether to remove the initial position or the next:
-                # copy the track
-                short_track = copy.deepcopy(self)
-                # get the initial point and the third point only (remove 2nd point)
-                short_track.data = short_track.data.iloc[[0, 2]]
-                # determine speed between these
-                short_track.refresh_stats(speed=True)
-                # compare
-                if (
-                    short_track.data.platform_speed_wrt_ground.loc[1]
-                    > self.data["platform_speed_wrt_ground"][1]
-                ):
-                    # this case is where it is _likely_ that the first point is bad (no proof)
-                    self.log.debug(
-                        f"Removing position at {self.data.iloc[0]} due to speed limit violations (note this was the first data point)"
-                    )
-                    self.data.drop(
-                        self.data.iloc[0],
-                        inplace=True,
-                    )
-                    continue
-                else:
-                    # in this case, we assume that the first position is ok, and the second
-                    # should be removed.
-                    self.log.debug(
-                        f'Removing position at {self.data.loc[self.data["platform_speed_wrt_ground"] > threshold, "timestamp"].iloc[0]} due to speed limit violations'
-                    )
-
-                    self.data.drop(
-                        self.data[
-                            self.data["platform_speed_wrt_ground"] > threshold
-                        ].index[0],
-                        inplace=True,
-                    )
-                    continue
             self.log.debug(
                 f'Removing position at {self.data.loc[self.data["platform_speed_wrt_ground"] > threshold, "timestamp"].iloc[0]} due to speed limit violations'
             )
