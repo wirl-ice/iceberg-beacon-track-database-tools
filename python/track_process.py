@@ -47,10 +47,10 @@ def tracklog(platform_id, path_output, level="INFO"):
     # name the logger after the platform_id
     track_log = logging.getLogger(platform_id)
 
-    if not track_log.handlers:
-        # Create a name for the file
-        loggerFileName = f"{platform_id}.log"
-        loggerFileName = os.path.join(path_output, loggerFileName)
+    # if not track_log.handlers:
+    #     # Create a name for the file
+    loggerFileName = f"{platform_id}.log"
+    loggerFileName = os.path.join(path_output, loggerFileName)
 
     # assign the log level here, defaults to INFO, note there is no ERROR or CRITICAL level
     match level.lower():
@@ -301,6 +301,24 @@ def read_args():
     meta_export = args.meta_export
     quiet = args.quiet
 
+    # some attempt at error trapping early on....
+    if not os.path.isfile(data_file):
+        Exception(f"Data file: {data_file} was not found. Please check and run again")
+        sys.exit(1)
+
+    if not os.path.isdir(output_path):
+        Exception(
+            f"Output path: {output_path} was not found. Please check and run again"
+        )
+        sys.exit(1)
+
+    if os.path.basename(data_file) == output_name:
+        if Path(data_file).parent == output_path:
+            Exception(
+                "The output file you specified will overwrite the raw data file, please fix and re-run"
+            )
+            sys.exit(1)
+
     return [
         data_file,
         output_path,
@@ -321,21 +339,14 @@ def read_args():
     ]
 
 
-def prep_run(data_file, output_path, output_name, spec_file, meta_file, log=None):
+def read_meta_files(spec_file, meta_file, log=None):
     """
-    Prepare for processing run by validating some inputs and reading files.
+    Read track metadata file and beacon spec file.
 
-    Looks to see if key files and folders are present. Quits if not.
     Reads in the metadata and specs files
 
     Parameters
     ----------
-    data_file : str
-        Path to the track data file to be processed.
-    output_path : str
-        Path where output files will be written.
-    output_name : str, optional
-        Name for the output file. The default (None) will result in naming based on platform_id.
     spec_file : str
         Full path to the beacon_specs file.
     meta_file : str
@@ -351,17 +362,6 @@ def prep_run(data_file, output_path, output_name, spec_file, meta_file, log=None
         Object containing model specifications. The default is None.
 
     """
-    # some attempt at error trapping early on....
-    if not os.path.isfile(data_file):
-        log.error(f"Data file: {data_file} was not found. Please check and run again")
-        sys.exit(1)
-
-    if not os.path.isdir(output_path):
-        log.error(
-            f"Output path: {output_path} was not found. Please check and run again"
-        )
-        sys.exit(1)
-
     if spec_file:
         if not os.path.isfile(spec_file):
             log.error(
@@ -373,13 +373,6 @@ def prep_run(data_file, output_path, output_name, spec_file, meta_file, log=None
         if not os.path.isfile(meta_file):
             log.error(
                 f"Meta file: {meta_file} was not found. Please check and run again"
-            )
-            sys.exit(1)
-
-    if os.path.basename(data_file) == output_name:
-        if Path(data_file).parent == output_path:
-            log.error(
-                "The output file you specified will overwrite the raw data file, please fix and re-run"
             )
             sys.exit(1)
 
@@ -532,12 +525,16 @@ def process(
         trk.load_model_specs(specs)
         trk.purge()
     trk.sort()
-    trk.speed()
-    trk.speed_limit()
-
     # if you want to see where the trim points are, don't run trim
     if not trim_check:
         trk.trim()
+
+    trk.speed()
+    trk.speed_limit()
+
+    # # if you want to see where the trim points are, don't run trim
+    # if not trim_check:
+    #     trk.trim()
 
     # output the track files
     trk.output(output_types, path_output=output_path, file_name=output_name)
@@ -589,9 +586,7 @@ def main():
     else:
         log = tracklog(Path(data_file).stem, output_path, level="INFO")
 
-    metadata, specs = prep_run(
-        data_file, output_path, output_name, spec_file, meta_file, log
-    )
+    metadata, specs = read_meta_files(spec_file, meta_file, log)
 
     process(
         data_file,

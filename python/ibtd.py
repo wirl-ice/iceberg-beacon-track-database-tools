@@ -154,7 +154,7 @@ class Meta:
             self.log.error(f"Failed to read {self.meta_file}, exiting... ")
             raise Exception(f"Failed to read {self.meta_file}")
         self.df = df
-        self.log.info(f"Specifications file {self.meta_file} read")
+        self.log.info(f"Track metadata file {self.meta_file} read")
 
 
 class Track:
@@ -493,7 +493,7 @@ class Track:
                 "has_air_pressure": bool,
                 "has_platform_pitch": bool,
                 "has_platform_roll": bool,
-                "has_platform_course": bool,
+                "has_platform_orientation": bool,
                 "has_voltage_battery_volts": bool,
             }
         )
@@ -723,7 +723,9 @@ class Track:
             self.data.duplicated(subset=["timestamp"], keep="last")
         ]  # keep last dup
         if self.raw_data:
-            self.log.info(f"{len(sdf_dup)} rows with duplicate timestamps were removed")
+            self.log.info(
+                f"Track rows: {len(sdf_dup)} rows removed due to duplicate timestamps"
+            )
         # remove all rows with duplicate times, prefer the one with best location accuracy
         self.data.drop_duplicates(
             subset=["timestamp"], keep="last", inplace=True, ignore_index=True
@@ -833,6 +835,49 @@ class Track:
         # needs to be in a loop since if there is a fly-away point, you have going out and coming back
         before = len(self.data)
         while (self.data["platform_speed_wrt_ground"] > threshold).any():
+            # if the first speed is over threshold, we need to investigate:
+            if (
+                self.data[self.data["platform_speed_wrt_ground"] > threshold].index[0]
+                == 1
+            ):
+                self.log.warning(
+                    "Track rows: Bad position might be the first row (rerun w/ debug log to see"
+                )
+                # To figure out whether to remove the initial position or the next:
+                # copy the track
+                short_track = copy.deepcopy(self)
+                # get the initial point and the third point only (remove 2nd point)
+                short_track.data = short_track.data.iloc[[0, 2]]
+                # determine speed between these
+                short_track.refresh_stats(speed=True)
+                # compare
+                if (
+                    short_track.data.platform_speed_wrt_ground.loc[1]
+                    > self.data["platform_speed_wrt_ground"][1]
+                ):
+                    # this case is where it is _likely_ that the first point is bad (no proof)
+                    self.log.debug(
+                        f"Removing position at {self.data.iloc[0]} due to speed limit violations (note this was the first data point)"
+                    )
+                    self.data.drop(
+                        self.data.iloc[0],
+                        inplace=True,
+                    )
+                    continue
+                else:
+                    # in this case, we assume that the first position is ok, and the second
+                    # should be removed.
+                    self.log.debug(
+                        f'Removing position at {self.data.loc[self.data["platform_speed_wrt_ground"] > threshold, "timestamp"].iloc[0]} due to speed limit violations'
+                    )
+
+                    self.data.drop(
+                        self.data[
+                            self.data["platform_speed_wrt_ground"] > threshold
+                        ].index[0],
+                        inplace=True,
+                    )
+                    continue
             self.log.debug(
                 f'Removing position at {self.data.loc[self.data["platform_speed_wrt_ground"] > threshold, "timestamp"].iloc[0]} due to speed limit violations'
             )
@@ -1140,12 +1185,6 @@ class Track:
         # get all the properties of the track
         t_meta = copy.deepcopy(self.__dict__)
 
-        # # some tracks may not have beacon specs, let's find out...
-        # if hasattr(self, "specs"):
-        #     # get the specs for the beacon here but only run if you have specs
-        #     s_meta = copy.deepcopy(self.specs.__dict__)
-        #     t_meta = t_meta | s_meta
-
         # get the extra metadata for the beacon here if available
         if hasattr(self, "meta_dict"):
             x_meta = copy.deepcopy(self.meta_dict)
@@ -1155,7 +1194,6 @@ class Track:
         remove_keys = [
             "log",
             "data",
-            # "specs",
             "meta_dict",
             "trackpoints",
             "trackline",

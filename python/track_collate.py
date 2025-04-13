@@ -501,7 +501,7 @@ def main():
     # Complete this to set up runtime parameters (all hard coded)
 
     # The run name will determine the folder name and the base name of the log and metadata files
-    run_name = "20250412_tc"
+    run_name = "20250413_5spd"
 
     # path to the metadata file
     meta_file = "/ibtd/raw_data/track_metadata_raw.ods"
@@ -544,7 +544,7 @@ def main():
 
     # open the metadata files.
     metadata = Meta(meta_file, log)
-    modeldata = Models(spec_file, log)
+    modeldata = Specs(spec_file, log)
 
     # create an empty dataframe for all the metadata output for all tracks
     alltrack_meta = pd.DataFrame()
@@ -599,9 +599,10 @@ def main():
                         output_plots=["trim", "map", "dist", "time"],
                         interactive=False,  # set to False unless you have nothing better to do today
                         raw_data=True,  # set to True for database collation
-                        trim_check=True,  # set to False for database collation
+                        trim_check=False,  # set to False for database collation
                         meta_verbose=True,  # set to True for database collation
                         meta_export="json",
+                        log=log,
                     )
 
                     # add track metadata to the dataframe of all metadata
