@@ -19,7 +19,7 @@ import logging
 from pathlib import Path
 
 # custom modules
-from ibtd import Track, Meta, Models, nolog
+from ibtd import Track, Meta, Specs, nolog
 
 
 def tracklog(platform_id, path_output, level="INFO"):
@@ -391,7 +391,7 @@ def prep_run(data_file, output_path, output_name, spec_file, meta_file, log=None
 
     # read in the spec file
     if spec_file:
-        specs = Models(spec_file, log)
+        specs = Specs(spec_file, log)
     else:
         specs = None
 
@@ -609,6 +609,7 @@ def main():
         raw_data=raw_data,
         trim_check=trim_check,
         meta_export=meta_export,
+        meta_verbose=True,
         log=log,
     )
 

@@ -27,7 +27,7 @@ import cartopy.feature as cfeature
 
 # import IBTD modules
 import track_process
-from ibtd import Meta, Models
+from ibtd import Meta, Specs
 
 # turn on the copy-on-write functionality
 pd.options.mode.copy_on_write = True

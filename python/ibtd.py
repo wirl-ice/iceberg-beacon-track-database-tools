@@ -86,7 +86,7 @@ def json_serialize(value):
         return bool(value)
 
 
-class Models:
+class Specs:
     """
     Class that holds info/specifications for all beacon models.
 
@@ -96,7 +96,7 @@ class Models:
 
     """
 
-    def __init__(self, model_file, logger=None):
+    def __init__(self, specs_file, logger=None):
         """
         Read beacon specification file and create a dataframe.
 
@@ -110,107 +110,15 @@ class Models:
             logger = nolog()
         self.log = logger
 
-        self.model_file = model_file
+        self.specs_file = specs_file
         try:
-            df = pd.read_excel(model_file)
+            df = pd.read_excel(specs_file)
 
         except:
             pass
-            self.log.error(f"Beacon specifications file {self.model_file} read error")
+            self.log.error(f"Beacon specifications file {self.specs_file} read error")
         self.df = df
-        self.log.debug(f"specifications file {self.model_file} read")
-
-
-class Specs:
-    """Class that holds info/specifications for a specific beacon model."""
-
-    def __init__(self, logger=None):
-        """
-        Initialize class, don't load data until ready.
-
-        Parameters
-        ----------
-        logger: instance of logger class
-            Pass a logger here if you want
-
-        """
-        if logger is None:
-            logger = nolog()
-        self.log = logger
-
-    def load_model_specs(self, model, Models):
-        """
-        Read the model specs record for this beacon and write them to track properties.
-
-        Parameters
-        ----------
-        model : str
-            The exact name of the beacon model
-        Models : Models object
-            An instance of the class Models representing a dataframe of all the beacon specs.
-
-        """
-        self.log.debug("Reading model specifications")
-
-        default_specs = Models.df.loc[Models.df.model == "Default"]
-        beacon_specs = Models.df.loc[Models.df.model == model]
-
-        if len(default_specs) != 1:
-            self.log.error(
-                f"Unkown model {model}, check spelling -or- duplicate model retrieved"
-            )
-            raise Exception(
-                f"Unkown model {model}, check spelling -or- duplicate model retrieved"
-            )
-        if len(beacon_specs) != 1:
-            self.log.error(
-                f"Unkown model {model}, check spelling -or- duplicate model retrieved"
-            )
-            raise Exception(
-                f"Unkown model {model}, check spelling -or- duplicate model retrieved"
-            )
-
-        # find which specs are meant to be 'default'and replace with default
-        beacon_specs_ind = beacon_specs.loc[:].values == "?"
-        beacon_specs_ind = np.argwhere(beacon_specs_ind.flatten()).tolist()
-        beacon_specs_ind = [i for row in beacon_specs_ind for i in row]
-        beacon_specs.iloc[0, beacon_specs_ind] = default_specs.iloc[0, beacon_specs_ind]
-
-        # remove a few columns that are not needed
-        beacon_specs = beacon_specs.drop(columns=["notes", "model"])
-
-        # set to boolean
-        beacon_specs = beacon_specs.astype(
-            {
-                "air_deployable": bool,
-                "buoyant": bool,
-                "has_internal_temperature": bool,
-                "has_surface_temperature": bool,
-                "has_air_temperature": bool,
-                "has_air_pressure": bool,
-                "has_platform_pitch": bool,
-                "has_platform_roll": bool,
-                "has_platform_course": bool,
-                "has_voltage_battery_volts": bool,
-            }
-        )
-
-        for column in beacon_specs.columns:
-            setattr(self, column, beacon_specs[column].iloc[0])
-
-        # now coerce the data to floats, argo_position_accuracy are really integers, so try, but skip if NA
-        specs = beacon_specs.filter(regex="_max|_min")
-        specs = specs.astype(float)
-
-        try:
-            specs = specs.astype(
-                {"argo_position_accuracy_max": int, "argo_position_accuracy_min": int}
-            )
-        except:
-            pass
-        # overwrite the properties above but with proper data types
-        for column in specs.columns:
-            setattr(self, column, specs[column].iloc[0])
+        self.log.debug(f"Model specifications file {self.specs_file} read")
 
 
 class Meta:
@@ -443,8 +351,7 @@ class Track:
         # refresh track limits and track stats.
         self.refresh_stats()
 
-        # make room for beacon specs that could be associated with this track later
-        self.specs = Specs(logger=self.log)
+        # some outputs
         if self.raw_data:
             self.log.info(
                 f"Raw data read-in with {self.observations} rows of valid data from {self.data_start} to {self.data_end}"
@@ -534,13 +441,13 @@ class Track:
         else:
             self.distance_travelled = None
 
-    def load_model_specs(self, Models):
+    def load_model_specs(self, Specs):
         """
-        Load the model specs into the Track.specs properties.
+        Load the specific specifications for this beacon and write them to track properties.
 
         Parameters
         ----------
-        Models : Models class
+        Specs : Specs class
             Specifications for all beacon models
 
         Returns
@@ -548,11 +455,66 @@ class Track:
         None.
 
         """
+        self.log.debug("Reading model specifications")
+
         if not self.model:
             self.log.error("Model not known. Check input")
 
-        # retrieve the default specs and the one for the beacon model in question
-        self.specs.load_model_specs(self.model, Models)
+        default_specs = Specs.df.loc[Specs.df.model == "Default"]
+        beacon_specs = Specs.df.loc[Specs.df.model == self.model]
+
+        if len(default_specs) != 1:
+            msg = "Unkown Default model, check spelling -or- duplicate model retrieved"
+            self.log.error(msg)
+            raise Exception(msg)
+
+        if len(beacon_specs) != 1:
+            msg = f"Unkown model {self.model}, check spelling -or- duplicate model retrieved"
+            self.log.error(msg)
+            raise Exception(msg)
+
+        # find which specs are meant to be 'default'and replace with default
+        beacon_specs_ind = beacon_specs.loc[:].values == "?"
+        beacon_specs_ind = np.argwhere(beacon_specs_ind.flatten()).tolist()
+        beacon_specs_ind = [i for row in beacon_specs_ind for i in row]
+        beacon_specs.iloc[0, beacon_specs_ind] = default_specs.iloc[0, beacon_specs_ind]
+
+        # remove a few columns that are not needed
+        beacon_specs = beacon_specs.drop(columns=["notes", "model"])
+
+        # set to boolean
+        beacon_specs = beacon_specs.astype(
+            {
+                "air_deployable": bool,
+                "buoyant": bool,
+                "has_internal_temperature": bool,
+                "has_surface_temperature": bool,
+                "has_air_temperature": bool,
+                "has_air_pressure": bool,
+                "has_platform_pitch": bool,
+                "has_platform_roll": bool,
+                "has_platform_course": bool,
+                "has_voltage_battery_volts": bool,
+            }
+        )
+
+        # put the contents of the specs df into the track properities
+        for column in beacon_specs.columns:
+            setattr(self, column, beacon_specs[column].iloc[0])
+
+        # now coerce the data to floats, argo_position_accuracy are really integers, so try, but skip if NA
+        specs = beacon_specs.filter(regex="_max|_min")
+        specs = specs.astype(float)
+
+        try:
+            specs = specs.astype(
+                {"argo_position_accuracy_max": int, "argo_position_accuracy_min": int}
+            )
+        except:
+            pass
+        # overwrite the properties above but with proper data types
+        for column in specs.columns:
+            setattr(self, column, specs[column].iloc[0])
 
     def load_metadata(self, Meta):
         """
@@ -634,101 +596,94 @@ class Track:
         """Purge bad data by assigning NaN to values that exceed the min/max range."""
         self.log.debug("Purging bad data from track")
 
-        if not self.specs.make:
+        # this tests whether you have specs read in...
+        if not self.make:
             self.log.error("No beacon specs are available, no data purging attempted")
             return
 
         # Latitude
         self.data.loc[
-            (self.data["latitude"] > self.specs.latitude_max)
-            | (self.data["latitude"] < self.specs.latitude_min),
+            (self.data["latitude"] > self.latitude_max)
+            | (self.data["latitude"] < self.latitude_min),
             "latitude",
         ] = np.nan
 
         # Longitude
         self.data.loc[
-            (self.data["longitude"] > self.specs.longitude_max)
-            | (self.data["longitude"] < self.specs.longitude_min)
+            (self.data["longitude"] > self.longitude_max)
+            | (self.data["longitude"] < self.longitude_min)
             | (self.data["longitude"] == 0),
             "longitude",
         ] = np.nan
 
         # Air temperature
         self.data.loc[
-            (self.data["air_temperature"] > self.specs.air_temperature_max)
-            | (self.data["air_temperature"] < self.specs.air_temperature_min),
+            (self.data["air_temperature"] > self.air_temperature_max)
+            | (self.data["air_temperature"] < self.air_temperature_min),
             "air_temperature",
         ] = np.nan
 
         # Internal temperature
         self.data.loc[
-            (self.data["internal_temperature"] > self.specs.internal_temperature_max)
-            | (self.data["internal_temperature"] < self.specs.internal_temperature_min),
+            (self.data["internal_temperature"] > self.internal_temperature_max)
+            | (self.data["internal_temperature"] < self.internal_temperature_min),
             "internal_temperature",
         ] = np.nan
 
         # Surface temperature
         self.data.loc[
-            (self.data["surface_temperature"] > self.specs.surface_temperature_max)
-            | (self.data["surface_temperature"] < self.specs.surface_temperature_min),
+            (self.data["surface_temperature"] > self.surface_temperature_max)
+            | (self.data["surface_temperature"] < self.surface_temperature_min),
             "surface_temperature",
         ] = np.nan
 
         # Pressure
         self.data.loc[
-            (self.data["air_pressure"] > self.specs.air_pressure_max)
-            | (self.data["air_pressure"] < self.specs.air_pressure_min),
+            (self.data["air_pressure"] > self.air_pressure_max)
+            | (self.data["air_pressure"] < self.air_pressure_min),
             "air_pressure",
         ] = np.nan
 
         # Pitch
         self.data.loc[
-            (self.data["platform_pitch"] > self.specs.platform_pitch_max)
-            | (self.data["platform_pitch"] < self.specs.platform_pitch_min),
+            (self.data["platform_pitch"] > self.platform_pitch_max)
+            | (self.data["platform_pitch"] < self.platform_pitch_min),
             "platform_pitch",
         ] = np.nan
 
         # Roll
         self.data.loc[
-            (self.data["platform_roll"] > self.specs.platform_roll_max)
-            | (self.data["platform_roll"] < self.specs.platform_roll_min),
+            (self.data["platform_roll"] > self.platform_roll_max)
+            | (self.data["platform_roll"] < self.platform_roll_min),
             "platform_roll",
         ] = np.nan
 
         # Heading
         self.data.loc[
-            (self.data["platform_orientation"] > self.specs.platform_orientation_max)
-            | (self.data["platform_orientation"] < self.specs.platform_orientation_min),
+            (self.data["platform_orientation"] > self.platform_orientation_max)
+            | (self.data["platform_orientation"] < self.platform_orientation_min),
             "platform_orientation",
         ] = np.nan
 
         # Battery voltage
         self.data.loc[
-            (self.data["voltage_battery_volts"] > self.specs.voltage_battery_volts_max)
-            | (
-                self.data["voltage_battery_volts"]
-                < self.specs.voltage_battery_volts_min
-            ),
+            (self.data["voltage_battery_volts"] > self.voltage_battery_volts_max)
+            | (self.data["voltage_battery_volts"] < self.voltage_battery_volts_min),
             "voltage_battery_volts",
         ] = np.nan
 
         # Drop data with poor accuracy (as specified in the specs)
         drop_index = self.data[
-            (
-                self.data["argo_position_accuracy"]
-                > self.specs.argo_position_accuracy_max
-            )
-            | (
-                self.data["argo_position_accuracy"]
-                < self.specs.argo_position_accuracy_min
-            )
+            (self.data["argo_position_accuracy"] > self.argo_position_accuracy_max)
+            | (self.data["argo_position_accuracy"] < self.argo_position_accuracy_min)
         ].index
 
         if len(drop_index) > 0:
             self.data.drop(drop_index, inplace=True)
             self.log.info(
-                f"{len(drop_index)} records ({len(drop_index)/len(self.data):.1%}) removed due to unacceptable argo_position_accuracy."
+                f"Track rows: {len(drop_index)} rows ({len(drop_index)/len(self.data):.1%}) removed due to unacceptable argo_position_accuracy."
             )
+            self.log.info(f"Track rows: {len(self.data)} - after argos location filter")
 
         # Drop all rows where timestamp, latitude or longitude is nan
         self.data.dropna(subset=["timestamp", "latitude", "longitude"], inplace=True)
@@ -1185,11 +1140,11 @@ class Track:
         # get all the properties of the track
         t_meta = copy.deepcopy(self.__dict__)
 
-        # some tracks may not have beacon specs, let's find out...
-        if hasattr(self, "specs"):
-            # get the specs for the beacon here but only run if you have specs
-            s_meta = copy.deepcopy(self.specs.__dict__)
-            t_meta = t_meta | s_meta
+        # # some tracks may not have beacon specs, let's find out...
+        # if hasattr(self, "specs"):
+        #     # get the specs for the beacon here but only run if you have specs
+        #     s_meta = copy.deepcopy(self.specs.__dict__)
+        #     t_meta = t_meta | s_meta
 
         # get the extra metadata for the beacon here if available
         if hasattr(self, "meta_dict"):
@@ -1200,7 +1155,7 @@ class Track:
         remove_keys = [
             "log",
             "data",
-            "specs",
+            # "specs",
             "meta_dict",
             "trackpoints",
             "trackline",
