@@ -142,8 +142,9 @@ def read_args():
         Whether the input is raw data (not standardized).
     - meta_export : str
         Format for metadata export ('pandas', 'json', or 'both').
-    - quiet : bool
-        Whether to suppress logging output.
+    - log : str
+        chose 'quiet' for no loggging, 'info' for regular logging or 'debug' for verbose logging.
+
 
     """
     prog_description = """Beacon track processing functions
@@ -275,10 +276,11 @@ def read_args():
             or 'json' format or 'both'. The default (None) does not export a file.",
     )
     parser.add_argument(
-        "-q",
-        "--quiet",
-        action="store_true",
-        help="set this to turn off logging to screen and file",
+        "-l",
+        "--loglevel",
+        choices={"quiet", "info", "debug", "warning"},
+        default="info",
+        help="chose 'quiet' for no loggging, 'info' for regular logging or 'debug' for verbose logging.",
     )
 
     args = parser.parse_args()
@@ -299,7 +301,7 @@ def read_args():
     trim_check = args.trim_check
     raw_data = args.raw_data
     meta_export = args.meta_export
-    quiet = args.quiet
+    loglevel = args.loglevel
 
     # some attempt at error trapping early on....
     if not os.path.isfile(data_file):
@@ -335,7 +337,7 @@ def read_args():
         trim_check,
         raw_data,
         meta_export,
-        quiet,
+        loglevel,
     ]
 
 
@@ -578,13 +580,13 @@ def main():
         trim_check,
         raw_data,
         meta_export,
-        quiet,
+        loglevel,
     ) = read_args()
 
-    if quiet:
+    if loglevel == "quiet":
         log = nolog()
     else:
-        log = tracklog(Path(data_file).stem, output_path, level="INFO")
+        log = tracklog(Path(data_file).stem, output_path, level=loglevel)
 
     metadata, specs = read_meta_files(spec_file, meta_file, log)
 
