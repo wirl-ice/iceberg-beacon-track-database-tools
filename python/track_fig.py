@@ -136,32 +136,6 @@ def plot_map(track, path_output=".", dpi=300, interactive=False, log=None):
         zorder=3,
     )
 
-    # this code will plot data where speed > a threshold in red so it can be visualized
-    # hard-coding and commenting it out
-    # sns.scatterplot(
-    #     x="longitude",
-    #     y="latitude",
-    #     data=track.data.loc[track.data.platform_speed_wrt_ground > 2.0],
-    #     linewidth=0.75,
-    #     edgecolor="tab:orange",
-    #     color="tab:orange",
-    #     legend=False,
-    #     transform=ccrs.PlateCarree(),
-    #     zorder=4,
-    # )
-
-    # sns.scatterplot(
-    #     x="longitude",
-    #     y="latitude",
-    #     data=track.data.loc[track.data.platform_speed_wrt_ground > 2.5],
-    #     linewidth=0.75,
-    #     edgecolor="red",
-    #     color="red",
-    #     legend=False,
-    #     transform=ccrs.PlateCarree(),
-    #     zorder=5,
-    # )
-
     # plot the line data
     ax.plot(
         track.data["longitude"],
@@ -603,16 +577,15 @@ def plot_dist(track, path_output=".", dpi=300, interactive=False, log=None):
 
     # Histogram of the speed
     """ Deal with high speeds -- this should not be needed, so commented out. (but kept here in case someone want to use it )
-    unreasonably high speeds >2.8 m/s Garbo thesis, > 8 m/s Dalton thesis 
+    Filters for unreasonably high speeds >2.8 m/s Garbo thesis, > 8 m/s Dalton thesis 
     Dalton's fastest was 2.3 m/s
     # code to remove data
     track.data.replace([np.inf, -np.inf], np.nan, inplace=True)
-    track.data.loc[track.data["platform_speed_wrt_ground"] > 5] = np.nan  # there is no way an iceberg moves faster than 5 m/s
+    track.data.loc[track.data["platform_speed_wrt_ground"] > 2.4] = np.nan  
 
     Create histogram
     here we are scaling under the assumption that there will not be any speeds greater 
-    than 2.5 m/s (i.e., more constrained than above)
-    by setting the same lower and upper limit, the histograms are comparable
+    than 2.5 m/s by setting the same lower and upper limit, the histograms are comparable
     """
     xlowerlim = 0
     xupperlim = 2.5

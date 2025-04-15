@@ -76,7 +76,7 @@ def tracklog(platform_id, path_output, level="INFO"):
     f_handler = logging.FileHandler(loggerFileName, mode="w")
 
     # this sets the logging level for both handlers:
-    c_handler.setLevel(logging.INFO)
+    c_handler.setLevel(loglevel)
     f_handler.setLevel(loglevel)
 
     # Create formatters and add them to handlers - this gives control over output

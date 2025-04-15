@@ -183,7 +183,7 @@ def file_mover(src, dest, ext, levelup=0, copy=True):
                     shutil.move(f_src, f_dest)
 
 
-def database_stats(ibtd_df, metadata, modeldata, run_name, outdir):
+def database_stats(ibtd_df, metadata, modeldata, run_name, outdir, log):
     """
     Output summary statistics, tables and figure about the Database for reporting.
 
@@ -207,6 +207,8 @@ def database_stats(ibtd_df, metadata, modeldata, run_name, outdir):
         The name of the database run.
     outdir : str
         The output directory
+    log : log instance
+        log to output to
 
     Returns
     -------
@@ -215,22 +217,24 @@ def database_stats(ibtd_df, metadata, modeldata, run_name, outdir):
     """
     # check to see if the file you need is there:
     if not os.path.isfile(f"{Path(outdir) / run_name}_ln.gpkg"):
-        print("\nYou need to run the combine_data function to create a trackline file")
-        print("\nMake sure to use the same values for run_name and outdir")
+        log.error(
+            "\nYou need to run the combine_data function to create a trackline file"
+        )
+        log.error("\nMake sure to use the same values for run_name and outdir")
         sys.exit(1)
 
     # First print out some generic info about the database
 
     # number of tracks and
-    print(
+    log.info(
         f"The IBTD contains {len(ibtd_df.platform_id.unique()):,} tracks comprised of a total of {len(ibtd_df):,} positions"
     )
-    print(f"Data span from {ibtd_df.timestamp.min()} to {ibtd_df.timestamp.max()}")
+    log.info(f"Data span from {ibtd_df.timestamp.min()} to {ibtd_df.timestamp.max()}")
 
     # number of groups and projects
-    print(
+    log.info(
         f"A total of {len(metadata.df.data_contributor.unique()):,} groups from government, \
-    industry and academia contributed data from {len(metadata.df.project.unique()):,} different projects."
+            industry and academia contributed data from {len(metadata.df.project.unique()):,} different projects."
     )
 
     """ 
@@ -501,7 +505,7 @@ def main():
     # Complete this to set up runtime parameters (all hard coded)
 
     # The run name will determine the folder name and the base name of the log and metadata files
-    run_name = "20250413_5spd"
+    run_name = "ibtd_v1"  # run name cannot have periods in it.
 
     # path to the metadata file
     meta_file = "/ibtd/raw_data/track_metadata_raw.ods"
@@ -516,9 +520,9 @@ def main():
     outdir = "/ibtd/output/" + run_name
 
     # if true, the log file will be sent to the raw data folder, it will go to the outdir otherwise
-    log2raw = False
+    log2raw = True
 
-    level = 2  # set to level 2, if you are working out of the raw data folder (files are 2 levels below the raw_data dir)
+    level = 0  # set to level 2, if you are working out of the raw data folder (files are 2 levels below the raw_data dir)
 
     # this just warns that data will be clobbered... last chance!
     ans = input(
@@ -537,14 +541,13 @@ def main():
     if not os.path.isdir(outdir):
         os.makedirs(outdir)
 
-    # set up logging
-    logfile = run_name
-    log = track_process.tracklog(logfile, outdir, level="INFO")
-    log.info("Starting run.....")
+    # set up logging for the whole operation.
+    log_collate = track_process.tracklog(run_name, outdir, level="INFO")
+    log_collate.info(f"Starting run {run_name}.....")
 
     # open the metadata files.
-    metadata = Meta(meta_file, log)
-    modeldata = Specs(spec_file, log)
+    metadata = Meta(meta_file, log_collate)
+    modeldata = Specs(spec_file, log_collate)
 
     # create an empty dataframe for all the metadata output for all tracks
     alltrack_meta = pd.DataFrame()
@@ -571,7 +574,7 @@ def main():
             else:
                 # if this condition is met, the file is assumed to be data... proceed...
                 if Path(f).stem in metadata.df.platform_id.values:
-                    print(f"\n\n......{f}.......")
+                    log_collate.info(f"Processing {f} .......")
 
                     # set up a log file for this track either in the outdir or the raw data folder
                     if log2raw:
@@ -596,7 +599,7 @@ def main():
                         specs=modeldata,
                         output_name=None,
                         output_types=["csv", "pt_kml", "ln_kml", "pt_gpkg", "ln_gpkg"],
-                        output_plots=["trim", "map", "dist", "time"],
+                        output_plots=["map", "dist", "time"],
                         interactive=False,  # set to False unless you have nothing better to do today
                         raw_data=True,  # set to True for database collation
                         trim_check=False,  # set to False for database collation
@@ -619,7 +622,7 @@ def main():
     alldata = combine_data(Path(outdir), Path(outdir), run_name)
 
     # output summary stats
-    database_stats(alldata, metadata, modeldata, run_name, outdir)
+    database_stats(alldata, metadata, modeldata, run_name, outdir, log=log_collate)
 
     # copy/move files around
     file_mover(outdir, Path(outdir).parent / (run_name + "_data"), "csv", levelup=level)

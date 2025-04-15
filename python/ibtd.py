@@ -502,16 +502,10 @@ class Track:
         for column in beacon_specs.columns:
             setattr(self, column, beacon_specs[column].iloc[0])
 
-        # now coerce the data to floats, argo_position_accuracy are really integers, so try, but skip if NA
+        # now coerce the data to floats
         specs = beacon_specs.filter(regex="_max|_min")
         specs = specs.astype(float)
 
-        try:
-            specs = specs.astype(
-                {"argo_position_accuracy_max": int, "argo_position_accuracy_min": int}
-            )
-        except:
-            pass
         # overwrite the properties above but with proper data types
         for column in specs.columns:
             setattr(self, column, specs[column].iloc[0])
@@ -672,19 +666,6 @@ class Track:
             "voltage_battery_volts",
         ] = np.nan
 
-        # Drop data with poor accuracy (as specified in the specs)
-        drop_index = self.data[
-            (self.data["argo_position_accuracy"] > self.argo_position_accuracy_max)
-            | (self.data["argo_position_accuracy"] < self.argo_position_accuracy_min)
-        ].index
-
-        if len(drop_index) > 0:
-            self.data.drop(drop_index, inplace=True)
-            self.log.info(
-                f"Track rows: {len(drop_index)} rows ({len(drop_index)/len(self.data):.1%}) removed due to unacceptable argo_position_accuracy."
-            )
-            self.log.info(f"Track rows: {len(self.data)} - after argos location filter")
-
         # Drop all rows where timestamp, latitude or longitude is nan
         self.data.dropna(subset=["timestamp", "latitude", "longitude"], inplace=True)
 
@@ -715,8 +696,8 @@ class Track:
         This function takes care of these issues.
 
         """
-        # sort by timestamp, and argo_position_accuracy if available. The best argo_position_accuracy is the highest number
-        self.data.sort_values(["timestamp", "argo_position_accuracy"], inplace=True)
+        # sort by timestamp
+        self.data.sort_values(["timestamp"], inplace=True)
         # look for repeated values
         # sdf_dup = self.data.loc[self.data.duplicated(subset=["timestamp"], keep=False)] # all lines
         sdf_dup = self.data.loc[
@@ -811,7 +792,7 @@ class Track:
         # recalculate stats here since things may have changed
         self.refresh_stats(speed=False)
 
-    def speed_limit(self, threshold=5):
+    def speed_limit(self, threshold=2.5):
         """
         Remove gross speeding violations from data.
 
@@ -819,23 +800,22 @@ class Track:
         a very crude way to cut down on _clearly wrong_ position data.  Note high speeds are
         often due to inaccurate positions, but also inprecise positions over short periods
         of time. (eg., an Argos position 1-2 min apart may exceed a threshold even if
-        the precision is relatively good).
+        precision is relatively good).
 
         It is important to be careful not to cut out good data.
 
-        The default value here is 5 m/s or 18 kph or 432 km/d (this is very conservative
-        to avoid throwing away data - especially for ARGOS beacons. It could easily be set
-        lower for GNSS-based systems - likely 2 m/s would be fine)
+        The default value here is 2.5 m/s or 9 kph or 216 km/d (this is very conservative
+        to avoid throwing away data.
 
-        Note, if the speed limit is higher than allowed from point 1 to point 2 then it
-        is implicitly assumed that the 2nd point is invalid, from the way the script works.
-        This may not be true but finding out, is challenging. If this situation arises,
-        a warning will be set.
+        Note, if the speed limit is exceeded from track point 1 to 2 then this algorithm
+        implicitly assumes that the 2nd point is invalid.  This may not be true (point 1
+        might be at fault), but finding out which point is problematic, is challenging.
+        If this situation arises, a warning will be set.
 
         Parameters
         ----------
         threshold : float, optional
-            A threshold, beyond which rows are removed (m/s). The default is 5.
+            A threshold, beyond which rows are removed (m/s). The default is 2.5.
 
         """
         # needs to be in a loop since if there is a fly-away point, you have going out and coming back
@@ -1118,7 +1098,6 @@ class Track:
             platform_roll=("platform_roll", number_f),
             platform_orientation=("platform_orientation", string_f),
             voltage_battery_volts=("voltage_battery_volts", number_f),
-            argo_position_accuracy=("argo_position_accuracy", number_f),
             u=("u", number_f),
             v=("v", number_f),
         )
@@ -1272,8 +1251,6 @@ class Track:
             "platform_orientation_max",
             "voltage_battery_volts_min",
             "voltage_battery_volts_max",
-            "argo_position_accuracy_min",
-            "argo_position_accuracy_max",
         ]
 
         process_metadata = [

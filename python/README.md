@@ -11,9 +11,8 @@ This Python code ingests raw tracking beacon data, standardizes it to a common f
 
 ## Python Code
 `track_process.py`
-* Script that contains functions to process raw and standardized beacon track data
+* Script that contains functions with the processing workflow to convert raw iceberg beacon track data into the Database standard format.  It can also work on standard format files for plotting and other operations. This file runs at the command line or the workflow functions can be called within custom Python scripts. 
   * Works on a single track to 
-  * Can run at the command line on 
   * Selects appropriate conversion function
   * Standardizes data columns
   * Purges data according to minimum/maximum values
@@ -21,12 +20,15 @@ This Python code ingests raw tracking beacon data, standardizes it to a common f
   * Creates output files
 
 `ibtb.py`
-* This is the main module that all other scripts rely on
+* This is the main module that all other scripts rely on.  
+* Defines 3 classes: 
+    * Track class - contains the track data and metadata and info on current processing as properties. Has many methods to 
+    
 
 
 `track_readers.py`
-* Contains Python functions to read specific beacon formats and output in a standard format. This module is imported by `ibtd.py` and does not work on its own. 
-* Includes the standardized format definition
+* Contains Python functions ('readers') to read specific beacon formats and output in a standard format. This module is imported by `ibtd.py` and does not work on its own. 
+* Includes the standardized format definition.
 * A template exists to add more reader functions as needed.  
 
 `track_fig.py` 
@@ -85,7 +87,6 @@ A CSV will be produced with the following column headings:
 | platform_roll | ° |
 | platform_orientation | ° |
 | voltage_battery_volts | V  |
-| argo_position_accuracy |   |
 | platform_displacement | m |
 | platform_speed_wrt_ground | m/s |
 

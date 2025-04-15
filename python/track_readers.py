@@ -84,7 +84,6 @@ def create_sdf(nrows):
         "platform_roll",
         "platform_orientation",
         "voltage_battery_volts",
-        "argo_position_accuracy",
         "platform_displacement",
         "platform_speed_wrt_ground",
         "platform_course",
@@ -103,7 +102,6 @@ def create_sdf(nrows):
         "platform_roll": float,
         "platform_orientation": float,
         "voltage_battery_volts": float,
-        # "argo_position_accuracy": int,
         "platform_displacement": float,
         "platform_speed_wrt_ground": float,
         "platform_course": float,
@@ -226,7 +224,6 @@ def standard(raw_data_file, log=None):
         sdf["platform_roll"] = rdf["platform_roll"]
         sdf["platform_orientation"] = rdf["platform_orientation"]
         sdf["voltage_battery_volts"] = rdf["voltage_battery_volts"]
-        sdf["argo_position_accuracy"] = rdf["argo_position_accuracy"]
         sdf["platform_displacement"] = rdf["platform_displacement"]
         sdf["platform_speed_wrt_ground"] = rdf["platform_speed_wrt_ground"]
         sdf["platform_course"] = rdf["platform_course"]
@@ -434,13 +431,28 @@ def calib_argos(raw_data_file, log=None):
         sdf["air_pressure"] = pressure
         sdf["air_pressure"] = sdf["air_pressure"] * 100  # from hPa to Pa
         sdf["voltage_battery_volts"] = voltage
+
+        # add this field temporarily.
         sdf["argo_position_accuracy"] = loc_accuracy
 
+        log.info(
+            f"Track rows: {len(sdf.loc[sdf['argo_position_accuracy'] != 3])} rows \
+                ({len(sdf.loc[sdf['argo_position_accuracy'] != 3])/len(sdf):.1%}) \
+                removed due to unacceptable argo_position_accuracy."
+        )
+
+        # remove all positions with quality less than 3
+        sdf = sdf.loc[sdf["argo_position_accuracy"] == 3]
+
+        # remove column now.
+        sdf = sdf.drop("argo_position_accuracy", axis=1)
+
+        # print comments to log
         if len(comments) > 0:
-            log.info("Start of comments from raw ARGOS file:")
+            log.info("Start of comments from raw Argos file:")
             for comment in comments:
                 log.info(comment)
-            log.info("End of comments from raw ARGOS file:")
+            log.info("End of comments from raw Argos file:")
     except:
         log.error(f"Problem with raw data file {raw_data_file}, check formatting")
         sys.exit(1)
