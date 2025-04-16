@@ -507,24 +507,26 @@ def main():
     # Complete this to set up runtime parameters (all hard coded)
 
     # The run name will determine the folder name and the base name of the log and metadata files
-    run_name = "ibtd_v1_trimfirst_"  # run name cannot have periods in it.
+    run_name = "ibtd_v1"  # run name cannot have periods in it.
 
     # path to the metadata file
-    meta_file = "/ibtd/raw_data/track_metadata_raw.ods"
+    meta_file = "/ibtd/raw/track_metadata_raw.ods"
 
     # path to the model specs file
-    spec_file = "/ibtd/beacon_models/beacon_specs.ods"
+    spec_file = "/ibtd/beacon/beacon_specs.ods"
 
     # directory to look through for raw data
-    scandir = "/ibtd/raw_data"
+    scandir = "/ibtd/raw"
 
     # put the output data here
-    outdir = "/ibtd/output/" + run_name
+    outdir = "/ibtd/data/" + run_name
 
     # if true, the log file will be sent to the raw data folder, it will go to the outdir otherwise
-    log2raw = False
+    log2raw = True
 
-    level = 2  # level 2 is good for viewing files
+    level = 2  # level 2 is good for viewing files, level 0 is same structure as raw
+
+    loglevel = "debug"  # level to log at - quiet, warning, info, debug, set to debug for collation
 
     # this just warns that data will be clobbered... last chance!
     ans = input(
@@ -583,14 +585,14 @@ def main():
                         logtrack = track_process.tracklog(
                             Path(os.path.join(root, f)).stem,
                             os.path.join(outdir, root),
-                            level="debug",
+                            level=loglevel,
                         )
 
                     else:
                         logtrack = track_process.tracklog(
                             Path(os.path.join(root, f)).stem,
                             os.path.join(outdir, root[prefix:]),
-                            level="debug",
+                            level=loglevel,
                         )
 
                     # # process this track with the settings below.
@@ -610,8 +612,9 @@ def main():
                         log=logtrack,
                     )
 
-                    # For the Database we want the trim plot previewed
-                    # -run this but don't save anything but the plot
+                    # For the Database we want the trim plot previewed and put in raw
+                    # run this again but don't save anything but the plot.
+                    # yes, inefficient but also easy to code.
                     track_process.process(
                         os.path.join(root, f),
                         os.path.join(outdir, root[prefix:]),
@@ -635,7 +638,7 @@ def main():
 
     # output the metadata
     alltrack_meta.to_csv(
-        os.path.join(outdir, f"{run_name}_meta.csv"), index=False, na_rep="NA"
+        os.path.join(outdir, f"{run_name}_track_metadata.csv"), index=False, na_rep="NA"
     )
 
     # combine data for the stats
@@ -680,7 +683,7 @@ def main():
         levelup=level,
     )
 
-    # move to raw data
+    # move the trim plots to raw data (we don't want them in the data folder at all)
     file_mover(
         outdir,
         scandir,

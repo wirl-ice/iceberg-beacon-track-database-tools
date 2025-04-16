@@ -533,11 +533,11 @@ def plot_dist(track, path_output=".", dpi=300, interactive=False, log=None):
     Create a graph of the track's statistical distributions.
 
     This figure has a histogram for iceberg speed on the left and a polar plot of velocity
-    on the right.  The histogram has bars that are 0.05 m/s wide. It goes up to 2.5 m/s
-    consistently so that tracks can be compared.  If there are positions that exceed this
-    this is written on the graph.  The cumulative histogram is also plotted in blue.  This
-    is also known as an exceedence plot showing the percentage of time the iceberg speed
-    is at or below a given level.
+    on the right.  The histogram has bars that are 0.05 m/s wide (0.18 km/h). It goes up
+    to 2.5 m/s (9 km/h) consistently so that tracks can be compared.  If there are
+    positions that exceed the uppermost bin, this is written on the graph.  The cumulative
+    histogram is plotted in blue.  This is also known as an exceedence plot showing the
+    percentage of time the iceberg speed is at or below a given level.
 
     The polar plot shows speed and direction of the iceberg.  This plot scales with data
     so cannot be intercompared as easily.
