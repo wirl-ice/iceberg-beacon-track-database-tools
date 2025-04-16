@@ -9,9 +9,7 @@ Defines the class:
 
     'Meta' containing the track metadata
 
-    'Models' containing beacon model specifications, read in from a table
-
-    'Specs' containing a single beacon model specifications, used for purging bad data
+    'Specs' containing beacon model specifications, used for purging bad data and adding properties
 
 Note that creating an instance of a Track that _is_ in the standard format assumes the track
  has been processed, which means all the steps in a workflow for standardizing, purging, filtering
@@ -26,6 +24,7 @@ Author: Derek Mueller Jul 2024-Apr 2025, with contribution from Adam Garbo's cod
 """
 # imports
 import os
+import sys
 from pathlib import Path
 import pandas as pd
 import geopandas as gpd
@@ -248,7 +247,7 @@ class Track:
         # at a minimum this step should be taken since a track must have all 3 of these
         # Drop all rows where timestamp, latitude or longitude is nan
         self.log.info(
-            f'Track rows: {self.data[["timestamp", "latitude", "longitude"]].isnull().sum().sum()} rows removed. NAs found in timestamp or position'
+            f'Track rows: {self.data[["timestamp", "latitude", "longitude"]].isnull().sum().sum()} rows removed because NAs found in timestamp or position'
         )
         self.data.dropna(subset=["timestamp", "latitude", "longitude"], inplace=True)
 
@@ -399,6 +398,14 @@ class Track:
 
         """
         self.log.debug("Refreshing track stats")
+
+        # make sure there is actually data:
+        if len(self.data) == 0:
+            self.log.error(
+                "There is no track data anymore, check that data filtering "
+                "or trimming didn't wipe it all out!"
+            )
+            sys.exit(1)
 
         # now set the track range
         self.track_start = self.data.timestamp.min()
@@ -739,9 +746,9 @@ class Track:
 
         """
         # Ensure rows are sorted by datetime.
-        assert self.data[
-            "timestamp"
-        ].is_monotonic_increasing, "Issue with timestamps, sort data!"
+        # assert self.data[
+        #     "timestamp"
+        # ].is_monotonic_increasing, "Issue with timestamps, sort data!"
 
         # Initialize pyproj with appropriate ellipsoid
         geodesic = pyproj.Geod(ellps="WGS84")
@@ -802,15 +809,46 @@ class Track:
         of time. (eg., an Argos position 1-2 min apart may exceed a threshold even if
         precision is relatively good).
 
-        It is important to be careful not to cut out good data.
-
         The default value here is 2.5 m/s or 9 kph or 216 km/d (this is very conservative
         to avoid throwing away data.
 
-        Note, if the speed limit is exceeded from track point 1 to 2 then this algorithm
-        implicitly assumes that the 2nd point is invalid.  This may not be true (point 1
-        might be at fault), but finding out which point is problematic, is challenging.
-        If this situation arises, a warning will be set.
+        The algorithm removes the first point with the speed > threshold and then
+        recalculates the speed again for the track and reruns the filtering to remove the
+        next point with speed > threshold.
+
+        This action is a good way to catch 'flyers' where random position errors cause a
+        jump in speed away from the track and then, typically, the position then returns to
+        along the original track.
+
+        Note, speed represents the displacement/time _between_ 2 points, but is recorded
+        in the same row as the second point (i.e., a row's speed is the speed from the
+        previous point up to the current point. Since the first row with speed > threshold
+        is removed, implicitly this assumes that the second point is invalid. This may
+        not be true (point 1 or both point 1 and 2 might be at fault). Finding out what
+        is going on is challenging.
+
+        This scenario is a 'track shift' where the entire track shifts position and in the
+        intervening time (between the new position and the old position) the speed was >
+        threshold.
+
+        Track shifts can come in two forms:
+
+        1) If the second point in the entire track has speed > threshold, this could be due
+            to an invalid first point.
+
+        2) If there is a shift in the middle of the track, whereby the speed jumps >
+            threshold but the next speed value is < threshold.
+
+        In both cases, because the speed_limit function loops and is, by nature, greedy,
+        a lot of potentially good data could be removed until the speed falls < threshold.
+        If either situation arises, a warning will be logged, but the row in question
+        will still be removed.
+
+        If the warning is repeated more than once in a row, the raw data should be investigated.
+        Is the removal of data justified? Was the trimming done correctly?  For example,
+        in an untrimmed track, this type of issue could be due to testing a beacon at
+        an airport overnight, flying for 30 minutes and deploying it on an iceberg.
+        Track shifts are not likely to arise naturally in the middle of a track.
 
         Parameters
         ----------
@@ -820,29 +858,45 @@ class Track:
         """
         # needs to be in a loop since if there is a fly-away point, you have going out and coming back
         before = len(self.data)
+        self.bad1index = (
+            1  # this sets up a record of the previous bad point this cannot be 0
+        )
+
+        # in this loop there are speed limit issues to find and resolve
         while (self.data["platform_speed_wrt_ground"] > threshold).any():
-            # if the first speed is over threshold, we need to investigate:
-            if (
-                self.data[self.data["platform_speed_wrt_ground"] > threshold].index[0]
-                == 1
-            ):
-                self.log.warning(
-                    "Track rows: Bad position might be the first row (rerun w/ debug log to see"
-                )
+            # first bad point index:
+            bad1index = self.data[
+                self.data["platform_speed_wrt_ground"] > threshold
+            ].index[0]
+
+            # check to see if you are off the end of the data frame
+            if bad1index < len(self.data) - 1:
+                # the next point after this is:
+                next2badspd = self.data.platform_speed_wrt_ground[bad1index + 1]
+                # it could be possible to look at bad1+2, etc but this may not be needed
+
+                if bad1index == self.bad1index:
+                    self.log.warning(
+                        "Track rows: track jump suspected (removed 2nd track point or >1 sequential "
+                        f"positions - the next speed is {next2badspd} m/s), please rerun "
+                        "w/ debug log to review"
+                    )
+
             self.log.debug(
-                f'Removing position at {self.data.loc[self.data["platform_speed_wrt_ground"] > threshold, "timestamp"].iloc[0]} due to speed limit violations'
+                f"Removing position at {self.data.timestamp[bad1index]} at index {bad1index} "
+                f"due to speed limit violations - the next speed is {next2badspd:.2f} m/s)"
             )
-            self.data.drop(
-                self.data[self.data["platform_speed_wrt_ground"] > threshold].index[0],
-                inplace=True,
-            )
+            self.bad1index = bad1index
+            self.data.drop(bad1index, inplace=True)
             self.speed()
+
         self.log.info(
             f"Track rows: {before - len(self.data)} rows removed due to speeds > {threshold} m/s"
         )
         self.log.info(f"Track rows: {len(self.data)} - after speed filter")
 
         self.speedlimited = True
+        del self.bad1index
 
         # recalculate stats here since things may have changed
         self.refresh_stats()
@@ -865,6 +919,7 @@ class Track:
 
         """
         if self.trim_start:
+
             self.data.drop(
                 self.data[self.data["timestamp"] < self.trim_start].index,
                 inplace=True,

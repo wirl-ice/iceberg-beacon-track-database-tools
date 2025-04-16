@@ -9,7 +9,7 @@ are determined by the data owner/provider and do not necessarily represent the f
 the original communication from the device itself.
 
 Each function takes the raw data file path/name and puts it into the standardized format
-At a minimum, the date/time, latitude and longitude are required.  Other columns are
+At a minimum, the timestamp, latitude and longitude are required.  Other columns are
 optional.
 
 A few variable names are somewhat terse, so defined here:
@@ -436,9 +436,9 @@ def calib_argos(raw_data_file, log=None):
         sdf["argo_position_accuracy"] = loc_accuracy
 
         log.info(
-            f"Track rows: {len(sdf.loc[sdf['argo_position_accuracy'] != 3])} rows \
-                ({len(sdf.loc[sdf['argo_position_accuracy'] != 3])/len(sdf):.1%}) \
-                removed due to unacceptable argo_position_accuracy."
+            f"Track rows: {len(sdf.loc[sdf['argo_position_accuracy'] != 3])} rows "
+            f"({len(sdf.loc[sdf['argo_position_accuracy'] != 3])/len(sdf):.1%}) "
+            "removed due to unacceptable argo_position_accuracy."
         )
 
         # remove all positions with quality less than 3

@@ -218,23 +218,25 @@ def database_stats(ibtd_df, metadata, modeldata, run_name, outdir, log):
     # check to see if the file you need is there:
     if not os.path.isfile(f"{Path(outdir) / run_name}_ln.gpkg"):
         log.error(
-            "\nYou need to run the combine_data function to create a trackline file"
+            "You need to run the combine_data function to create a trackline file"
         )
-        log.error("\nMake sure to use the same values for run_name and outdir")
+        log.error("Make sure to use the same values for run_name and outdir")
         sys.exit(1)
 
     # First print out some generic info about the database
 
     # number of tracks and
     log.info(
-        f"The IBTD contains {len(ibtd_df.platform_id.unique()):,} tracks comprised of a total of {len(ibtd_df):,} positions"
+        f"The IBTD contains {len(ibtd_df.platform_id.unique()):,} "
+        f"tracks comprised of a total of {len(ibtd_df):,} positions"
     )
     log.info(f"Data span from {ibtd_df.timestamp.min()} to {ibtd_df.timestamp.max()}")
 
     # number of groups and projects
     log.info(
-        f"A total of {len(metadata.df.data_contributor.unique()):,} groups from government, \
-            industry and academia contributed data from {len(metadata.df.project.unique()):,} different projects."
+        f"A total of {len(metadata.df.data_contributor.unique()):,} groups from government, "
+        f"industry and academia contributed data from {len(metadata.df.project.unique()):,} "
+        "different projects."
     )
 
     """ 
@@ -505,7 +507,7 @@ def main():
     # Complete this to set up runtime parameters (all hard coded)
 
     # The run name will determine the folder name and the base name of the log and metadata files
-    run_name = "ibtd_v1"  # run name cannot have periods in it.
+    run_name = "ibtd_v1_trimfirst_"  # run name cannot have periods in it.
 
     # path to the metadata file
     meta_file = "/ibtd/raw_data/track_metadata_raw.ods"
@@ -520,9 +522,9 @@ def main():
     outdir = "/ibtd/output/" + run_name
 
     # if true, the log file will be sent to the raw data folder, it will go to the outdir otherwise
-    log2raw = True
+    log2raw = False
 
-    level = 0  # set to level 2, if you are working out of the raw data folder (files are 2 levels below the raw_data dir)
+    level = 2  # level 2 is good for viewing files
 
     # this just warns that data will be clobbered... last chance!
     ans = input(
@@ -578,20 +580,20 @@ def main():
 
                     # set up a log file for this track either in the outdir or the raw data folder
                     if log2raw:
-                        log = track_process.tracklog(
+                        logtrack = track_process.tracklog(
                             Path(os.path.join(root, f)).stem,
                             os.path.join(outdir, root),
-                            level="INFO",
+                            level="debug",
                         )
 
                     else:
-                        log = track_process.tracklog(
+                        logtrack = track_process.tracklog(
                             Path(os.path.join(root, f)).stem,
                             os.path.join(outdir, root[prefix:]),
-                            level="INFO",
+                            level="debug",
                         )
 
-                    # process this track with the settings below.
+                    # # process this track with the settings below.
                     trk_meta = track_process.process(
                         os.path.join(root, f),
                         os.path.join(outdir, root[prefix:]),
@@ -602,10 +604,28 @@ def main():
                         output_plots=["map", "dist", "time"],
                         interactive=False,  # set to False unless you have nothing better to do today
                         raw_data=True,  # set to True for database collation
-                        trim_check=False,  # set to False for database collation
+                        trim="accept",  # set to accept for database collation
                         meta_verbose=True,  # set to True for database collation
                         meta_export="json",
-                        log=log,
+                        log=logtrack,
+                    )
+
+                    # For the Database we want the trim plot previewed
+                    # -run this but don't save anything but the plot
+                    track_process.process(
+                        os.path.join(root, f),
+                        os.path.join(outdir, root[prefix:]),
+                        metadata=metadata,
+                        specs=modeldata,
+                        output_name=None,
+                        output_types=None,
+                        output_plots=["trim"],
+                        interactive=False,
+                        raw_data=True,  # set to True for database collation
+                        trim="preview-decline",
+                        meta_verbose=False,  # set to True for database collation
+                        meta_export="None",
+                        log=None,
                     )
 
                     # add track metadata to the dataframe of all metadata
@@ -658,6 +678,15 @@ def main():
         Path(outdir).parent / (run_name + "_figures/trim"),
         "trim.png",
         levelup=level,
+    )
+
+    # move to raw data
+    file_mover(
+        outdir,
+        scandir,
+        "trim.png",
+        levelup=0,
+        copy=False,
     )
 
 

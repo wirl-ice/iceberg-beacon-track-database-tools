@@ -80,9 +80,10 @@ def tracklog(platform_id, path_output, level="INFO"):
     f_handler.setLevel(loglevel)
 
     # Create formatters and add them to handlers - this gives control over output
+    # Delimited with pipe | so it can be parsed easily.
     c_format = logging.Formatter("%(message)s")
     f_format = logging.Formatter(
-        "%(asctime)s - %(module)s - %(levelname)s - %(name)s - %(message)s"
+        "%(asctime)s | %(module)s | %(levelname)s | %(name)s | %(message)s"
     )
     c_handler.setFormatter(c_format)
     f_handler.setFormatter(f_format)
@@ -136,8 +137,8 @@ def read_args():
         List of plot types to generate.
     - interactive : bool
         Whether to create interactive plots.
-    - trim_check : bool
-        Whether to check trim points without applying trimming.
+    - trim : str
+        Trim directive. Choice of: accept, decline, preview-accept, preview-decline.
     - raw_data : bool
         Whether the input is raw data (not standardized).
     - meta_export : str
@@ -160,7 +161,7 @@ def read_args():
     For reading-in, standardizing and processing raw data: 
         - include the -rd (--raw_data) flag 
         - the reader must be specified (-r or listed in the track metadata file -mf)
-        - trimming (trim_start and/or trim_end) must be listed (-s -e) or track metadata file
+        - trimming (trim_start and/or trim_end) must be listed (-s -e) or in the track metadata file
         - file and plot outputs can be requested
     
     Example: read standard data file 2021_300434065868240.csv, trim it to a 4 day sub-section 
@@ -224,8 +225,8 @@ def read_args():
         "--meta_file",
         type=str,
         default=None,
-        help="the path/name of the metadata csv file. Note that the script will OVERWRITE \
-            arguments reader, model, trim_start, trim_end with values in this file",
+        help="the path/name of the metadata csv file. Note that the script will OVERWRITE "
+        "arguments reader, model, trim_start, trim_end with values in this file",
     )
     parser.add_argument(
         "-of",
@@ -258,10 +259,12 @@ def read_args():
     )
     parser.add_argument(
         "-t",
-        "--trim_check",
-        action="store_true",
-        help="set -t to check where the trim points _would be_ on the map, time and \
-            trim plot; defaults to false",
+        "--trim",
+        type=str,
+        nargs="?",
+        choices={"accept", "decline", "preview-accept", "preview-decline"},
+        default="accept",
+        help="Trim directive. Choice of: accept, decline, preview-accept, preview-decline; defaults to accept",
     )
     parser.add_argument(
         "-rd",
@@ -272,8 +275,8 @@ def read_args():
     parser.add_argument(
         "-me",
         "--meta_export",
-        help="Specify whether to export metadata in the current directory in 'pandas' \
-            or 'json' format or 'both'. The default (None) does not export a file.",
+        help="Specify whether to export metadata in the current directory in 'pandas' "
+        "or 'json' format or 'both'. The default (None) does not export a file.",
     )
     parser.add_argument(
         "-l",
@@ -298,7 +301,7 @@ def read_args():
     output_types = args.output_types
     output_plots = args.output_plots
     interactive = args.interactive
-    trim_check = args.trim_check
+    trim = args.trim
     raw_data = args.raw_data
     meta_export = args.meta_export
     loglevel = args.loglevel
@@ -334,7 +337,7 @@ def read_args():
         output_types,
         output_plots,
         interactive,
-        trim_check,
+        trim,
         raw_data,
         meta_export,
         loglevel,
@@ -406,7 +409,7 @@ def process(
     output_types=None,
     output_plots=None,
     interactive=False,
-    trim_check=False,
+    trim="accept",
     raw_data=False,
     meta_export=None,
     meta_verbose=False,
@@ -441,8 +444,8 @@ def process(
         List of plot types to generate. The default is None.
     interactive : bool, optional
         Whether to create interactive plots. The default is False.
-    trim_check : bool, optional
-        Whether to check trim points without applying trimming. The default is False.
+    trim : str, optional
+        Trim directive. Choice of: accept, decline, preview-accept, preview-decline. The default is accept.
     raw_data : bool, optional
         Whether the input is raw data (not standardized). The default is False.
     meta_export : str, optional
@@ -460,6 +463,9 @@ def process(
         Track metadata (one row) in a dataframe.
 
     """
+    if log is None:
+        log = nolog()
+
     log.info(f"~Processing {Path(data_file).stem}....")
 
     log.debug(f"Data file: {data_file}")
@@ -482,7 +488,7 @@ def process(
     log.debug(f"Output types: {output_types}")
     log.debug(f"Output plots: {output_plots}")
     log.debug(f"Interactive: {interactive}")
-    log.debug(f"Trim check: {trim_check}")
+    log.debug(f"Trim: {trim}")
     log.debug(f"Raw data: {raw_data}")
     log.debug(f"Meta export: {meta_export}")
     log.debug(f"Meta verbose: {meta_verbose}")
@@ -527,30 +533,46 @@ def process(
         trk.load_model_specs(specs)
         trk.purge()
     trk.sort()
-    # if you want to see where the trim points are, don't run trim
-    if not trim_check:
-        trk.trim()
-
     trk.speed()
-    trk.speed_limit()
 
-    # # if you want to see where the trim points are, don't run trim
-    # if not trim_check:
-    #     trk.trim()
+    # if you want to see where the trim points are, preview before trimming
+    if trim.split("-")[0] == "preview":
+        # generate figures
+        if output_plots:
+            if "map" in output_plots:
+                trk.plot_map(interactive=interactive, path_output=output_path)
+            if "trim" in output_plots:
+                trk.plot_trim(interactive=interactive, path_output=output_path)
+            if "time" in output_plots:
+                trk.plot_time(interactive=interactive, path_output=output_path)
+            if "dist" in output_plots:
+                trk.plot_dist(interactive=interactive, path_output=output_path)
 
-    # output the track files
-    trk.output(output_types, path_output=output_path, file_name=output_name)
+        if trim[-6:] == "accept":
+            trk.trim()
+            trk.speed_limit()
 
-    # generate figures
-    if output_plots:
-        if "map" in output_plots:
-            trk.plot_map(interactive=interactive, path_output=output_path)
-        if "trim" in output_plots:
-            trk.plot_trim(interactive=interactive, path_output=output_path)
-        if "time" in output_plots:
-            trk.plot_time(interactive=interactive, path_output=output_path)
-        if "dist" in output_plots:
-            trk.plot_dist(interactive=interactive, path_output=output_path)
+        # output the track files
+        trk.output(output_types, path_output=output_path, file_name=output_name)
+
+    else:
+        if trim[-6:] == "accept":
+            trk.trim()
+            trk.speed_limit()
+
+        # output the track files
+        trk.output(output_types, path_output=output_path, file_name=output_name)
+
+        # generate figures
+        if output_plots:
+            if "map" in output_plots:
+                trk.plot_map(interactive=interactive, path_output=output_path)
+            if "trim" in output_plots:
+                trk.plot_trim(interactive=interactive, path_output=output_path)
+            if "time" in output_plots:
+                trk.plot_time(interactive=interactive, path_output=output_path)
+            if "dist" in output_plots:
+                trk.plot_dist(interactive=interactive, path_output=output_path)
 
     # create a trk_meta pandas dataframe:
     trk_meta = trk.track_metadata(
@@ -577,7 +599,7 @@ def main():
         output_types,
         output_plots,
         interactive,
-        trim_check,
+        trim,
         raw_data,
         meta_export,
         loglevel,
@@ -604,9 +626,9 @@ def main():
         output_plots=output_plots,
         interactive=interactive,
         raw_data=raw_data,
-        trim_check=trim_check,
+        trim=trim,
         meta_export=meta_export,
-        meta_verbose=True,
+        meta_verbose=False,  # hard coded here.
         log=log,
     )
 

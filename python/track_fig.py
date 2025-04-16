@@ -208,8 +208,9 @@ def plot_map(track, path_output=".", dpi=300, interactive=False, log=None):
     ax.text(
         0,
         -0.09,
-        f"Start (*): {track.data_start:%Y-%m-%d %H:%M:%S} UTC, End: {track.data_end:%Y-%m-%d %H:%M:%S} UTC\n  \
-        Duration: {track.duration:.2f} days, Distance: {track.distance_travelled:,.2f} km, Observations: {track.observations:,}",
+        f"Start (*): {track.data_start:%Y-%m-%d %H:%M:%S} UTC, End: {track.data_end:%Y-%m-%d %H:%M:%S} UTC\n"
+        f"Duration: {track.duration:.2f} days, Distance: {track.distance_travelled:,.2f} km, "
+        f"Observations: {track.observations:,}",
         transform=ax.transAxes,
         color="black",
         fontsize=12,
@@ -501,8 +502,9 @@ def plot_trim(track, path_output=".", dpi=300, interactive=False, log=None):
     v.text(
         0,
         -0.61,
-        f"Start (*): {track.data_start:%Y-%m-%d %H:%M:%S} UTC, End: {track.data_end:%Y-%m-%d %H:%M:%S} UTC\n  \
-        Duration: {track.duration:.2f} days, Distance: {track.distance_travelled:,.2f} km, Observations: {track.observations:,}",
+        f"Start (*): {track.data_start:%Y-%m-%d %H:%M:%S} UTC, End: {track.data_end:%Y-%m-%d %H:%M:%S} UTC\n"
+        f"Duration: {track.duration:.2f} days, Distance: {track.distance_travelled:,.2f} km, "
+        f"Observations: {track.observations:,}",
         transform=v.transAxes,
         color="black",
         fontsize=12,
@@ -639,6 +641,7 @@ def plot_dist(track, path_output=".", dpi=300, interactive=False, log=None):
     h2.set_ylim([ylowerlim, yupperlim * 1.01])
 
     # Calculate the number of observations to right edge to the histogram and print that
+    # only really works if speed_limit is higher than the graph x limit
     out_of_range = sum(track.data.platform_speed_wrt_ground > xupperlim)
     if out_of_range > 0:
         plt.text(
@@ -669,8 +672,9 @@ def plot_dist(track, path_output=".", dpi=300, interactive=False, log=None):
     h.text(
         0.0,
         -0.275,
-        f"Start (*): {track.data_start:%Y-%m-%d %H:%M:%S} UTC, End: {track.data_end:%Y-%m-%d %H:%M:%S} UTC\n  \
-        Duration: {track.duration:.2f} days, Distance: {track.distance_travelled:,.2f} km, Observations: {track.observations:,}",
+        f"Start (*): {track.data_start:%Y-%m-%d %H:%M:%S} UTC, End: {track.data_end:%Y-%m-%d %H:%M:%S} UTC\n"
+        f"Duration: {track.duration:.2f} days, Distance: {track.distance_travelled:,.2f} km, "
+        f"Observations: {track.observations:,}",
         transform=h.transAxes,
         color="black",
         fontsize=12,
@@ -848,8 +852,9 @@ def plot_time(track, path_output=".", dpi=300, interactive=False, log=None):
     q.text(
         0,
         -0.61,
-        f"Start (*): {track.data_start:%Y-%m-%d %H:%M:%S} UTC, End: {track.data_end:%Y-%m-%d %H:%M:%S} UTC\n  \
-        Duration: {track.duration:.2f} days, Distance: {track.distance_travelled:,.2f} km, Observations: {track.observations:,}",
+        f"Start (*): {track.data_start:%Y-%m-%d %H:%M:%S} UTC, End: {track.data_end:%Y-%m-%d %H:%M:%S} UTC\n"
+        f"Duration: {track.duration:.2f} days, Distance: {track.distance_travelled:,.2f} km, "
+        f"Observations: {track.observations:,}",
         transform=q.transAxes,
         color="black",
         fontsize=12,
@@ -880,82 +885,3 @@ def plot_time(track, path_output=".", dpi=300, interactive=False, log=None):
         plt.close()
 
     log.debug("Plotting timeseries complete")
-
-
-"""
-def main():
-    '''Work from command line.'''
-    # get parameters from command line:
-    parser = argparse.ArgumentParser(description="Beacon track visualization functions")
-    parser.add_argument("std_file", help="enter full path to the standard data file")
-    parser.add_argument(
-        "-p",
-        "--path_output",
-        help="enter path to store output png files ; \
-                        defaults to the current directory",
-    )
-    parser.add_argument(
-        "-g",
-        "--graphs",
-        nargs="+",
-        choices={"map", "time", "temp", "dist"},
-        help="list the graphs to produce: map time temp dist ; defaults to producing ALL graphs",
-    )
-    args = parser.parse_args()
-
-    std_file = args.std_file
-    path_output = args.path_output
-    graphs = args.graphs
-
-    # validate the parameters
-
-    if not os.path.isfile(std_file):
-        print(f"{std_file} not found, exiting...")
-        sys.exit(1)
-
-    if path_output:
-        if not os.path.isdir(path_output):
-            print(f"{path_output} not found, exiting... ")
-            sys.exit(1)
-    else:
-        print(
-            f"Output directory not requested, defaulting to current directory: {os.getcwd()}..."
-        )
-        path_output = os.getcwd()
-
-    trk = Track(std_file)
-
-    if graphs:
-        if "map" in graphs:
-            plot_map(trk, path_output=path_output)
-        if "dist" in graphs:
-            plot_dist(trk, path_output=path_output)
-        if "temp" in graphs:
-            plot_temp(trk, path_output=path_output)
-        if "time" in graphs:
-            plot_time(trk, path_output=path_output)
-
-    else:  # if no graphs are requested, then produce them all
-        plot_map(trk, path_output=path_output)
-        plot_temp(trk, path_output=path_output)
-        plot_dist(trk, path_output=path_output)
-        plot_time(trk, path_output=path_output)
-
-
-if __name__ == "__main__":
-    main()
-"""
-
-"""
-# TODO Add more tracks to plots 
-# here is some pseudocode:
-def plot(track, *other_tracks):
-    fig, ax = plt.subplots()
-    ax.plot(track.data, label=track.platform_id)
-    
-    for track in other_tracks:
-        ax.plot(track.data, label=track.platform_id)
-
-this will use matplotlibs colours to plot each one as a different colour
-need to deal with the title and text.
-"""
