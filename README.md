@@ -2,8 +2,8 @@
 
 This repository provides the core Python scripts and modules for processing, standardizing, visualizing, and collating iceberg beacon track data into the Iceberg Beacon Track Database (IBTD). The processing workflow is designed to read-in various raw data formats from multiple beacon types/telemetry providers, standardize them, perform quality control, and output processed data files and visualizations.  
 
-TODO insert map here and a few photos
-
+![Map](https://github.com/user-attachments/assets/ceb666c2-5f4f-4d98-aae3-6058d2131b4f)
+A visual overview of the Iceberg Beacon Track Database (IBTD).  a) Map of all the tracks in the IBTD (version 1). b) Photo of 6 km-long ice island MIL20-A-1-A (begining of track 2021_300234011751690) off the coast of Axel Heiberg Island in August 2021 (photo: Mike Knox/Darryl Herman, Kenn Borek Air/PCSP); c) Photo of unnamed large tabular iceberg (begining of track 2013_300234011240410) in Nares Strait in August 2013 (photo: Meaghan Shields, CEOS, University of Manitoba); d) Photo of 'Station 3' a 4.5 km long ice island (beginning of tracks 2015_300134010505190, 2015_300234062791420, and 2015_300134010907780), which is about to be laser scanned from the CCGS Amundsen in April 2013 (photo: Anna Crawford, WIRL, Carleton University).  
 
 ## IBTD background
 Researchers at Carleton University's Water and Ice Research Laboratory, in collaboration with the Canadian Ice Service (Meteorological Service of Canada, Environment and Climate Change Canada), have recently compiled one of the most comprehensive databases of in-situ iceberg tracking beacon drift trajectories in the Northern Hemisphere, with over 719,000 observations collected between 1997 and 2024. 
