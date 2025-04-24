@@ -95,7 +95,7 @@ python track_process.py 2021_300434065868240.csv . -s '2021-08-22 13:00:00' -e '
 ```sh
 python track_collate.py
 ```
-    * The script will prompt before overwriting output files.
+* The script will prompt before overwriting output files.
 
 ## Standardized Data Format
 
