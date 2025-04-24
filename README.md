@@ -18,8 +18,7 @@ The Database itself can be accessed here:
 
 More details on the IBTD can be found in the Database documentation: 
 
-Mueller D, Rajewicz, J, Garbo A, Tivy A (2025) Iceberg Beacon Track Database [version 1.0] Documentation. Water and Ice Research Lab, Department of Geography and Environmental Studies,
-Carleton University, Ottawa. 32 pp.
+[Mueller D, Rajewicz, J, Garbo A, Tivy A (2025) Iceberg Beacon Track Database [version 1.0] Documentation. Water and Ice Research Lab, Department of Geography and Environmental Studies, Carleton University, Ottawa. 32 pp. doi:10.22215/wirl/2025.1](https://doi.org/10.22215/wirl/2025.1)
 
 ## Overview
 
@@ -123,7 +122,7 @@ All tracks are converted to a standard format with the following columns, where 
 ## **Dependencies**
 
 * python 3
-* pandas, numpy, geopandas>=1.0, matplotlib, seaborn, cartopy, xlrd, openpyxl, odfpy
+* pandas, numpy, geopandas>=1.0, matplotlib, seaborn, cartopy, openpyxl, odfpy
 
 ## Installation
 Dependencies can be installed using conda and the environment.yml file as follows: 
@@ -140,7 +139,7 @@ Mueller D, Garbo A (2025) Iceberg Beacon Track Database (IBTD) Processing Tools.
 
 ## Licence
 
-This software is licenced under ??? See `LICENSE` file for details. (to come)
+This software is licenced under GNU General Public License v3 See `LICENSE` file for details.
 
 ## References
 

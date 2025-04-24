@@ -9,7 +9,20 @@ Stand-alone script to process tracks for the IBTD (Iceberg Beacon Track Database
 
 If you have standardized data already, it can be used to make plots and output data
 
-Author: Derek Mueller Jan 2025
+Copyright (C) 2025  Derek Mueller
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
 import os
@@ -118,13 +131,13 @@ def read_args():
     - output_path : str
         Directory path where output files will be written.
     - metadata : Meta object or None
-        Metadata object containing track information if provided.
+        Metadata file containing track information if provided.
     - reader : str
         Name of the reader function to use.
     - model : str
         Beacon model name.
     - specs : Models object or None
-        Object containing model specifications if provided.
+        File containing model specifications if provided.
     - trim_start : str or None
         Timestamp to trim the start of the track in UTC format.
     - trim_end : str or None
@@ -173,6 +186,11 @@ def read_args():
         >python track_process.py 2011_300234010031950.csv .. -op map time -ot ln_kml
 
     For more information see github. 
+    
+    track_process.py  Copyright (C) 2025  Derek Mueller
+    This program comes with ABSOLUTELY NO WARRANTY; 
+    This is free software, and you are welcome to redistribute it
+    under certain conditions;
         
     """
 
@@ -493,33 +511,39 @@ def process(
     log.debug(f"Meta export: {meta_export}")
     log.debug(f"Meta verbose: {meta_verbose}")
 
-    if metadata and raw_data:
-        trk = Track(
-            data_file, metadata=metadata, raw_data=raw_data, logger=log
-        )  # get reader from metadata file
-    elif reader and raw_data:
-        trk = Track(
-            data_file,
-            reader=reader,
-            model=model,
-            trim_start=trim_start,
-            trim_end=trim_end,
-            raw_data=raw_data,
-            logger=log,
-        )  # get reader from user
-    elif not raw_data:
-        trk = Track(
-            data_file,
-            reader="standard",
-            model=model,
-            trim_start=trim_start,
-            trim_end=trim_end,
-            logger=log,
-        )  # this is not raw data
-    else:
-        log.error(
-            "You must specify a valid metadata object or reader function to read a raw data track"
-        )
+    if metadata:
+        if raw_data:
+            trk = Track(
+                data_file, metadata=metadata, raw_data=raw_data, logger=log
+            )  # get reader from metadata file
+        else:
+            trk = Track(
+                data_file, metadata=metadata, raw_data=raw_data, logger=log
+            )  # get reader from metadata file - assume it is set to standard
+    else:  # no metadata file
+        if reader and raw_data:
+            trk = Track(
+                data_file,
+                reader=reader,
+                model=model,
+                trim_start=trim_start,
+                trim_end=trim_end,
+                raw_data=raw_data,
+                logger=log,
+            )  # get reader from user
+        elif not raw_data:
+            trk = Track(
+                data_file,
+                reader="standard",
+                model=model,
+                trim_start=trim_start,
+                trim_end=trim_end,
+                logger=log,
+            )  # this is not raw data and there is no metadata
+        else:
+            log.error(
+                "You must specify a valid metadata object or reader function to read a raw data track"
+            )
 
     # note that the steps purge, sort, speed, speed_limit and trim are for processing raw data
     # if you have standard data, it is possible to trim it to a specific period, as desired

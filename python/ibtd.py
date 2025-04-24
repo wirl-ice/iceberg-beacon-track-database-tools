@@ -20,7 +20,21 @@ The functions to plot figures are in track_fig.py
 
 The Database itself is created using this code base.  To (re-)create the Database use track_collate.py
 
-Author: Derek Mueller Jul 2024-Apr 2025, with contribution from Adam Garbo's code
+Copyright (C) 2025  Derek Mueller
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 """
 # imports
 import os
@@ -148,7 +162,8 @@ class Meta:
         self.meta_file = meta_file
 
         try:
-            df = pd.read_excel(meta_file)
+            df = pd.read_excel(meta_file, dtype={"wmo": str})
+
         except:
             self.log.error(f"Failed to read {self.meta_file}, exiting... ")
             raise Exception(f"Failed to read {self.meta_file}")
@@ -530,7 +545,6 @@ class Track:
         self.log.info("Reading track metadata")
         # filter records to find the data for this beacon
         record = Meta.df.loc[Meta.df.platform_id == self.platform_id]
-
         # check that one and only one record is returned
         if len(record) == 0:
             self.log.error("metadata not found, exiting....")

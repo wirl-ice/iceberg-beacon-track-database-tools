@@ -6,7 +6,6 @@ dependencies:
   - geopandas>=1.0
   - seaborn
   - cartopy
-  - xlrd
   - openpyxl
   - odfpy
 
