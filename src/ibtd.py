@@ -20,7 +20,9 @@ The functions to plot figures are in track_fig.py
 
 The Database itself is created using this code base.  To (re-)create the Database use track_collate.py
 
-Copyright (C) 2025  Derek Mueller
+Author: Derek Mueller, Water and Ice Research Laboratory (WIRL), Carleton University
+
+Copyright (C) 2025  WIRL
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -106,7 +108,6 @@ class Specs:
     Currently this is the valid range (min, max) of various sensors and some beacon attributes
     but this could be expanded to hold any data related to the model.
 
-
     """
 
     def __init__(self, specs_file, logger=None):
@@ -179,6 +180,159 @@ class Track:
     the standard format.
 
     Tracks have many properties and methods for data purging, filtering, inspection and analysis.
+
+
+    Attributes
+    ----------
+    datafile : str
+        Path to the raw or standardized data file.
+    platform_id : str
+        Identifier for the platform (from filename stem).
+    year : str
+        Year of the platform deployment (from filename).
+    id : str
+        Unique identifier for the beacon (from filename).
+    data : pandas.DataFrame
+        DataFrame containing the track data (timestamp, latitude, longitude, etc.).
+    raw_data : bool
+        True if track is from raw data, False if standardized.
+    reader : str
+        Name of the reader function used to load the data.
+    model : str or None
+        Name of the beacon model.
+    trim_start : pandas.Timestamp or None
+        Timestamp for the start trim of the track.
+    trim_end : pandas.Timestamp or None
+        Timestamp for the end trim of the track.
+    data_start : pandas.Timestamp
+        Timestamp of the first data point in the file.
+    data_end : pandas.Timestamp
+        Timestamp of the last data point in the file.
+    track_start : pandas.Timestamp
+        Timestamp of the first valid data point after trimming/filtering.
+    track_end : pandas.Timestamp
+        Timestamp of the last valid data point after trimming/filtering.
+    duration : float
+        Duration of the track in days.
+    observations : int
+        Number of valid data points in the track.
+    latitude_start : float or None
+        Starting latitude (after sorting).
+    longitude_start : float or None
+        Starting longitude (after sorting).
+    latitude_end : float or None
+        Ending latitude (after sorting).
+    longitude_end : float or None
+        Ending longitude (after sorting).
+    distance_travelled : float or None
+        Total distance travelled by the platform (km).
+    purged : bool
+        True if bad data have been purged.
+    sorted : bool
+        True if the data have been sorted chronologically.
+    speeded : bool
+        True if speed/displacement calculations have been performed.
+    speedlimited : bool
+        True if speed limit filtering has been applied.
+    trimmed : bool
+        True if the track has been trimmed.
+    trimmed_start : bool
+        True if the start of the track has been trimmed.
+    trimmed_end : bool
+        True if the end of the track has been trimmed.
+    geoed : bool
+        True if geospatial objects have been created.
+    trackpoints : geopandas.GeoDataFrame or None
+        Geodataframe of track points (created by geo()).
+    trackline : geopandas.GeoSeries or None
+        Geospatial line representing the track (created by geo()).
+    meta_dict : dict
+        Additional metadata loaded from the Meta object.
+    log : logging.Logger or NoOpLogger
+        Logger instance used for logging messages.
+
+    # Beacon/model specification attributes (if loaded via load_model_specs)
+    make : str
+        Beacon manufacturer.
+    transmitter : str
+        Transmitter type/model.
+    air_deployable : bool
+        Whether the beacon is air deployable.
+    buoyant : bool
+        Whether the beacon is buoyant.
+    has_internal_temperature : bool
+        If the beacon has an internal temperature sensor.
+    has_surface_temperature : bool
+        If the beacon has a surface temperature sensor.
+    has_air_temperature : bool
+        If the beacon has an air temperature sensor.
+    has_air_pressure : bool
+        If the beacon has an air pressure sensor.
+    has_platform_pitch : bool
+        If the beacon has a pitch sensor.
+    has_platform_roll : bool
+        If the beacon has a roll sensor.
+    has_platform_orientation : bool
+        If the beacon has an orientation sensor.
+    has_voltage_battery_volts : bool
+        If the beacon has a battery voltage sensor.
+
+    # Valid range attributes (if loaded via load_model_specs)
+    latitude_min, latitude_max : float
+        Valid range for latitude.
+    longitude_min, longitude_max : float
+        Valid range for longitude.
+    air_temperature_min, air_temperature_max : float
+        Valid range for air temperature.
+    internal_temperature_min, internal_temperature_max : float
+        Valid range for internal temperature.
+    surface_temperature_min, surface_temperature_max : float
+        Valid range for surface temperature.
+    air_pressure_min, air_pressure_max : float
+        Valid range for air pressure.
+    platform_pitch_min, platform_pitch_max : float
+        Valid range for platform pitch.
+    platform_roll_min, platform_roll_max : float
+        Valid range for platform roll.
+    platform_orientation_min, platform_orientation_max : float
+        Valid range for platform orientation.
+    voltage_battery_volts_min, voltage_battery_volts_max : float
+        Valid range for battery voltage.
+
+
+    Methods
+    -------
+    geo()
+        Add a geodataframe of track points and a track line to the track object.
+    load_metadata(Meta)
+        Read the metadata record for this track and overwrite track properties.
+    load_model_specs(Specs)
+        Load the specific specifications for this beacon and write them to track properties.
+    purge()
+        Purge bad data by assigning NaN to values that exceed the min/max range.
+    sort()
+        Order the track chronologically and remove redundant entries.
+    speed()
+        Calculate displacement, speed, and course bearing between iceberg positions.
+    speed_limit(threshold=2.5)
+        Remove gross speeding violations from data.
+    trim()
+        Trim a track from data_start/end with trim_start/end to yield a track from track_start to _end.
+    output(types=['csv'], path_output='.', file_name=None)
+        Output the track to a file in various formats.
+    resample(timestep='D', agg_function=None, first=True)
+        Resample track to a given time step.
+    track_metadata(path_output='.', meta_export=None, verbose=False)
+        Make a dataframe and dictionary of the known track metadata for export.
+    plot_map(path_output='.', interactive=False, dpi=300)
+        Plot a map of the track.
+    plot_trim(path_output='.', interactive=False, dpi=300)
+        Plot a trim diagnostic graph for the track.
+    plot_dist(path_output='.', interactive=False, dpi=300)
+        Plot distributions along the track.
+    plot_time(path_output='.', interactive=False, dpi=300)
+        Plot a timeseries of the track.
+
     """
 
     def __init__(
@@ -818,7 +972,7 @@ class Track:
         Remove gross speeding violations from data.
 
         Note the intent here is to remove only the very worst rows from datasets.  It is
-        a very crude way to cut down on _clearly wrong_ position data.  Note high speeds are
+        a very crude way to cut down on *clearly wrong* position data.  Note high speeds are
         often due to inaccurate positions, but also inprecise positions over short periods
         of time. (eg., an Argos position 1-2 min apart may exceed a threshold even if
         precision is relatively good).
@@ -1098,8 +1252,8 @@ class Track:
 
         Since the track data and properies will be overwritten, it is a good idea to make
         a copy first:
-            track_6h = copy.deepcopy(track)
-            track_6h.resample(timestep="6h")
+        - track_6h = copy.deepcopy(track)
+        - track_6h.resample(timestep="6h")
 
         Note this method has not been thoroughly tested!
 

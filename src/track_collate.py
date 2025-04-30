@@ -9,7 +9,9 @@ Note you must have a track metadata file and a beacon model file to run this
 The file structure of the raw data folders (scandir) is preserved. Some functions can
 be used to move files into a different arrangement.
 
-Copyright (C) 2025  Derek Mueller
+Author: Derek Mueller, Water and Ice Research Laboratory (WIRL), Carleton University
+
+Copyright (C) 2025  WIRL
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -74,8 +76,8 @@ def combine_data(indir, outdir, run_name):
     alltrack_data : GeoPandas.GeoDataFrame
         A geodatafame of all the track points and attributes.
 
-    Example
-    -------
+    Examples
+    --------
     Scan the processed data directory, combine all tracks, and save outputs with basename "ibtd_v1"
     combined_data = combine_data("/path/to/processed_tracks", "/path/to/output", "ibtd_v1")
 

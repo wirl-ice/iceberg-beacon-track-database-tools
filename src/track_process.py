@@ -9,7 +9,9 @@ Stand-alone script to process tracks for the IBTD (Iceberg Beacon Track Database
 
 If you have standardized data already, it can be used to make plots and output data
 
-Copyright (C) 2025  Derek Mueller
+Author: Derek Mueller, Water and Ice Research Laboratory (WIRL), Carleton University
+
+Copyright (C) 2025  WIRL
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -117,10 +119,11 @@ def read_args():
 
     This function facilitates the command line operation of the workflow. Note that most
     of the arguments are not required, since they have defaults. There are some choices:
-        The user can specify the reader, beacon model, trim start and end times (for trimming),
-        or leave them blank (which may limit what steps can be accomplished),
-        or they can provide the path to the track metadata file. If this file is present, the
-        keywords mentioned above will be overwritten.
+
+    - The user can specify the reader, beacon model, trim start and end times (for trimming),
+    - or leave them blank (which may limit what steps can be accomplished),
+    - or they can provide the path to the track metadata file. If this file is present, the
+      keywords mentioned above will be overwritten.
 
     Returns
     -------

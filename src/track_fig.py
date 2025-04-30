@@ -12,9 +12,10 @@ Visualizations include:
     dist - statistical distributions - polar plot of direction, histogram of speed
     trim - time series of data that can be used for checking if beacon is still on target
 
-Author: Derek Mueller, July 2024-April 2025, modifying code from Adam Garbo from 2021
+Author: Derek Mueller, July 2024-April 2025, modifying code from Adam Garbo from 2021,
+Water and Ice Research Laboratory (WIRL), Carleton University
 
-Copyright (C) 2025  Derek Mueller and Adam Garbo
+Copyright (C) 2025 WIRL
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

@@ -26,7 +26,7 @@ IBTD Processing Tools contains a modular workflow that:
 
 * Reads and standardizes raw beacon track data from various formats.
 * Purges, filters, and trims track data according to command-line arguments or track metadata and beacon specifications.
-* Generates standardized outputs in CSV format, as well as point and line geospatial formats (GeoPackage, KML) and 3 types of overview plots (a map, a timeseries plot and a plot of velocity/speed distributions).
+* Generates standardized outputs in csv format, as well as point and line geospatial formats (GeoPackage, KML) and 3 types of overview plots (a map, a timeseries plot and a plot of velocity/speed distributions).
 * Batch processes and collates tracks into the IBTD and outputs summary database statistics for documentation.
 
 
@@ -67,7 +67,7 @@ IBTD Processing Tools contains a modular workflow that:
         * A csv file of all track observations in the standard format (this is the output format 'of record')
         * A track point and track line GeoPackage file (*_pt.gpkg, *_ln.gpkg)
         * A track point and track line Google Earth file (*_pt.kml, *_ln.kml)
-        * A metadata file in JSON or CSV format
+        * A metadata file in json or csv format
         * A map of the track (a map plot, *_map.png)
         * A graph of temperature, displacement and velocity through time (a time plot, *_time.png)
         * A graph of the speed distribution (as a histogram and cumulative histogram) and the distribution of velocities (a polar plot) for the track (a dist plot, *_dist.png)
@@ -119,7 +119,7 @@ All tracks are converted to a standard format with the following columns, where 
 | `platform_speed_wrt_ground`  | Speed from previous to current track position                                                                 | ms-1                      | CF         | https://cfconventions.org/Data/cf-standard-names/current/build/cf-standard-name-table.html#platform_speed_wrt_ground | float     |
 | `platform_course`            | Azimuth relative to true north from previous to current track position                                        | degrees                   | CF         | https://cfconventions.org/Data/cf-standard-names/current/build/cf-standard-name-table.html#platform_course           | float     |
 
-## **Dependencies**
+## Dependencies
 
 * python 3
 * pandas, numpy, geopandas>=1.0, matplotlib, seaborn, cartopy, openpyxl, odfpy

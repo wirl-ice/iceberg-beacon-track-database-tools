@@ -17,12 +17,12 @@ A few variable names are somewhat terse, so defined here:
     rdf - raw data frame
 
 
-Created December 2022 by Adam Garbo based on R scripts from Derek Mueller, Cindy
-Lopes, Anna Crawford and Jill Rajewicz
+Created December 2022 by Adam Garbo based on R scripts from Derek Mueller, Anna Crawford
+and Jill Rajewicz at the Water and Ice Research Laboratory (WIRL), Carleton University
 Rewritten June-July 2024 by Derek Mueller, and further modified to Apr 2025
 
 
-Copyright (C) 2025  Derek Mueller and Adam Garbo
+Copyright (C) 2025 WIRL
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -209,9 +209,9 @@ def standard(raw_data_file, log=None):
     sdf : Pandas DataFrame
         Standardized beacon track pandas dataframe.
 
-    Data format
-    -----------------------------------
-    See create_sdf function
+    Notes
+    -----
+    See create_sdf function for data format
 
     """
     # set up the logger to output nowhere if None
@@ -267,8 +267,8 @@ def calib_argos(raw_data_file, log=None):
     sdf : Pandas DataFrame
         Standardized Pandas dataframe ready for processing.
 
-    Raw data format
-    ----------------------------------
+    Notes
+    -----
     A challenging format to read!
 
     There are four types of lines -
@@ -492,28 +492,29 @@ def canatec(raw_data_file, log=None):
     sdf : Pandas DataFrame
         Standardized Pandas dataframe ready for processing.
 
-    Raw data format
-    ----------------------------------
-    Columns are:
-        ReadingDate
-        Latitude
-        Longitude
-        Elevation
-        Heading
-        Speed
-        Fix
-        Satellites
-        HDOP
-        VDOP
-        VerticalVelocity
-        Pressure
-        TempExternal
-        TempInternal
-        BeaconAlarmState
-        BatteryVoltage
-        ModemVoltage
-        WindSpeed
-        WindDirection
+    Notes
+    -----
+    Raw Data Columns:
+
+    - ReadingDate
+    - Latitude
+    - Longitude
+    - Elevation
+    - Heading
+    - Speed
+    - Fix
+    - Satellites
+    - HDOP
+    - VDOP
+    - VerticalVelocity
+    - Pressure
+    - TempExternal
+    - TempInternal
+    - BeaconAlarmState
+    - BatteryVoltage
+    - ModemVoltage
+    - WindSpeed
+    - WindDirection
 
     """
     # set up the logger to output nowhere if None
@@ -571,15 +572,15 @@ def pathfinder_ccore(raw_data_file, log=None):
     sdf : Pandas DataFrame
         Standardized Pandas dataframe ready for processing.
 
-    Raw data format
-    ----------------------------------
-    Columns (case sensitive):
-        Buoy Name
-        Time (2011 Jun 18 18:20:02 UTC)
-        Latitude
-        Longitude
-        Temperature
-        Drogue Depth (m)
+    Notes
+    -----
+    Raw Data Columns (case sensitive):
+    - Buoy Name
+    - Time (2011 Jun 18 18:20:02 UTC)
+    - Latitude
+    - Longitude
+    - Temperature
+    - Drogue Depth (m)
 
     """
     # set up the logger to output nowhere if None
@@ -625,32 +626,33 @@ def cryologger(raw_data_file, log=None):
     sdf : Pandas DataFrame
         Standardized Pandas dataframe ready for processing.
 
-    Raw data format
-    ----------------------------------
+    Notes
+    -----
     See Cryologger_ITB in beacon model info for more details
 
-    Data columns (case sensitive):
-        imei
-        momsn
-        transmit_time
-        iridium_latitude
-        iridium_longitude
-        iridium_cep
-        data
-        unixtime
-        temperature_int
-        humidity_int
-        pressure_int
-        platform_pitch
-        roll
-        heading
-        latitude
-        longitude
-        satellites
-        hdop
-        voltage
-        transmitDuration
-        messageCounter
+    Raw Data columns (case sensitive):
+
+    - imei
+    - momsn
+    - transmit_time
+    - iridium_latitude
+    - iridium_longitude
+    - iridium_cep
+    - data
+    - unixtime
+    - temperature_int
+    - humidity_int
+    - pressure_int
+    - platform_pitch
+    - roll
+    - heading
+    - latitude
+    - longitude
+    - satellites
+    - hdop
+    - voltage
+    - transmitDuration
+    - messageCounter
     """
     # set up the logger to output nowhere if None
     if log == None:
@@ -719,21 +721,22 @@ def iabp(raw_data_file, log=None):
     sdf : Pandas DataFrame
         Standardized Pandas dataframe ready for processing.
 
-    Raw data format
-    ----------------------------------
-    Data columns:
-        BuoyID
-        Date
-        Year
-        Hour
-        Min
-        DOY
-        POS_DOY
-        Lat
-        Lon
-        BP
-        Ta
-        Ts
+    Notes
+    -----
+    Raw Data columns:
+
+    - BuoyID
+    - Date
+    - Year
+    - Hour
+    - Min
+    - DOY
+    - POS_DOY
+    - Lat
+    - Lon
+    - BP
+    - Ta
+    - Ts
     """
     # set up the logger to output nowhere if None
     if log == None:
@@ -795,20 +798,23 @@ def globalstar(raw_data_file, log=None):
     sdf : Pandas DataFrame
         Standardized Pandas dataframe ready for processing.
 
-    Raw data format
-    ----------------------------------
-    Columns:  (from CCORE)
-        INDEX
-        BERG_ID
-        DT_TAG_POS_UTC (2019-04-29T23:03UTC)
-        LAT_TAG
-        LON_TAG
-    OR  (from IIP)
-        INDEX
-        ID
-        DATETIME (2019-04-29T23:03UTC)
-        LATITUDE
-        LONGITUDE
+    Notes
+    -----
+    Raw Data Columns:  (from CCORE)
+
+    - INDEX
+    - BERG_ID
+    - DT_TAG_POS_UTC (2019-04-29T23:03UTC)
+    - LAT_TAG
+    - LON_TAG
+
+    OR  (from IIP):
+
+    - INDEX
+    - ID
+    - DATETIME (2019-04-29T23:03UTC)
+    - LATITUDE
+    - LONGITUDE
 
     """
     # set up the logger to output nowhere if None
@@ -870,16 +876,17 @@ def oceanetic(raw_data_file, log=None):
     sdf : Pandas DataFrame
         Standardized Pandas dataframe ready for processing.
 
-    Raw data format
-    ----------------------------------
-    Columns:
-        beacon id
-        yr
-        mm
-        dd
-        hr
-        lat
-        long
+    Notes
+    -----
+    Raw Data Columns:
+
+    - beacon id
+    - yr
+    - mm
+    - dd
+    - hr
+    - lat
+    - long
 
     """
     # read in the raw data frame - rdf
@@ -930,22 +937,22 @@ def ceos(raw_data_file, log=None):
     sdf : Pandas DataFrame
         Standardized Pandas dataframe ready for processing.
 
-    Raw data format
-    ----------------------------------
-    Columns:
-        imei
-        unknown
-        unknown
-        date
-        time
-        lat
-        hemi
-        long
-        hemi
-        unknown
-        unknown
-        unknown
-        unknown
+    Notes
+    -----
+    Raw Data Columns:
+    - imei
+    - unknown
+    - unknown
+    - date
+    - time
+    - lat
+    - hemi
+    - long
+    - hemi
+    - unknown
+    - unknown
+    - unknown
+    - unknown
     """
     # read in the raw data frame - rdf
     rdf = pd.read_csv(raw_data_file, index_col=False, skipinitialspace=True)
@@ -990,21 +997,22 @@ def wirl_sbd(raw_data_file, log=None):
     sdf : Pandas DataFrame
         Standardized Pandas dataframe ready for processing.
 
-    Raw data format
-    ----------------------------------
-    Columns:
-        IMEI
-        Year
-        Month
-        Day
-        Hour
-        Minute
-        Latitude
-        Longitude
-        Temperature
-        Voltage Battery
-        AtmPress
-        FormatID
+    Notes
+    -----
+    Raw Data Columns:
+
+    - IMEI
+    - Year
+    - Month
+    - Day
+    - Hour
+    - Minute
+    - Latitude
+    - Longitude
+    - Temperature
+    - Voltage Battery
+    - AtmPress
+    - FormatID
 
     """
     # set up the logger to output nowhere if None
@@ -1070,27 +1078,28 @@ def rockstar(raw_data_file, log=None):
     sdf : Pandas DataFrame
         Standardized Pandas dataframe ready for processing.
 
-    Raw data format
-    ----------------------------------
-    Columns:
-        ID
-        GPS Time (UTC)  (dd-mm-yyyy hh:mm:ss)
-        GPS Time (UTC)  (dd/mm/yyyy hh:mm:ss)
-        Latitude
-        Longitude
-        GPS SOG
-        SOG
-        COG
-        GPS COG
-        Altitude
-        Ext. Power
-        Battery
-        Source
-        CEP
-        Temperature
-        Reason
-        GPS PDOP
-        Nav Mode
+    Notes
+    -----
+    Raw Data Columns:
+
+    - ID
+    - GPS Time (UTC)  (dd-mm-yyyy hh:mm:ss)
+    - GPS Time (UTC)  (dd/mm/yyyy hh:mm:ss)
+    - Latitude
+    - Longitude
+    - GPS SOG
+    - SOG
+    - COG
+    - GPS COG
+    - Altitude
+    - Ext. Power
+    - Battery
+    - Source
+    - CEP
+    - Temperature
+    - Reason
+    - GPS PDOP
+    - Nav Mode
 
     """
     # set up the logger to output nowhere if None
@@ -1158,16 +1167,18 @@ def solara(raw_data_file, log=None):
     sdf : Pandas DataFrame
         Standardized Pandas dataframe ready for processing.
 
-    Raw data format
-    ----------------------------------
-    Columns:
-        serial
-        alias
-        lat
-        long
-        timestamp
-            format_1 = "%Y-%m-%d %H:%M:%S"
-            format_2 = "%d/%m/%Y %H:%M:%S"
+    Notes
+    -----
+    Raw Data Columns:
+
+    - serial
+    - alias
+    - lat
+    - long
+    - timestamp
+
+      - format_1 = "%Y-%m-%d %H:%M:%S"
+      - format_2 = "%d/%m/%Y %H:%M:%S"
 
     """
     # set up the logger to output nowhere if None
@@ -1201,11 +1212,12 @@ def metocean(raw_data_file, log=None):
     Convert raw data from Metocean SVP/iCALIB format to standardized dataframe.
 
     Some examples are:
+
     - iCALIB beacons
     - SVP-I-BXGS-LP beacons have BP, GPS, and SST
     - SVP-I-XXGS-LP beacons have GPS and SST, no BP
     - SVP-I-BXGSA-L-AD beacons have BP, GPS, SST, AT, lithium battery and are
-        designed for air deployment in Arctic regions
+      designed for air deployment in Arctic regions
 
     Note that variable names are slightly different so lots of if/elif or finding columns
     from a list of options or regex.
@@ -1225,33 +1237,35 @@ def metocean(raw_data_file, log=None):
     sdf : Pandas DataFrame
         Standardized Pandas dataframe ready for processing.
 
-    Raw data format
-    ---------------
-    Columns:
-        Asset Name / Asset.Name
-        Asset Id  / Asset.Id / Modem ID
-        Data Date (UTC) / DataDate_UTC  / Date(GMT)
-        Received Date (UTC) / Date (GMT)
-        LATITUDE / LAT  # this is in dd.dddd format / GPS LATITUDE (DEGREES) # dd mm.mmmmmm
-        LONGITUDE / LON # this is in dd.dddd format / GPS LONGITUDE (DEGREES) # dd mm.mmmmmm
-        FMTID / FORMAT ID
-        YEAR
-        MONTH
-        DAY / DAY (day)
-        HOUR / HOUR (hr)
-        JHOUR
-        GPSFIXJHOUR
-        MIN  / MINUTE (min)
-        SST  / Sea Surface Temperature (�C)
-        BP  / Barometric Pressure (mbar) / Ref Pressure
-        BPT / Barometric Pressure Tendency (mbar)
-        AT
-        VBAT / Battery Voltage (V)
-        GPSDELAY / Time Since Last GPS fix (min) (up to 4095)
-        SNR  / GPS reported Signal to Noise ratio (dB)
-        TTFF / Time to First fix (s)
-        SBDTIME  / Iridium Transmission Duration (s)
-        Report Body / Report.Body / Hex Data
+    Notes
+    -----
+
+    Raw Data Columns:
+
+    - Asset Name / Asset.Name
+    - Asset Id  / Asset.Id / Modem ID
+    - Data Date (UTC) / DataDate_UTC  / Date(GMT)
+    - Received Date (UTC) / Date (GMT)
+    - LATITUDE / LAT  # this is in dd.dddd format / GPS LATITUDE (DEGREES) # dd mm.mmmmmm
+    - LONGITUDE / LON # this is in dd.dddd format / GPS LONGITUDE (DEGREES) # dd mm.mmmmmm
+    - FMTID / FORMAT ID
+    - YEAR
+    - MONTH
+    - DAY / DAY (day)
+    - HOUR / HOUR (hr)
+    - JHOUR
+    - GPSFIXJHOUR
+    - MIN  / MINUTE (min)
+    - SST  / Sea Surface Temperature (�C)
+    - BP  / Barometric Pressure (mbar) / Ref Pressure
+    - BPT / Barometric Pressure Tendency (mbar)
+    - AT
+    - VBAT / Battery Voltage (V)
+    - GPSDELAY / Time Since Last GPS fix (min) (up to 4095)
+    - SNR  / GPS reported Signal to Noise ratio (dB)
+    - TTFF / Time to First fix (s)
+    - SBDTIME  / Iridium Transmission Duration (s)
+    - Report Body / Report.Body / Hex Data
 
     """
     # set up the logger to output nowhere if None
@@ -1423,14 +1437,16 @@ def bio(raw_data_file, log=None):
     sdf : Pandas DataFrame
         Standardized Pandas dataframe ready for processing.
 
-    Raw data format
-    ----------------------------------
-    BID
-    VOLTAGE
-    GPS_DATE (08-09-15 13:00:00.000000000 or 2011-03-20 13:00:00.0)
+    Notes
+    -----
+    Raw Data Columns:
 
-    LATITUDE
-    LONGITUDE
+    - BID
+    - VOLTAGE
+    - GPS_DATE (08-09-15 13:00:00.000000000 or 2011-03-20 13:00:00.0)
+    - LATITUDE
+    - LONGITUDE
+
     """
     # set up the logger to output nowhere if None
     if log == None:
@@ -1486,11 +1502,13 @@ def navidatum(raw_data_file, log=None):
     sdf : Pandas DataFrame
         Standardized Pandas dataframe ready for processing.
 
-    Raw data format
-    -----------------------------------
-    Date (02/08/2012 21:01)
-    Latitude
-    Longitude
+    Notes
+    -----
+    Raw Data Columns:
+
+    - Date (02/08/2012 21:01)
+    - Latitude
+    - Longitude
 
     """
     # set up the logger to output nowhere if None
@@ -1538,8 +1556,8 @@ def fn_template(raw_data_file, log=None):
     sdf : Pandas DataFrame
         Standardized Pandas dataframe ready for processing.
 
-    Raw data format
-    ----------------------------------
+    Notes
+    -----
     <INSERT HERE>
     """
     # set up the logger to output nowhere if None
