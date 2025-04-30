@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>track_process &#8212; Iceberg Beacon Track Database (IBTD) Tools 1.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=27fed22d" />
+    <script src="../_static/documentation_options.js?v=8d563738"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for track_process</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">track_proceessing.py</span>
+
+<span class="sd">Stand-alone script to process tracks for the IBTD (Iceberg Beacon Track Database)</span>
+
+<span class="sd">--or--</span>
+
+<span class="sd">If you have standardized data already, it can be used to make plots and output data</span>
+
+<span class="sd">Author: Derek Mueller, Water and Ice Research Laboratory (WIRL), Carleton University</span>
+
+<span class="sd">Copyright (C) 2025  WIRL</span>
+
+<span class="sd">    This program is free software: you can redistribute it and/or modify</span>
+<span class="sd">    it under the terms of the GNU General Public License as published by</span>
+<span class="sd">    the Free Software Foundation, either version 3 of the License, or</span>
+<span class="sd">    (at your option) any later version.</span>
+
+<span class="sd">    This program is distributed in the hope that it will be useful,</span>
+<span class="sd">    but WITHOUT ANY WARRANTY; without even the implied warranty of</span>
+<span class="sd">    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the</span>
+<span class="sd">    GNU General Public License for more details.</span>
+
+<span class="sd">    You should have received a copy of the GNU General Public License</span>
+<span class="sd">    along with this program.  If not, see &lt;https://www.gnu.org/licenses/&gt;.</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">argparse</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+
+<span class="c1"># custom modules</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">ibtd</span><span class="w"> </span><span class="kn">import</span> <span class="n">Track</span><span class="p">,</span> <span class="n">Meta</span><span class="p">,</span> <span class="n">Specs</span><span class="p">,</span> <span class="n">nolog</span>
+
+
+<div class="viewcode-block" id="tracklog">
+<a class="viewcode-back" href="../api.html#track_process.tracklog">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">tracklog</span><span class="p">(</span><span class="n">platform_id</span><span class="p">,</span> <span class="n">path_output</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="s2">&quot;INFO&quot;</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Set up logging.</span>
+
+<span class="sd">    The level is the standard logging levels with DEBUG being the most verbose, INFO</span>
+<span class="sd">    being the recommended level and WARNING capturing only bad news.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    platform_id : str</span>
+<span class="sd">        the beacon id - used for naming log</span>
+<span class="sd">    path_output : str</span>
+<span class="sd">        path to the output file</span>
+<span class="sd">    level : str, optional</span>
+<span class="sd">        the logging level for the file. The default is &quot;INFO&quot;.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    track_log : logging.Logger</span>
+<span class="sd">        An instance of the logger class</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># name the logger after the platform_id</span>
+    <span class="n">track_log</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="n">platform_id</span><span class="p">)</span>
+
+    <span class="c1"># if not track_log.handlers:</span>
+    <span class="c1">#     # Create a name for the file</span>
+    <span class="n">loggerFileName</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">platform_id</span><span class="si">}</span><span class="s2">.log&quot;</span>
+    <span class="n">loggerFileName</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">path_output</span><span class="p">,</span> <span class="n">loggerFileName</span><span class="p">)</span>
+
+    <span class="c1"># assign the log level here, defaults to INFO, note there is no ERROR or CRITICAL level</span>
+    <span class="k">match</span> <span class="n">level</span><span class="o">.</span><span class="n">lower</span><span class="p">():</span>
+        <span class="k">case</span> <span class="s2">&quot;debug&quot;</span><span class="p">:</span>
+            <span class="n">loglevel</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span>
+        <span class="k">case</span> <span class="s2">&quot;warning&quot;</span><span class="p">:</span>
+            <span class="n">loglevel</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">WARNING</span>
+        <span class="k">case</span><span class="w"> </span><span class="k">_</span><span class="p">:</span>
+            <span class="n">loglevel</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">INFO</span>
+
+    <span class="c1"># Remove all handlers associated with the logger (avoids duplicates)</span>
+    <span class="k">if</span> <span class="n">track_log</span><span class="o">.</span><span class="n">hasHandlers</span><span class="p">():</span>
+        <span class="n">track_log</span><span class="o">.</span><span class="n">handlers</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+
+    <span class="n">track_log</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>  <span class="c1"># sets the default level for this logger</span>
+
+    <span class="c1"># Create handlers - these control output from the logger</span>
+    <span class="c1"># stream handler - output to the console</span>
+    <span class="n">c_handler</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">StreamHandler</span><span class="p">()</span>
+    <span class="c1"># file handler - output to a file</span>
+    <span class="c1"># Note that mode = &#39;w&#39; sets logger to overwrite (not append).</span>
+    <span class="c1"># For some applications (testing speed_limit thresholds for example) you may want to change this</span>
+    <span class="n">f_handler</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">FileHandler</span><span class="p">(</span><span class="n">loggerFileName</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;w&quot;</span><span class="p">)</span>
+
+    <span class="c1"># this sets the logging level for both handlers:</span>
+    <span class="n">c_handler</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">loglevel</span><span class="p">)</span>
+    <span class="n">f_handler</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">loglevel</span><span class="p">)</span>
+
+    <span class="c1"># Create formatters and add them to handlers - this gives control over output</span>
+    <span class="c1"># Delimited with pipe | so it can be parsed easily.</span>
+    <span class="n">c_format</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">Formatter</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%(message)s</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">f_format</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">Formatter</span><span class="p">(</span>
+        <span class="s2">&quot;</span><span class="si">%(asctime)s</span><span class="s2"> | </span><span class="si">%(module)s</span><span class="s2"> | </span><span class="si">%(levelname)s</span><span class="s2"> | </span><span class="si">%(name)s</span><span class="s2"> | </span><span class="si">%(message)s</span><span class="s2">&quot;</span>
+    <span class="p">)</span>
+    <span class="n">c_handler</span><span class="o">.</span><span class="n">setFormatter</span><span class="p">(</span><span class="n">c_format</span><span class="p">)</span>
+    <span class="n">f_handler</span><span class="o">.</span><span class="n">setFormatter</span><span class="p">(</span><span class="n">f_format</span><span class="p">)</span>
+
+    <span class="c1"># Add handlers to the logger</span>
+    <span class="n">track_log</span><span class="o">.</span><span class="n">addHandler</span><span class="p">(</span><span class="n">c_handler</span><span class="p">)</span>
+    <span class="n">track_log</span><span class="o">.</span><span class="n">addHandler</span><span class="p">(</span><span class="n">f_handler</span><span class="p">)</span>
+
+    <span class="c1"># Prevent propagation to avoid duplicate logs</span>
+    <span class="n">track_log</span><span class="o">.</span><span class="n">propagate</span> <span class="o">=</span> <span class="kc">False</span>
+
+    <span class="k">return</span> <span class="n">track_log</span></div>
+
+
+
+<div class="viewcode-block" id="read_args">
+<a class="viewcode-back" href="../api.html#track_process.read_args">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">read_args</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Read arguments from command line, checks them, reads some files.</span>
+
+<span class="sd">    This function facilitates the command line operation of the workflow. Note that most</span>
+<span class="sd">    of the arguments are not required, since they have defaults. There are some choices:</span>
+
+<span class="sd">    - The user can specify the reader, beacon model, trim start and end times (for trimming),</span>
+<span class="sd">    - or leave them blank (which may limit what steps can be accomplished),</span>
+<span class="sd">    - or they can provide the path to the track metadata file. If this file is present, the</span>
+<span class="sd">      keywords mentioned above will be overwritten.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    list</span>
+<span class="sd">    A list containing the following arguments in order:</span>
+<span class="sd">    - data_file : str</span>
+<span class="sd">        Path to the track data file.</span>
+<span class="sd">    - output_path : str</span>
+<span class="sd">        Directory path where output files will be written.</span>
+<span class="sd">    - metadata : Meta object or None</span>
+<span class="sd">        Metadata file containing track information if provided.</span>
+<span class="sd">    - reader : str</span>
+<span class="sd">        Name of the reader function to use.</span>
+<span class="sd">    - model : str</span>
+<span class="sd">        Beacon model name.</span>
+<span class="sd">    - specs : Models object or None</span>
+<span class="sd">        File containing model specifications if provided.</span>
+<span class="sd">    - trim_start : str or None</span>
+<span class="sd">        Timestamp to trim the start of the track in UTC format.</span>
+<span class="sd">    - trim_end : str or None</span>
+<span class="sd">        Timestamp to trim the end of the track in UTC format.</span>
+<span class="sd">    - output_name : str or None</span>
+<span class="sd">        Name for the output file.</span>
+<span class="sd">    - output_types : list or None</span>
+<span class="sd">        List of output file types to produce.</span>
+<span class="sd">    - output_plots : list or None</span>
+<span class="sd">        List of plot types to generate.</span>
+<span class="sd">    - interactive : bool</span>
+<span class="sd">        Whether to create interactive plots.</span>
+<span class="sd">    - trim : str</span>
+<span class="sd">        Trim directive. Choice of: accept, decline, preview-accept, preview-decline.</span>
+<span class="sd">    - raw_data : bool</span>
+<span class="sd">        Whether the input is raw data (not standardized).</span>
+<span class="sd">    - meta_export : str</span>
+<span class="sd">        Format for metadata export (&#39;pandas&#39;, &#39;json&#39;, or &#39;both&#39;).</span>
+<span class="sd">    - log : str</span>
+<span class="sd">        chose &#39;quiet&#39; for no loggging, &#39;info&#39; for regular logging or &#39;debug&#39; for verbose logging.</span>
+
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">prog_description</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;Beacon track processing functions</span>
+<span class="s2">    </span>
+<span class="s2">    For reading-in standard data files:</span>
+<span class="s2">        - do not include the -rd (--raw_data) flag </span>
+<span class="s2">        - -r (--reader) will be ignored and reader listed in the meta_file will be ignored</span>
+<span class="s2">        - -m (--model) will be ignored</span>
+<span class="s2">        - -sf (--spec_file) will be ignored</span>
+<span class="s2">        - track can be re-trimmed as required (be sure to add -s and -e values)</span>
+<span class="s2">        - file and plot outputs can be requested</span>
+<span class="s2">        </span>
+<span class="s2">    For reading-in, standardizing and processing raw data: </span>
+<span class="s2">        - include the -rd (--raw_data) flag </span>
+<span class="s2">        - the reader must be specified (-r or listed in the track metadata file -mf)</span>
+<span class="s2">        - trimming (trim_start and/or trim_end) must be listed (-s -e) or in the track metadata file</span>
+<span class="s2">        - file and plot outputs can be requested</span>
+<span class="s2">    </span>
+<span class="s2">    Example: read standard data file 2021_300434065868240.csv, trim it to a 4 day sub-section </span>
+<span class="s2">        and output a map and a csv file in the current directory: </span>
+<span class="s2">        &gt;python track_process.py 2021_300434065868240.csv . -s &#39;2021-08-22 13:00:00&#39; -e &#39;2021-08-26 21:00:00&#39; -op map -ot</span>
+
+<span class="s2">    Example: read standard data file 2011_300234010031950.csv, output a map, timeseries </span>
+<span class="s2">    plot and kml in the parent directory:     </span>
+<span class="s2">        &gt;python track_process.py 2011_300234010031950.csv .. -op map time -ot ln_kml</span>
+
+<span class="s2">    For more information see github. </span>
+<span class="s2">    </span>
+<span class="s2">    track_process.py  Copyright (C) 2025  Derek Mueller</span>
+<span class="s2">    This program comes with ABSOLUTELY NO WARRANTY; </span>
+<span class="s2">    This is free software, and you are welcome to redistribute it</span>
+<span class="s2">    under certain conditions;</span>
+<span class="s2">        </span>
+<span class="s2">    &quot;&quot;&quot;</span>
+
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">(</span><span class="n">prog_description</span><span class="p">)</span>
+
+    <span class="c1"># these are the required parameters - all others have default values</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;data_file&quot;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;enter the track data file&quot;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;output_path&quot;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;enter the path to write the output file to&quot;</span>
+    <span class="p">)</span>
+
+    <span class="c1"># These keywords are not obligatory.</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;-r&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;--reader&quot;</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="s2">&quot;standard&quot;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;provide the name of the reader function (default is &#39;standard&#39;, which is used with processed data)&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;-m&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;--model&quot;</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="s2">&quot;Default&quot;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;the beacon model name (must be exact)&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;-sf&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;--spec_file&quot;</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;the path/name of the model specifications file&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;-s&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;--trim_start&quot;</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;timestamp to trim the start of the track in UTC (format: yyyy-mm-dd HH:MM:SS)&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;-e&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;--trim_end&quot;</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;timestamp to trim the end of the track in UTC (format: yyyy-mm-dd HH:MM:SS)&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;-mf&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;--meta_file&quot;</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;the path/name of the metadata csv file. Note that the script will OVERWRITE &quot;</span>
+        <span class="s2">&quot;arguments reader, model, trim_start, trim_end with values in this file&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;-of&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;--output_name&quot;</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;the name of the standardized fully processed track file: defaults to platform_id&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;-ot&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;--output_types&quot;</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
+        <span class="n">nargs</span><span class="o">=</span><span class="s2">&quot;+&quot;</span><span class="p">,</span>
+        <span class="n">choices</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;csv&quot;</span><span class="p">,</span> <span class="s2">&quot;pt_kml&quot;</span><span class="p">,</span> <span class="s2">&quot;ln_kml&quot;</span><span class="p">,</span> <span class="s2">&quot;pt_gpkg&quot;</span><span class="p">,</span> <span class="s2">&quot;ln_gpkg&quot;</span><span class="p">},</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;list the output types to produce&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;-op&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;--output_plots&quot;</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
+        <span class="n">nargs</span><span class="o">=</span><span class="s2">&quot;+&quot;</span><span class="p">,</span>
+        <span class="n">choices</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;map&quot;</span><span class="p">,</span> <span class="s2">&quot;time&quot;</span><span class="p">,</span> <span class="s2">&quot;dist&quot;</span><span class="p">,</span> <span class="s2">&quot;trim&quot;</span><span class="p">},</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;list the output plots to produce&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;-i&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;--interactive&quot;</span><span class="p">,</span>
+        <span class="n">action</span><span class="o">=</span><span class="s2">&quot;store_true&quot;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;create interactive plots; defaults to non-interactive plots&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;-t&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;--trim&quot;</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
+        <span class="n">nargs</span><span class="o">=</span><span class="s2">&quot;?&quot;</span><span class="p">,</span>
+        <span class="n">choices</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;accept&quot;</span><span class="p">,</span> <span class="s2">&quot;decline&quot;</span><span class="p">,</span> <span class="s2">&quot;preview-accept&quot;</span><span class="p">,</span> <span class="s2">&quot;preview-decline&quot;</span><span class="p">},</span>
+        <span class="n">default</span><span class="o">=</span><span class="s2">&quot;accept&quot;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Trim directive. Choice of: accept, decline, preview-accept, preview-decline; defaults to accept&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;-rd&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;--raw_data&quot;</span><span class="p">,</span>
+        <span class="n">action</span><span class="o">=</span><span class="s2">&quot;store_true&quot;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;set -rd to work with raw data (not standard); defaults to false&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;-me&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;--meta_export&quot;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Specify whether to export metadata in the current directory in &#39;pandas&#39; &quot;</span>
+        <span class="s2">&quot;or &#39;json&#39; format or &#39;both&#39;. The default (None) does not export a file.&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;-l&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;--loglevel&quot;</span><span class="p">,</span>
+        <span class="n">choices</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;quiet&quot;</span><span class="p">,</span> <span class="s2">&quot;info&quot;</span><span class="p">,</span> <span class="s2">&quot;debug&quot;</span><span class="p">,</span> <span class="s2">&quot;warning&quot;</span><span class="p">},</span>
+        <span class="n">default</span><span class="o">=</span><span class="s2">&quot;info&quot;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;chose &#39;quiet&#39; for no loggging, &#39;info&#39; for regular logging or &#39;debug&#39; for verbose logging.&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">()</span>
+
+    <span class="c1"># all the arguments here:</span>
+    <span class="n">data_file</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">data_file</span>
+    <span class="n">output_path</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">output_path</span>
+    <span class="n">reader</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">reader</span>
+    <span class="n">model</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">model</span>
+    <span class="n">spec_file</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">spec_file</span>
+    <span class="n">trim_start</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">trim_start</span>
+    <span class="n">trim_end</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">trim_end</span>
+    <span class="n">meta_file</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">meta_file</span>
+    <span class="n">output_name</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">output_name</span>
+    <span class="n">output_types</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">output_types</span>
+    <span class="n">output_plots</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">output_plots</span>
+    <span class="n">interactive</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">interactive</span>
+    <span class="n">trim</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">trim</span>
+    <span class="n">raw_data</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">raw_data</span>
+    <span class="n">meta_export</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">meta_export</span>
+    <span class="n">loglevel</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">loglevel</span>
+
+    <span class="c1"># some attempt at error trapping early on....</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">data_file</span><span class="p">):</span>
+        <span class="ne">Exception</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Data file: </span><span class="si">{</span><span class="n">data_file</span><span class="si">}</span><span class="s2"> was not found. Please check and run again&quot;</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">output_path</span><span class="p">):</span>
+        <span class="ne">Exception</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Output path: </span><span class="si">{</span><span class="n">output_path</span><span class="si">}</span><span class="s2"> was not found. Please check and run again&quot;</span>
+        <span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">data_file</span><span class="p">)</span> <span class="o">==</span> <span class="n">output_name</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">Path</span><span class="p">(</span><span class="n">data_file</span><span class="p">)</span><span class="o">.</span><span class="n">parent</span> <span class="o">==</span> <span class="n">output_path</span><span class="p">:</span>
+            <span class="ne">Exception</span><span class="p">(</span>
+                <span class="s2">&quot;The output file you specified will overwrite the raw data file, please fix and re-run&quot;</span>
+            <span class="p">)</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="p">[</span>
+        <span class="n">data_file</span><span class="p">,</span>
+        <span class="n">output_path</span><span class="p">,</span>
+        <span class="n">meta_file</span><span class="p">,</span>
+        <span class="n">reader</span><span class="p">,</span>
+        <span class="n">model</span><span class="p">,</span>
+        <span class="n">spec_file</span><span class="p">,</span>
+        <span class="n">trim_start</span><span class="p">,</span>
+        <span class="n">trim_end</span><span class="p">,</span>
+        <span class="n">output_name</span><span class="p">,</span>
+        <span class="n">output_types</span><span class="p">,</span>
+        <span class="n">output_plots</span><span class="p">,</span>
+        <span class="n">interactive</span><span class="p">,</span>
+        <span class="n">trim</span><span class="p">,</span>
+        <span class="n">raw_data</span><span class="p">,</span>
+        <span class="n">meta_export</span><span class="p">,</span>
+        <span class="n">loglevel</span><span class="p">,</span>
+    <span class="p">]</span></div>
+
+
+
+<div class="viewcode-block" id="read_meta_files">
+<a class="viewcode-back" href="../api.html#track_process.read_meta_files">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">read_meta_files</span><span class="p">(</span><span class="n">spec_file</span><span class="p">,</span> <span class="n">meta_file</span><span class="p">,</span> <span class="n">log</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Read track metadata file and beacon spec file.</span>
+
+<span class="sd">    Reads in the metadata and specs files</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    spec_file : str</span>
+<span class="sd">        Full path to the beacon_specs file.</span>
+<span class="sd">    meta_file : str</span>
+<span class="sd">        Full path to the track_metadata file.</span>
+<span class="sd">    log : logger instance</span>
+<span class="sd">        A logger instance.  The default is None.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    metadata : Meta object, optional</span>
+<span class="sd">        Metadata object containing track information. The default is None.</span>
+<span class="sd">    specs : Models object, optional</span>
+<span class="sd">        Object containing model specifications. The default is None.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">spec_file</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">spec_file</span><span class="p">):</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Spec file: </span><span class="si">{</span><span class="n">spec_file</span><span class="si">}</span><span class="s2"> was not found. Please check and run again&quot;</span>
+            <span class="p">)</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">meta_file</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">meta_file</span><span class="p">):</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Meta file: </span><span class="si">{</span><span class="n">meta_file</span><span class="si">}</span><span class="s2"> was not found. Please check and run again&quot;</span>
+            <span class="p">)</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="c1"># if there is a meta_file, then open it and replace the following parameters</span>
+    <span class="k">if</span> <span class="n">meta_file</span><span class="p">:</span>
+        <span class="n">metadata</span> <span class="o">=</span> <span class="n">Meta</span><span class="p">(</span><span class="n">meta_file</span><span class="p">,</span> <span class="n">log</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">metadata</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="c1"># read in the spec file</span>
+    <span class="k">if</span> <span class="n">spec_file</span><span class="p">:</span>
+        <span class="n">specs</span> <span class="o">=</span> <span class="n">Specs</span><span class="p">(</span><span class="n">spec_file</span><span class="p">,</span> <span class="n">log</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">specs</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="k">return</span> <span class="n">metadata</span><span class="p">,</span> <span class="n">specs</span></div>
+
+
+
+<div class="viewcode-block" id="process">
+<a class="viewcode-back" href="../api.html#track_process.process">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">process</span><span class="p">(</span>
+    <span class="n">data_file</span><span class="p">,</span>
+    <span class="n">output_path</span><span class="p">,</span>
+    <span class="n">metadata</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">reader</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">model</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">specs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">trim_start</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">trim_end</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">output_name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">output_types</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">output_plots</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">interactive</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">trim</span><span class="o">=</span><span class="s2">&quot;accept&quot;</span><span class="p">,</span>
+    <span class="n">raw_data</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">meta_export</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">meta_verbose</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">log</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Process a raw track: standardize, purge, trim and output.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    data_file : str</span>
+<span class="sd">        Path to the track data file to be processed.</span>
+<span class="sd">    output_path : str</span>
+<span class="sd">        Path where output files will be written.</span>
+<span class="sd">    metadata : Meta object, optional</span>
+<span class="sd">        Metadata object containing track information. The default is None.</span>
+<span class="sd">    reader : str, optional</span>
+<span class="sd">        Name of the reader function to use. The default is None.</span>
+<span class="sd">    model : str, optional</span>
+<span class="sd">        Beacon model name. The default is None.</span>
+<span class="sd">    specs : Models object, optional</span>
+<span class="sd">        Object containing model specifications. The default is None.</span>
+<span class="sd">    trim_start : str, optional</span>
+<span class="sd">        Timestamp to trim the start of the track in UTC format. The default is None.</span>
+<span class="sd">    trim_end : str, optional</span>
+<span class="sd">        Timestamp to trim the end of the track in UTC format. The default is None.</span>
+<span class="sd">    output_name : str, optional</span>
+<span class="sd">        Name for the output file. The default (None) will result in naming based on platform_id.</span>
+<span class="sd">    output_types : list, optional</span>
+<span class="sd">        List of output file types to produce. The default is None.</span>
+<span class="sd">    output_plots : list, optional</span>
+<span class="sd">        List of plot types to generate. The default is None.</span>
+<span class="sd">    interactive : bool, optional</span>
+<span class="sd">        Whether to create interactive plots. The default is False.</span>
+<span class="sd">    trim : str, optional</span>
+<span class="sd">        Trim directive. Choice of: accept, decline, preview-accept, preview-decline. The default is accept.</span>
+<span class="sd">    raw_data : bool, optional</span>
+<span class="sd">        Whether the input is raw data (not standardized). The default is False.</span>
+<span class="sd">    meta_export : str, optional</span>
+<span class="sd">        Format for metadata export (&#39;pandas&#39;, &#39;json&#39;, or &#39;both&#39;). The default is None.</span>
+<span class="sd">    meta_verbose : bool, optional</span>
+<span class="sd">        Whether to include all available metadata fields in the track metadata. If True,</span>
+<span class="sd">        metadata categories like processing details and valid range information are included.</span>
+<span class="sd">        The default is False.</span>
+<span class="sd">    log : logger instance</span>
+<span class="sd">        A logger instance.  The default is None.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    trk_meta : pandas Dataframe</span>
+<span class="sd">        Track metadata (one row) in a dataframe.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">log</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">log</span> <span class="o">=</span> <span class="n">nolog</span><span class="p">()</span>
+
+    <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;~Processing </span><span class="si">{</span><span class="n">Path</span><span class="p">(</span><span class="n">data_file</span><span class="p">)</span><span class="o">.</span><span class="n">stem</span><span class="si">}</span><span class="s2">....&quot;</span><span class="p">)</span>
+
+    <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Data file: </span><span class="si">{</span><span class="n">data_file</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Output path: </span><span class="si">{</span><span class="n">output_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">metadata</span><span class="p">:</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Metadata file read-in&quot;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;No metadata file&quot;</span><span class="p">)</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Reader: </span><span class="si">{reader}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Model: </span><span class="si">{model}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">specs</span><span class="p">:</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Beacon specs read-in&quot;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;No beacon specs available&quot;</span><span class="p">)</span>
+
+    <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Trim start: </span><span class="si">{</span><span class="n">trim_start</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Trim end: </span><span class="si">{</span><span class="n">trim_end</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Output name: </span><span class="si">{</span><span class="n">output_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Output types: </span><span class="si">{</span><span class="n">output_types</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Output plots: </span><span class="si">{</span><span class="n">output_plots</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Interactive: </span><span class="si">{</span><span class="n">interactive</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Trim: </span><span class="si">{</span><span class="n">trim</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Raw data: </span><span class="si">{</span><span class="n">raw_data</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Meta export: </span><span class="si">{</span><span class="n">meta_export</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Meta verbose: </span><span class="si">{</span><span class="n">meta_verbose</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">metadata</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">raw_data</span><span class="p">:</span>
+            <span class="n">trk</span> <span class="o">=</span> <span class="n">Track</span><span class="p">(</span>
+                <span class="n">data_file</span><span class="p">,</span> <span class="n">metadata</span><span class="o">=</span><span class="n">metadata</span><span class="p">,</span> <span class="n">raw_data</span><span class="o">=</span><span class="n">raw_data</span><span class="p">,</span> <span class="n">logger</span><span class="o">=</span><span class="n">log</span>
+            <span class="p">)</span>  <span class="c1"># get reader from metadata file</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">trk</span> <span class="o">=</span> <span class="n">Track</span><span class="p">(</span>
+                <span class="n">data_file</span><span class="p">,</span> <span class="n">metadata</span><span class="o">=</span><span class="n">metadata</span><span class="p">,</span> <span class="n">raw_data</span><span class="o">=</span><span class="n">raw_data</span><span class="p">,</span> <span class="n">logger</span><span class="o">=</span><span class="n">log</span>
+            <span class="p">)</span>  <span class="c1"># get reader from metadata file - assume it is set to standard</span>
+    <span class="k">else</span><span class="p">:</span>  <span class="c1"># no metadata file</span>
+        <span class="k">if</span> <span class="n">reader</span> <span class="ow">and</span> <span class="n">raw_data</span><span class="p">:</span>
+            <span class="n">trk</span> <span class="o">=</span> <span class="n">Track</span><span class="p">(</span>
+                <span class="n">data_file</span><span class="p">,</span>
+                <span class="n">reader</span><span class="o">=</span><span class="n">reader</span><span class="p">,</span>
+                <span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span>
+                <span class="n">trim_start</span><span class="o">=</span><span class="n">trim_start</span><span class="p">,</span>
+                <span class="n">trim_end</span><span class="o">=</span><span class="n">trim_end</span><span class="p">,</span>
+                <span class="n">raw_data</span><span class="o">=</span><span class="n">raw_data</span><span class="p">,</span>
+                <span class="n">logger</span><span class="o">=</span><span class="n">log</span><span class="p">,</span>
+            <span class="p">)</span>  <span class="c1"># get reader from user</span>
+        <span class="k">elif</span> <span class="ow">not</span> <span class="n">raw_data</span><span class="p">:</span>
+            <span class="n">trk</span> <span class="o">=</span> <span class="n">Track</span><span class="p">(</span>
+                <span class="n">data_file</span><span class="p">,</span>
+                <span class="n">reader</span><span class="o">=</span><span class="s2">&quot;standard&quot;</span><span class="p">,</span>
+                <span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span>
+                <span class="n">trim_start</span><span class="o">=</span><span class="n">trim_start</span><span class="p">,</span>
+                <span class="n">trim_end</span><span class="o">=</span><span class="n">trim_end</span><span class="p">,</span>
+                <span class="n">logger</span><span class="o">=</span><span class="n">log</span><span class="p">,</span>
+            <span class="p">)</span>  <span class="c1"># this is not raw data and there is no metadata</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+                <span class="s2">&quot;You must specify a valid metadata object or reader function to read a raw data track&quot;</span>
+            <span class="p">)</span>
+
+    <span class="c1"># note that the steps purge, sort, speed, speed_limit and trim are for processing raw data</span>
+    <span class="c1"># if you have standard data, it is possible to trim it to a specific period, as desired</span>
+    <span class="c1"># the script runs sort, speed and speed_limit regardless (doesn&#39;t take much time/ can&#39;t hurt)</span>
+    <span class="c1"># if you want to refine the speedlimit, then that can be done by adding a new limit here</span>
+    <span class="c1"># like: trk.speed_limit(1.5)</span>
+
+    <span class="k">if</span> <span class="p">(</span>
+        <span class="n">specs</span> <span class="ow">and</span> <span class="n">raw_data</span>
+    <span class="p">):</span>  <span class="c1"># no point purging bad data without the beacon specs, only raw data needs purging</span>
+        <span class="n">trk</span><span class="o">.</span><span class="n">load_model_specs</span><span class="p">(</span><span class="n">specs</span><span class="p">)</span>
+        <span class="n">trk</span><span class="o">.</span><span class="n">purge</span><span class="p">()</span>
+    <span class="n">trk</span><span class="o">.</span><span class="n">sort</span><span class="p">()</span>
+    <span class="n">trk</span><span class="o">.</span><span class="n">speed</span><span class="p">()</span>
+
+    <span class="c1"># if you want to see where the trim points are, preview before trimming</span>
+    <span class="k">if</span> <span class="n">trim</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;-&quot;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;preview&quot;</span><span class="p">:</span>
+        <span class="c1"># generate figures</span>
+        <span class="k">if</span> <span class="n">output_plots</span><span class="p">:</span>
+            <span class="k">if</span> <span class="s2">&quot;map&quot;</span> <span class="ow">in</span> <span class="n">output_plots</span><span class="p">:</span>
+                <span class="n">trk</span><span class="o">.</span><span class="n">plot_map</span><span class="p">(</span><span class="n">interactive</span><span class="o">=</span><span class="n">interactive</span><span class="p">,</span> <span class="n">path_output</span><span class="o">=</span><span class="n">output_path</span><span class="p">)</span>
+            <span class="k">if</span> <span class="s2">&quot;trim&quot;</span> <span class="ow">in</span> <span class="n">output_plots</span><span class="p">:</span>
+                <span class="n">trk</span><span class="o">.</span><span class="n">plot_trim</span><span class="p">(</span><span class="n">interactive</span><span class="o">=</span><span class="n">interactive</span><span class="p">,</span> <span class="n">path_output</span><span class="o">=</span><span class="n">output_path</span><span class="p">)</span>
+            <span class="k">if</span> <span class="s2">&quot;time&quot;</span> <span class="ow">in</span> <span class="n">output_plots</span><span class="p">:</span>
+                <span class="n">trk</span><span class="o">.</span><span class="n">plot_time</span><span class="p">(</span><span class="n">interactive</span><span class="o">=</span><span class="n">interactive</span><span class="p">,</span> <span class="n">path_output</span><span class="o">=</span><span class="n">output_path</span><span class="p">)</span>
+            <span class="k">if</span> <span class="s2">&quot;dist&quot;</span> <span class="ow">in</span> <span class="n">output_plots</span><span class="p">:</span>
+                <span class="n">trk</span><span class="o">.</span><span class="n">plot_dist</span><span class="p">(</span><span class="n">interactive</span><span class="o">=</span><span class="n">interactive</span><span class="p">,</span> <span class="n">path_output</span><span class="o">=</span><span class="n">output_path</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">trim</span><span class="p">[</span><span class="o">-</span><span class="mi">6</span><span class="p">:]</span> <span class="o">==</span> <span class="s2">&quot;accept&quot;</span><span class="p">:</span>
+            <span class="n">trk</span><span class="o">.</span><span class="n">trim</span><span class="p">()</span>
+            <span class="n">trk</span><span class="o">.</span><span class="n">speed_limit</span><span class="p">()</span>
+
+        <span class="c1"># output the track files</span>
+        <span class="n">trk</span><span class="o">.</span><span class="n">output</span><span class="p">(</span><span class="n">output_types</span><span class="p">,</span> <span class="n">path_output</span><span class="o">=</span><span class="n">output_path</span><span class="p">,</span> <span class="n">file_name</span><span class="o">=</span><span class="n">output_name</span><span class="p">)</span>
+
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">trim</span><span class="p">[</span><span class="o">-</span><span class="mi">6</span><span class="p">:]</span> <span class="o">==</span> <span class="s2">&quot;accept&quot;</span><span class="p">:</span>
+            <span class="n">trk</span><span class="o">.</span><span class="n">trim</span><span class="p">()</span>
+            <span class="n">trk</span><span class="o">.</span><span class="n">speed_limit</span><span class="p">()</span>
+
+        <span class="c1"># output the track files</span>
+        <span class="n">trk</span><span class="o">.</span><span class="n">output</span><span class="p">(</span><span class="n">output_types</span><span class="p">,</span> <span class="n">path_output</span><span class="o">=</span><span class="n">output_path</span><span class="p">,</span> <span class="n">file_name</span><span class="o">=</span><span class="n">output_name</span><span class="p">)</span>
+
+        <span class="c1"># generate figures</span>
+        <span class="k">if</span> <span class="n">output_plots</span><span class="p">:</span>
+            <span class="k">if</span> <span class="s2">&quot;map&quot;</span> <span class="ow">in</span> <span class="n">output_plots</span><span class="p">:</span>
+                <span class="n">trk</span><span class="o">.</span><span class="n">plot_map</span><span class="p">(</span><span class="n">interactive</span><span class="o">=</span><span class="n">interactive</span><span class="p">,</span> <span class="n">path_output</span><span class="o">=</span><span class="n">output_path</span><span class="p">)</span>
+            <span class="k">if</span> <span class="s2">&quot;trim&quot;</span> <span class="ow">in</span> <span class="n">output_plots</span><span class="p">:</span>
+                <span class="n">trk</span><span class="o">.</span><span class="n">plot_trim</span><span class="p">(</span><span class="n">interactive</span><span class="o">=</span><span class="n">interactive</span><span class="p">,</span> <span class="n">path_output</span><span class="o">=</span><span class="n">output_path</span><span class="p">)</span>
+            <span class="k">if</span> <span class="s2">&quot;time&quot;</span> <span class="ow">in</span> <span class="n">output_plots</span><span class="p">:</span>
+                <span class="n">trk</span><span class="o">.</span><span class="n">plot_time</span><span class="p">(</span><span class="n">interactive</span><span class="o">=</span><span class="n">interactive</span><span class="p">,</span> <span class="n">path_output</span><span class="o">=</span><span class="n">output_path</span><span class="p">)</span>
+            <span class="k">if</span> <span class="s2">&quot;dist&quot;</span> <span class="ow">in</span> <span class="n">output_plots</span><span class="p">:</span>
+                <span class="n">trk</span><span class="o">.</span><span class="n">plot_dist</span><span class="p">(</span><span class="n">interactive</span><span class="o">=</span><span class="n">interactive</span><span class="p">,</span> <span class="n">path_output</span><span class="o">=</span><span class="n">output_path</span><span class="p">)</span>
+
+    <span class="c1"># create a trk_meta pandas dataframe:</span>
+    <span class="n">trk_meta</span> <span class="o">=</span> <span class="n">trk</span><span class="o">.</span><span class="n">track_metadata</span><span class="p">(</span>
+        <span class="n">path_output</span><span class="o">=</span><span class="n">output_path</span><span class="p">,</span> <span class="n">meta_export</span><span class="o">=</span><span class="n">meta_export</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="n">meta_verbose</span>
+    <span class="p">)</span>
+
+    <span class="c1"># complete the run.</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Completed track processing... </span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">trk_meta</span></div>
+
+
+
+<div class="viewcode-block" id="main">
+<a class="viewcode-back" href="../api.html#track_process.main">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Run main function.&quot;&quot;&quot;</span>
+    <span class="p">(</span>
+        <span class="n">data_file</span><span class="p">,</span>
+        <span class="n">output_path</span><span class="p">,</span>
+        <span class="n">meta_file</span><span class="p">,</span>
+        <span class="n">reader</span><span class="p">,</span>
+        <span class="n">model</span><span class="p">,</span>
+        <span class="n">spec_file</span><span class="p">,</span>
+        <span class="n">trim_start</span><span class="p">,</span>
+        <span class="n">trim_end</span><span class="p">,</span>
+        <span class="n">output_name</span><span class="p">,</span>
+        <span class="n">output_types</span><span class="p">,</span>
+        <span class="n">output_plots</span><span class="p">,</span>
+        <span class="n">interactive</span><span class="p">,</span>
+        <span class="n">trim</span><span class="p">,</span>
+        <span class="n">raw_data</span><span class="p">,</span>
+        <span class="n">meta_export</span><span class="p">,</span>
+        <span class="n">loglevel</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">=</span> <span class="n">read_args</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">loglevel</span> <span class="o">==</span> <span class="s2">&quot;quiet&quot;</span><span class="p">:</span>
+        <span class="n">log</span> <span class="o">=</span> <span class="n">nolog</span><span class="p">()</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">log</span> <span class="o">=</span> <span class="n">tracklog</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">data_file</span><span class="p">)</span><span class="o">.</span><span class="n">stem</span><span class="p">,</span> <span class="n">output_path</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">loglevel</span><span class="p">)</span>
+
+    <span class="n">metadata</span><span class="p">,</span> <span class="n">specs</span> <span class="o">=</span> <span class="n">read_meta_files</span><span class="p">(</span><span class="n">spec_file</span><span class="p">,</span> <span class="n">meta_file</span><span class="p">,</span> <span class="n">log</span><span class="p">)</span>
+
+    <span class="n">process</span><span class="p">(</span>
+        <span class="n">data_file</span><span class="p">,</span>
+        <span class="n">output_path</span><span class="p">,</span>
+        <span class="n">metadata</span><span class="o">=</span><span class="n">metadata</span><span class="p">,</span>
+        <span class="n">reader</span><span class="o">=</span><span class="n">reader</span><span class="p">,</span>
+        <span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span>
+        <span class="n">specs</span><span class="o">=</span><span class="n">specs</span><span class="p">,</span>
+        <span class="n">trim_start</span><span class="o">=</span><span class="n">trim_start</span><span class="p">,</span>
+        <span class="n">trim_end</span><span class="o">=</span><span class="n">trim_end</span><span class="p">,</span>
+        <span class="n">output_name</span><span class="o">=</span><span class="n">output_name</span><span class="p">,</span>
+        <span class="n">output_types</span><span class="o">=</span><span class="n">output_types</span><span class="p">,</span>
+        <span class="n">output_plots</span><span class="o">=</span><span class="n">output_plots</span><span class="p">,</span>
+        <span class="n">interactive</span><span class="o">=</span><span class="n">interactive</span><span class="p">,</span>
+        <span class="n">raw_data</span><span class="o">=</span><span class="n">raw_data</span><span class="p">,</span>
+        <span class="n">trim</span><span class="o">=</span><span class="n">trim</span><span class="p">,</span>
+        <span class="n">meta_export</span><span class="o">=</span><span class="n">meta_export</span><span class="p">,</span>
+        <span class="n">meta_verbose</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>  <span class="c1"># hard coded here.</span>
+        <span class="n">log</span><span class="o">=</span><span class="n">log</span><span class="p">,</span>
+    <span class="p">)</span></div>
+
+
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">main</span><span class="p">()</span>
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">Iceberg Beacon Track Database (IBTD) Tools</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../README.html">Iceberg Beacon Track Database (IBTD) Tools</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api.html">Scripts</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api.html#api-reference">API Reference</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2025, WIRL.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

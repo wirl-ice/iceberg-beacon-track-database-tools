@@ -1,0 +1,1021 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>track_fig &#8212; Iceberg Beacon Track Database (IBTD) Tools 1.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=27fed22d" />
+    <script src="../_static/documentation_options.js?v=8d563738"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for track_fig</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">track_fig.py</span>
+
+<span class="sd">Functions to produce visualizations of beacon data after it</span>
+<span class="sd">has been ingested, purgred/filtered, and standardized.</span>
+
+<span class="sd">Visualizations include:</span>
+<span class="sd">    map - a map of the iceberg track</span>
+<span class="sd">    time - variables over time - temperature, displacement and velocity</span>
+<span class="sd">    dist - statistical distributions - polar plot of direction, histogram of speed</span>
+<span class="sd">    trim - time series of data that can be used for checking if beacon is still on target</span>
+
+<span class="sd">Author: Derek Mueller, July 2024-April 2025, modifying code from Adam Garbo from 2021,</span>
+<span class="sd">Water and Ice Research Laboratory (WIRL), Carleton University</span>
+
+<span class="sd">Copyright (C) 2025 WIRL</span>
+
+<span class="sd">    This program is free software: you can redistribute it and/or modify</span>
+<span class="sd">    it under the terms of the GNU General Public License as published by</span>
+<span class="sd">    the Free Software Foundation, either version 3 of the License, or</span>
+<span class="sd">    (at your option) any later version.</span>
+
+<span class="sd">    This program is distributed in the hope that it will be useful,</span>
+<span class="sd">    but WITHOUT ANY WARRANTY; without even the implied warranty of</span>
+<span class="sd">    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the</span>
+<span class="sd">    GNU General Public License for more details.</span>
+
+<span class="sd">    You should have received a copy of the GNU General Public License</span>
+<span class="sd">    along with this program.  If not, see &lt;https://www.gnu.org/licenses/&gt;.</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">seaborn</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">sns</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.dates</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mdates</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">cartopy.crs</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ccrs</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">cartopy.feature</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">cfeature</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">collections</span><span class="w"> </span><span class="kn">import</span> <span class="n">namedtuple</span>
+
+<span class="c1"># turn on the copy-on-write functionality</span>
+<span class="n">pd</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">mode</span><span class="o">.</span><span class="n">copy_on_write</span> <span class="o">=</span> <span class="kc">True</span>
+
+
+<div class="viewcode-block" id="nolog">
+<a class="viewcode-back" href="../api.html#track_fig.nolog">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">nolog</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Create a logger instance that doesn&#39;t do anything.</span>
+
+<span class="sd">    Used to allow logging or not in the code below</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    NoOpLogger</span>
+<span class="sd">        A named tuple that mimics a log instance.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">NoOpLogger</span> <span class="o">=</span> <span class="n">namedtuple</span><span class="p">(</span>
+        <span class="s2">&quot;NoOpLogger&quot;</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;debug&quot;</span><span class="p">,</span> <span class="s2">&quot;info&quot;</span><span class="p">,</span> <span class="s2">&quot;warning&quot;</span><span class="p">,</span> <span class="s2">&quot;error&quot;</span><span class="p">,</span> <span class="s2">&quot;critical&quot;</span><span class="p">]</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">NoOpLogger</span><span class="p">(</span><span class="o">*</span><span class="p">([</span><span class="k">lambda</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="kc">None</span><span class="p">]</span> <span class="o">*</span> <span class="mi">5</span><span class="p">))</span></div>
+
+
+
+<div class="viewcode-block" id="plot_map">
+<a class="viewcode-back" href="../api.html#track_fig.plot_map">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">plot_map</span><span class="p">(</span><span class="n">track</span><span class="p">,</span> <span class="n">path_output</span><span class="o">=</span><span class="s2">&quot;.&quot;</span><span class="p">,</span> <span class="n">dpi</span><span class="o">=</span><span class="mi">300</span><span class="p">,</span> <span class="n">interactive</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">log</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Create a map of the iceberg track.</span>
+
+<span class="sd">    The map is in orthographic projection, zoomed in to the track extent. A red star</span>
+<span class="sd">    indicates the start of the track.  Track points are plotted in blue with a thin grey</span>
+<span class="sd">    line underneath.</span>
+
+<span class="sd">    The map uses a generic coastline. Some track points are on land apparently but this</span>
+<span class="sd">    is due to the resolution of the map (and the retreat of glaciers, sadly).</span>
+
+<span class="sd">    This plot can be produced as a png or it can be viewed interactively.</span>
+
+<span class="sd">    If the track has been trimmed, there will be a green dot at the trim_start and an</span>
+<span class="sd">    orange dot at trim_end.</span>
+
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    track : track object</span>
+<span class="sd">        Standardized beacon track object.</span>
+<span class="sd">    path_output : str, optional</span>
+<span class="sd">        Path to save output. The default is &quot;.&quot;.</span>
+<span class="sd">    dpi : int, optional</span>
+<span class="sd">        Resolution of the graph in dots per inch. The default is 300.</span>
+<span class="sd">    interactive : bool, optional</span>
+<span class="sd">        If true, the plot can be viewed interactively.</span>
+<span class="sd">    log : logger</span>
+<span class="sd">        A logger instance.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    None.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># set up the logger to output nowhere if None</span>
+    <span class="k">if</span> <span class="n">log</span> <span class="o">==</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">log</span> <span class="o">=</span> <span class="n">nolog</span><span class="p">()</span>
+
+    <span class="c1"># quiet these loggers a bit..</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s2">&quot;PIL&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">WARNING</span><span class="p">)</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s2">&quot;matplotlib&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">WARNING</span><span class="p">)</span>
+
+    <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Plotting map&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Add Natural Earth coastline</span>
+    <span class="n">coast</span> <span class="o">=</span> <span class="n">cfeature</span><span class="o">.</span><span class="n">NaturalEarthFeature</span><span class="p">(</span>
+        <span class="s2">&quot;physical&quot;</span><span class="p">,</span> <span class="s2">&quot;land&quot;</span><span class="p">,</span> <span class="s2">&quot;10m&quot;</span><span class="p">,</span> <span class="n">edgecolor</span><span class="o">=</span><span class="s2">&quot;black&quot;</span><span class="p">,</span> <span class="n">facecolor</span><span class="o">=</span><span class="s2">&quot;lightgray&quot;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mf">0.5</span>
+    <span class="p">)</span>
+
+    <span class="c1"># Set map centres</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;longitude&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">median</span><span class="p">()</span>
+    <span class="n">y</span> <span class="o">=</span> <span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;latitude&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">median</span><span class="p">()</span>
+
+    <span class="c1"># Plot latitude and longitude</span>
+    <span class="n">fig</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">10</span><span class="p">),</span> <span class="n">constrained_layout</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">axes</span><span class="p">(</span><span class="n">projection</span><span class="o">=</span><span class="n">ccrs</span><span class="o">.</span><span class="n">Orthographic</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">),</span> <span class="n">zorder</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="c1"># add coast and grid</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">add_feature</span><span class="p">(</span><span class="n">coast</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_adjustable</span><span class="p">(</span><span class="s2">&quot;datalim&quot;</span><span class="p">)</span>
+    <span class="n">gl</span> <span class="o">=</span> <span class="n">ax</span><span class="o">.</span><span class="n">gridlines</span><span class="p">(</span>
+        <span class="n">crs</span><span class="o">=</span><span class="n">ccrs</span><span class="o">.</span><span class="n">PlateCarree</span><span class="p">(),</span>
+        <span class="n">draw_labels</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">color</span><span class="o">=</span><span class="s2">&quot;black&quot;</span><span class="p">,</span>
+        <span class="n">alpha</span><span class="o">=</span><span class="mf">0.25</span><span class="p">,</span>
+        <span class="n">linestyle</span><span class="o">=</span><span class="s2">&quot;dotted&quot;</span><span class="p">,</span>
+        <span class="n">x_inline</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">y_inline</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">zorder</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">gl</span><span class="o">.</span><span class="n">rotate_labels</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="n">gl</span><span class="o">.</span><span class="n">top_labels</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="n">gl</span><span class="o">.</span><span class="n">right_labels</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="n">gl</span><span class="o">.</span><span class="n">xpadding</span> <span class="o">=</span> <span class="mi">5</span>
+
+    <span class="c1"># plot the point data</span>
+    <span class="n">sns</span><span class="o">.</span><span class="n">scatterplot</span><span class="p">(</span>
+        <span class="n">x</span><span class="o">=</span><span class="s2">&quot;longitude&quot;</span><span class="p">,</span>
+        <span class="n">y</span><span class="o">=</span><span class="s2">&quot;latitude&quot;</span><span class="p">,</span>
+        <span class="n">data</span><span class="o">=</span><span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="p">,</span>
+        <span class="n">linewidth</span><span class="o">=</span><span class="mf">0.75</span><span class="p">,</span>
+        <span class="n">edgecolor</span><span class="o">=</span><span class="s2">&quot;black&quot;</span><span class="p">,</span>
+        <span class="n">color</span><span class="o">=</span><span class="s2">&quot;royalblue&quot;</span><span class="p">,</span>  <span class="c1"># this is the closest match to the default colour</span>
+        <span class="n">legend</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">transform</span><span class="o">=</span><span class="n">ccrs</span><span class="o">.</span><span class="n">PlateCarree</span><span class="p">(),</span>
+        <span class="n">zorder</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="c1"># plot the line data</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span>
+        <span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;longitude&quot;</span><span class="p">],</span>
+        <span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;latitude&quot;</span><span class="p">],</span>
+        <span class="n">color</span><span class="o">=</span><span class="s2">&quot;dimgrey&quot;</span><span class="p">,</span>
+        <span class="n">linewidth</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span>
+        <span class="n">transform</span><span class="o">=</span><span class="n">ccrs</span><span class="o">.</span><span class="n">PlateCarree</span><span class="p">(),</span>
+        <span class="n">zorder</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="c1"># plot the track trimming points so it can be verified before trimming.</span>
+    <span class="c1"># green dot is the first good value, orange dot is the last good value</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">track</span><span class="o">.</span><span class="n">trimmed</span><span class="p">:</span>
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="ow">not</span> <span class="n">pd</span><span class="o">.</span><span class="n">isnull</span><span class="p">(</span><span class="n">track</span><span class="o">.</span><span class="n">trim_start</span><span class="p">)</span>
+            <span class="ow">and</span> <span class="p">(</span><span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">timestamp</span> <span class="o">&lt;=</span> <span class="n">track</span><span class="o">.</span><span class="n">trim_start</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">()</span>
+        <span class="p">):</span>
+
+            <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span>
+                <span class="c1"># you only want the first one...</span>
+                <span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">longitude</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">timestamp</span> <span class="o">&lt;=</span> <span class="n">track</span><span class="o">.</span><span class="n">trim_start</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span>
+                    <span class="o">-</span><span class="mi">1</span>
+                <span class="p">],</span>
+                <span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">latitude</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">timestamp</span> <span class="o">&lt;=</span> <span class="n">track</span><span class="o">.</span><span class="n">trim_start</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span>
+                    <span class="o">-</span><span class="mi">1</span>
+                <span class="p">],</span>
+                <span class="n">marker</span><span class="o">=</span><span class="s2">&quot;o&quot;</span><span class="p">,</span>
+                <span class="n">ms</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span>
+                <span class="n">mfc</span><span class="o">=</span><span class="s2">&quot;lime&quot;</span><span class="p">,</span>
+                <span class="n">mec</span><span class="o">=</span><span class="s2">&quot;k&quot;</span><span class="p">,</span>
+                <span class="n">transform</span><span class="o">=</span><span class="n">ccrs</span><span class="o">.</span><span class="n">PlateCarree</span><span class="p">(),</span>
+                <span class="n">zorder</span><span class="o">=</span><span class="mi">18</span><span class="p">,</span>
+            <span class="p">)</span>
+
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="ow">not</span> <span class="n">pd</span><span class="o">.</span><span class="n">isnull</span><span class="p">(</span><span class="n">track</span><span class="o">.</span><span class="n">trim_end</span><span class="p">)</span>
+            <span class="ow">and</span> <span class="p">(</span><span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">timestamp</span> <span class="o">&gt;=</span> <span class="n">track</span><span class="o">.</span><span class="n">trim_end</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">()</span>
+        <span class="p">):</span>
+            <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span>
+                <span class="c1"># you only want the last one...</span>
+                <span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">longitude</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">timestamp</span> <span class="o">&gt;=</span> <span class="n">track</span><span class="o">.</span><span class="n">trim_end</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span>
+                    <span class="mi">0</span>
+                <span class="p">],</span>
+                <span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">latitude</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">timestamp</span> <span class="o">&gt;=</span> <span class="n">track</span><span class="o">.</span><span class="n">trim_end</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+                <span class="n">marker</span><span class="o">=</span><span class="s2">&quot;o&quot;</span><span class="p">,</span>
+                <span class="n">ms</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span>
+                <span class="n">mfc</span><span class="o">=</span><span class="s2">&quot;tab:orange&quot;</span><span class="p">,</span>
+                <span class="n">mec</span><span class="o">=</span><span class="s2">&quot;k&quot;</span><span class="p">,</span>
+                <span class="n">transform</span><span class="o">=</span><span class="n">ccrs</span><span class="o">.</span><span class="n">PlateCarree</span><span class="p">(),</span>
+                <span class="n">zorder</span><span class="o">=</span><span class="mi">19</span><span class="p">,</span>
+            <span class="p">)</span>
+
+    <span class="c1"># plot the very start of the track</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span>
+        <span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">longitude</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+        <span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">latitude</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+        <span class="n">marker</span><span class="o">=</span><span class="s2">&quot;*&quot;</span><span class="p">,</span>
+        <span class="n">ms</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span>
+        <span class="n">mfc</span><span class="o">=</span><span class="s2">&quot;r&quot;</span><span class="p">,</span>
+        <span class="n">mec</span><span class="o">=</span><span class="s2">&quot;k&quot;</span><span class="p">,</span>
+        <span class="n">transform</span><span class="o">=</span><span class="n">ccrs</span><span class="o">.</span><span class="n">PlateCarree</span><span class="p">(),</span>
+        <span class="n">zorder</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">fig</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">track</span><span class="o">.</span><span class="n">platform_id</span><span class="si">}</span><span class="s2"> map&quot;</span><span class="p">,</span> <span class="n">fontweight</span><span class="o">=</span><span class="s2">&quot;bold&quot;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">18</span>
+    <span class="p">)</span>  <span class="c1"># note use y= to adjust</span>
+
+    <span class="n">ax</span><span class="o">.</span><span class="n">text</span><span class="p">(</span>
+        <span class="mi">0</span><span class="p">,</span>
+        <span class="o">-</span><span class="mf">0.09</span><span class="p">,</span>
+        <span class="sa">f</span><span class="s2">&quot;Start (*): </span><span class="si">{</span><span class="n">track</span><span class="o">.</span><span class="n">data_start</span><span class="si">:</span><span class="s2">%Y-%m-%d %H:%M:%S</span><span class="si">}</span><span class="s2"> UTC, End: </span><span class="si">{</span><span class="n">track</span><span class="o">.</span><span class="n">data_end</span><span class="si">:</span><span class="s2">%Y-%m-%d %H:%M:%S</span><span class="si">}</span><span class="s2"> UTC</span><span class="se">\n</span><span class="s2">&quot;</span>
+        <span class="sa">f</span><span class="s2">&quot;Duration: </span><span class="si">{</span><span class="n">track</span><span class="o">.</span><span class="n">duration</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> days, Distance: </span><span class="si">{</span><span class="n">track</span><span class="o">.</span><span class="n">distance_travelled</span><span class="si">:</span><span class="s2">,.2f</span><span class="si">}</span><span class="s2"> km, &quot;</span>
+        <span class="sa">f</span><span class="s2">&quot;Observations: </span><span class="si">{</span><span class="n">track</span><span class="o">.</span><span class="n">observations</span><span class="si">:</span><span class="s2">,</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+        <span class="n">transform</span><span class="o">=</span><span class="n">ax</span><span class="o">.</span><span class="n">transAxes</span><span class="p">,</span>
+        <span class="n">color</span><span class="o">=</span><span class="s2">&quot;black&quot;</span><span class="p">,</span>
+        <span class="n">fontsize</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span>
+        <span class="n">fontweight</span><span class="o">=</span><span class="s2">&quot;regular&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">interactive</span><span class="p">:</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">savefig</span><span class="p">(</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">path_output</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">track</span><span class="o">.</span><span class="n">platform_id</span><span class="si">}</span><span class="s2">_map.png&quot;</span><span class="p">),</span>
+            <span class="n">dpi</span><span class="o">=</span><span class="n">dpi</span><span class="p">,</span>
+            <span class="n">transparent</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">bbox_inches</span><span class="o">=</span><span class="s2">&quot;tight&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+    <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Plotting map complete&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="plot_trim">
+<a class="viewcode-back" href="../api.html#track_fig.plot_trim">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">plot_trim</span><span class="p">(</span><span class="n">track</span><span class="p">,</span> <span class="n">path_output</span><span class="o">=</span><span class="s2">&quot;.&quot;</span><span class="p">,</span> <span class="n">dpi</span><span class="o">=</span><span class="mi">300</span><span class="p">,</span> <span class="n">interactive</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">log</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Create a timeseries graph of data from the beacon to assist in finding trim_start and trim_end.</span>
+
+<span class="sd">    There are 3 panels:</span>
+<span class="sd">        1) Temperature (of the air, surface or internal, depending on what is available), the</span>
+<span class="sd">        air pressure, if available.</span>
+
+<span class="sd">        2) 5 and 3 day rolling mean and standard deviation of temperature.</span>
+
+<span class="sd">        3) Battery voltage along with pitch and roll, if available.</span>
+
+<span class="sd">    When beacons fall off their target into the water, the standard deviation of temperature should</span>
+<span class="sd">            decrease. Temperature should approach water temperature at the same time</span>
+<span class="sd">            (typically decreasing).  The rolling average and std are optimized for</span>
+<span class="sd">            determining trim_end, not trim_start (the window is left-aligned). When beacons</span>
+<span class="sd">            are deployed, they may still be acclimatizing to ambient conditions. In this</span>
+<span class="sd">            scenario, the rolling mean and std are less helpful because their windows are</span>
+<span class="sd">            positioned on the left to capture a sudden change as it occurs.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    track : track object</span>
+<span class="sd">        Standardized beacon track object.</span>
+<span class="sd">    path_output : str, optional</span>
+<span class="sd">        Path to save output. The default is &quot;.&quot;.</span>
+<span class="sd">    dpi : int, optional</span>
+<span class="sd">        Resolution of the graph in dots per inch. The default is 300.</span>
+<span class="sd">    interactive : bool, optional</span>
+<span class="sd">        If true, the plot can be viewed interactively.</span>
+<span class="sd">    log : logger</span>
+<span class="sd">        A logger instance.</span>
+
+
+<span class="sd">    This plot can be produced as a png or it can be viewed interactively.</span>
+
+<span class="sd">    If the track has not been trimmed, there will be a green vertical line at the</span>
+<span class="sd">    trim_start and an orange vertical line at trim_end.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    None.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># set up the logger to output nowhere if None</span>
+    <span class="k">if</span> <span class="n">log</span> <span class="o">==</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">log</span> <span class="o">=</span> <span class="n">nolog</span><span class="p">()</span>
+
+    <span class="c1"># quiet these loggers a bit..</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s2">&quot;PIL&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">WARNING</span><span class="p">)</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s2">&quot;matplotlib&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">WARNING</span><span class="p">)</span>
+
+    <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Plotting trim&quot;</span><span class="p">)</span>
+
+    <span class="c1"># get the temperature</span>
+    <span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;temperature&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;air_temperature&quot;</span><span class="p">]</span> <span class="o">-</span> <span class="mf">273.15</span>  <span class="c1"># plot Celsius</span>
+    <span class="n">temp_type</span> <span class="o">=</span> <span class="s2">&quot;Air&quot;</span>
+    <span class="k">if</span> <span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;air_temperature&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">isnull</span><span class="p">()</span><span class="o">.</span><span class="n">all</span><span class="p">():</span>
+        <span class="n">temp_type</span> <span class="o">=</span> <span class="s2">&quot;Surface&quot;</span>
+        <span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;temperature&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;surface_temperature&quot;</span><span class="p">]</span> <span class="o">-</span> <span class="mf">273.15</span>
+        <span class="p">)</span>  <span class="c1"># plot Celsius</span>
+        <span class="k">if</span> <span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;surface_temperature&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">isnull</span><span class="p">()</span><span class="o">.</span><span class="n">all</span><span class="p">():</span>
+            <span class="n">temp_type</span> <span class="o">=</span> <span class="s2">&quot;Internal&quot;</span>
+            <span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;temperature&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;internal_temperature&quot;</span><span class="p">]</span> <span class="o">-</span> <span class="mf">273.15</span>
+            <span class="p">)</span>  <span class="c1"># plot Celsius</span>
+            <span class="k">if</span> <span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;internal_temperature&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">isnull</span><span class="p">()</span><span class="o">.</span><span class="n">all</span><span class="p">():</span>
+                <span class="n">temp_type</span> <span class="o">=</span> <span class="s2">&quot;No&quot;</span>
+                <span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;temperature&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span>
+
+    <span class="c1"># the following makes a left aligned window which should match well with any event</span>
+    <span class="c1"># reverse the series, run the rolling operation and reverse again. Center false</span>
+    <span class="c1"># keeps the window index on the right, reversing sets this to the left.</span>
+    <span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;Tmean5&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="o">.</span><span class="n">rolling</span><span class="p">(</span><span class="n">window</span><span class="o">=</span><span class="s2">&quot;5d&quot;</span><span class="p">,</span> <span class="n">on</span><span class="o">=</span><span class="s2">&quot;timestamp&quot;</span><span class="p">,</span> <span class="n">center</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="o">.</span><span class="n">temperature</span><span class="o">.</span><span class="n">mean</span><span class="p">()[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="p">)</span>
+    <span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;Tmean3&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="o">.</span><span class="n">rolling</span><span class="p">(</span><span class="n">window</span><span class="o">=</span><span class="s2">&quot;3d&quot;</span><span class="p">,</span> <span class="n">on</span><span class="o">=</span><span class="s2">&quot;timestamp&quot;</span><span class="p">,</span> <span class="n">center</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="o">.</span><span class="n">temperature</span><span class="o">.</span><span class="n">mean</span><span class="p">()[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="p">)</span>
+
+    <span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;Tstd5&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="o">.</span><span class="n">rolling</span><span class="p">(</span><span class="n">window</span><span class="o">=</span><span class="s2">&quot;5d&quot;</span><span class="p">,</span> <span class="n">on</span><span class="o">=</span><span class="s2">&quot;timestamp&quot;</span><span class="p">,</span> <span class="n">center</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="o">.</span><span class="n">temperature</span><span class="o">.</span><span class="n">std</span><span class="p">()[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="p">)</span>
+    <span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;Tstd3&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="o">.</span><span class="n">rolling</span><span class="p">(</span><span class="n">window</span><span class="o">=</span><span class="s2">&quot;3d&quot;</span><span class="p">,</span> <span class="n">on</span><span class="o">=</span><span class="s2">&quot;timestamp&quot;</span><span class="p">,</span> <span class="n">center</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="o">.</span><span class="n">temperature</span><span class="o">.</span><span class="n">std</span><span class="p">()[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="p">)</span>
+
+    <span class="c1"># plotting  - t temp, m mean, s std</span>
+    <span class="n">fig</span><span class="p">,</span> <span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">r</span><span class="p">,</span> <span class="n">v</span><span class="p">)</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span>
+        <span class="mi">3</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">8</span><span class="p">),</span> <span class="n">sharex</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">constrained_layout</span><span class="o">=</span><span class="kc">True</span>
+    <span class="p">)</span>
+
+    <span class="c1"># Temperature plot  = t</span>
+    <span class="n">t</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="n">ls</span><span class="o">=</span><span class="s2">&quot;dotted&quot;</span><span class="p">,</span> <span class="n">zorder</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
+    <span class="n">sns</span><span class="o">.</span><span class="n">lineplot</span><span class="p">(</span>
+        <span class="n">ax</span><span class="o">=</span><span class="n">t</span><span class="p">,</span>
+        <span class="n">x</span><span class="o">=</span><span class="s2">&quot;timestamp&quot;</span><span class="p">,</span>
+        <span class="n">y</span><span class="o">=</span><span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;temperature&quot;</span><span class="p">],</span>
+        <span class="n">label</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">temp_type</span><span class="si">}</span><span class="s2"> temperature&quot;</span><span class="p">,</span>
+        <span class="n">data</span><span class="o">=</span><span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="p">,</span>
+        <span class="n">errorbar</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">color</span><span class="o">=</span><span class="s2">&quot;b&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">t</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">xlabel</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">ylabel</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">temp_type</span><span class="si">}</span><span class="s2"> temperature (°C)&quot;</span><span class="p">)</span>
+    <span class="n">t</span><span class="o">.</span><span class="n">get_legend</span><span class="p">()</span><span class="o">.</span><span class="n">remove</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;air_pressure&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">notna</span><span class="p">()</span><span class="o">.</span><span class="n">any</span><span class="p">():</span>
+        <span class="c1"># plot pressure on y axis - only if there is data...</span>
+        <span class="n">t2</span> <span class="o">=</span> <span class="n">t</span><span class="o">.</span><span class="n">twinx</span><span class="p">()</span>
+        <span class="n">t2</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">&quot;Air pressure (hPa)&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;black&quot;</span><span class="p">,</span> <span class="n">rotation</span><span class="o">=</span><span class="mi">270</span><span class="p">,</span> <span class="n">labelpad</span><span class="o">=</span><span class="mi">15</span><span class="p">)</span>
+
+        <span class="n">sns</span><span class="o">.</span><span class="n">lineplot</span><span class="p">(</span>
+            <span class="n">ax</span><span class="o">=</span><span class="n">t2</span><span class="p">,</span>
+            <span class="n">x</span><span class="o">=</span><span class="s2">&quot;timestamp&quot;</span><span class="p">,</span>
+            <span class="n">y</span><span class="o">=</span><span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;air_pressure&quot;</span><span class="p">]</span> <span class="o">/</span> <span class="mi">100</span><span class="p">,</span>  <span class="c1"># in hPa (mb) for display</span>
+            <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Pressure&quot;</span><span class="p">,</span>
+            <span class="n">data</span><span class="o">=</span><span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="p">,</span>
+            <span class="n">errorbar</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+            <span class="n">color</span><span class="o">=</span><span class="s2">&quot;r&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">handles_t1</span><span class="p">,</span> <span class="n">labels_t1</span> <span class="o">=</span> <span class="n">t</span><span class="o">.</span><span class="n">get_legend_handles_labels</span><span class="p">()</span>
+        <span class="n">handles_t2</span><span class="p">,</span> <span class="n">labels_t2</span> <span class="o">=</span> <span class="n">t2</span><span class="o">.</span><span class="n">get_legend_handles_labels</span><span class="p">()</span>
+
+        <span class="n">t2</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span>
+            <span class="n">handles_t1</span> <span class="o">+</span> <span class="n">handles_t2</span><span class="p">,</span> <span class="n">labels_t1</span> <span class="o">+</span> <span class="n">labels_t2</span><span class="p">,</span> <span class="n">loc</span><span class="o">=</span><span class="s2">&quot;upper center&quot;</span>
+        <span class="p">)</span>  <span class="c1"># This position avoids overlap with beginning and end of track</span>
+
+    <span class="c1"># Rolling temperature mean/std plot = r</span>
+    <span class="n">r</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="n">ls</span><span class="o">=</span><span class="s2">&quot;dotted&quot;</span><span class="p">,</span> <span class="n">zorder</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
+    <span class="n">sns</span><span class="o">.</span><span class="n">lineplot</span><span class="p">(</span>
+        <span class="n">ax</span><span class="o">=</span><span class="n">r</span><span class="p">,</span>
+        <span class="n">x</span><span class="o">=</span><span class="s2">&quot;timestamp&quot;</span><span class="p">,</span>
+        <span class="n">y</span><span class="o">=</span><span class="s2">&quot;Tmean5&quot;</span><span class="p">,</span>
+        <span class="n">label</span><span class="o">=</span><span class="s2">&quot;5 day mean&quot;</span><span class="p">,</span>
+        <span class="n">data</span><span class="o">=</span><span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="p">,</span>
+        <span class="n">errorbar</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">color</span><span class="o">=</span><span class="s2">&quot;r&quot;</span><span class="p">,</span>
+        <span class="n">linestyle</span><span class="o">=</span><span class="s2">&quot;-&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">sns</span><span class="o">.</span><span class="n">lineplot</span><span class="p">(</span>
+        <span class="n">ax</span><span class="o">=</span><span class="n">r</span><span class="p">,</span>
+        <span class="n">x</span><span class="o">=</span><span class="s2">&quot;timestamp&quot;</span><span class="p">,</span>
+        <span class="n">y</span><span class="o">=</span><span class="s2">&quot;Tmean3&quot;</span><span class="p">,</span>
+        <span class="n">label</span><span class="o">=</span><span class="s2">&quot;3 day mean&quot;</span><span class="p">,</span>
+        <span class="n">data</span><span class="o">=</span><span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="p">,</span>
+        <span class="n">errorbar</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">color</span><span class="o">=</span><span class="s2">&quot;r&quot;</span><span class="p">,</span>
+        <span class="n">linestyle</span><span class="o">=</span><span class="s2">&quot;--&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">r</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">xlabel</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">ylabel</span><span class="o">=</span><span class="s2">&quot;Temp. rolling mean (°C)&quot;</span><span class="p">)</span>
+    <span class="n">r</span><span class="o">.</span><span class="n">get_legend</span><span class="p">()</span><span class="o">.</span><span class="n">remove</span><span class="p">()</span>
+
+    <span class="c1"># second axis</span>
+    <span class="n">r2</span> <span class="o">=</span> <span class="n">r</span><span class="o">.</span><span class="n">twinx</span><span class="p">()</span>
+    <span class="n">r2</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">&quot;Temp. rolling std (°C)&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;black&quot;</span><span class="p">,</span> <span class="n">rotation</span><span class="o">=</span><span class="mi">270</span><span class="p">,</span> <span class="n">labelpad</span><span class="o">=</span><span class="mi">15</span><span class="p">)</span>
+
+    <span class="n">sns</span><span class="o">.</span><span class="n">lineplot</span><span class="p">(</span>
+        <span class="n">ax</span><span class="o">=</span><span class="n">r2</span><span class="p">,</span>
+        <span class="n">x</span><span class="o">=</span><span class="s2">&quot;timestamp&quot;</span><span class="p">,</span>
+        <span class="n">y</span><span class="o">=</span><span class="s2">&quot;Tstd5&quot;</span><span class="p">,</span>
+        <span class="n">label</span><span class="o">=</span><span class="s2">&quot;5 day std&quot;</span><span class="p">,</span>
+        <span class="n">data</span><span class="o">=</span><span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="p">,</span>
+        <span class="n">errorbar</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">color</span><span class="o">=</span><span class="s2">&quot;k&quot;</span><span class="p">,</span>
+        <span class="n">linestyle</span><span class="o">=</span><span class="s2">&quot;-&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">sns</span><span class="o">.</span><span class="n">lineplot</span><span class="p">(</span>
+        <span class="n">ax</span><span class="o">=</span><span class="n">r2</span><span class="p">,</span>
+        <span class="n">x</span><span class="o">=</span><span class="s2">&quot;timestamp&quot;</span><span class="p">,</span>
+        <span class="n">y</span><span class="o">=</span><span class="s2">&quot;Tstd3&quot;</span><span class="p">,</span>
+        <span class="n">label</span><span class="o">=</span><span class="s2">&quot;3 day std&quot;</span><span class="p">,</span>
+        <span class="n">data</span><span class="o">=</span><span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="p">,</span>
+        <span class="n">errorbar</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">color</span><span class="o">=</span><span class="s2">&quot;k&quot;</span><span class="p">,</span>
+        <span class="n">linestyle</span><span class="o">=</span><span class="s2">&quot;--&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">handles_r1</span><span class="p">,</span> <span class="n">labels_r1</span> <span class="o">=</span> <span class="n">r</span><span class="o">.</span><span class="n">get_legend_handles_labels</span><span class="p">()</span>
+    <span class="n">handles_r2</span><span class="p">,</span> <span class="n">labels_r2</span> <span class="o">=</span> <span class="n">r2</span><span class="o">.</span><span class="n">get_legend_handles_labels</span><span class="p">()</span>
+
+    <span class="n">r2</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span>
+        <span class="n">handles_r1</span> <span class="o">+</span> <span class="n">handles_r2</span><span class="p">,</span> <span class="n">labels_r1</span> <span class="o">+</span> <span class="n">labels_r2</span><span class="p">,</span> <span class="n">loc</span><span class="o">=</span><span class="s2">&quot;upper center&quot;</span>
+    <span class="p">)</span>  <span class="c1"># This position avoids overlap with beginning and end of track</span>
+
+    <span class="c1"># Voltage plot = v</span>
+    <span class="n">v</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="n">ls</span><span class="o">=</span><span class="s2">&quot;dotted&quot;</span><span class="p">,</span> <span class="n">zorder</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
+    <span class="n">sns</span><span class="o">.</span><span class="n">lineplot</span><span class="p">(</span>
+        <span class="n">ax</span><span class="o">=</span><span class="n">v</span><span class="p">,</span>
+        <span class="n">x</span><span class="o">=</span><span class="s2">&quot;timestamp&quot;</span><span class="p">,</span>
+        <span class="n">y</span><span class="o">=</span><span class="s2">&quot;voltage_battery_volts&quot;</span><span class="p">,</span>
+        <span class="n">data</span><span class="o">=</span><span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="p">,</span>
+        <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Battery&quot;</span><span class="p">,</span>
+        <span class="n">errorbar</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">color</span><span class="o">=</span><span class="s2">&quot;g&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">v</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">xlabel</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">ylabel</span><span class="o">=</span><span class="s2">&quot;Battery (V)&quot;</span><span class="p">)</span>
+
+    <span class="n">v</span><span class="o">.</span><span class="n">get_legend</span><span class="p">()</span><span class="o">.</span><span class="n">remove</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">platform_pitch</span><span class="o">.</span><span class="n">notna</span><span class="p">()</span><span class="o">.</span><span class="n">any</span><span class="p">():</span>
+        <span class="c1"># plot pitch and roll on y axis - only if there is data...</span>
+        <span class="n">v2</span> <span class="o">=</span> <span class="n">v</span><span class="o">.</span><span class="n">twinx</span><span class="p">()</span>
+
+        <span class="n">v2</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">&quot;Tilt (degrees)&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;black&quot;</span><span class="p">,</span> <span class="n">rotation</span><span class="o">=</span><span class="mi">270</span><span class="p">,</span> <span class="n">labelpad</span><span class="o">=</span><span class="mi">15</span><span class="p">)</span>
+        <span class="n">sns</span><span class="o">.</span><span class="n">lineplot</span><span class="p">(</span>
+            <span class="n">ax</span><span class="o">=</span><span class="n">v2</span><span class="p">,</span>
+            <span class="n">x</span><span class="o">=</span><span class="s2">&quot;timestamp&quot;</span><span class="p">,</span>
+            <span class="n">y</span><span class="o">=</span><span class="s2">&quot;platform_pitch&quot;</span><span class="p">,</span>
+            <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Pitch&quot;</span><span class="p">,</span>
+            <span class="n">data</span><span class="o">=</span><span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="p">,</span>
+            <span class="n">errorbar</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+            <span class="n">color</span><span class="o">=</span><span class="s2">&quot;m&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">sns</span><span class="o">.</span><span class="n">lineplot</span><span class="p">(</span>
+            <span class="n">ax</span><span class="o">=</span><span class="n">v2</span><span class="p">,</span>
+            <span class="n">x</span><span class="o">=</span><span class="s2">&quot;timestamp&quot;</span><span class="p">,</span>
+            <span class="n">y</span><span class="o">=</span><span class="s2">&quot;platform_roll&quot;</span><span class="p">,</span>
+            <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Roll&quot;</span><span class="p">,</span>
+            <span class="n">data</span><span class="o">=</span><span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="p">,</span>
+            <span class="n">errorbar</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+            <span class="n">color</span><span class="o">=</span><span class="s2">&quot;c&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">v2</span><span class="o">.</span><span class="n">tick_params</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="n">labelcolor</span><span class="o">=</span><span class="s2">&quot;black&quot;</span><span class="p">)</span>
+        <span class="n">v2</span><span class="o">.</span><span class="n">set_ylim</span><span class="p">([</span><span class="o">-</span><span class="mi">185</span><span class="p">,</span> <span class="mi">185</span><span class="p">])</span>
+
+        <span class="n">handles_v1</span><span class="p">,</span> <span class="n">labels_v1</span> <span class="o">=</span> <span class="n">v</span><span class="o">.</span><span class="n">get_legend_handles_labels</span><span class="p">()</span>
+        <span class="n">handles_v2</span><span class="p">,</span> <span class="n">labels_v2</span> <span class="o">=</span> <span class="n">v2</span><span class="o">.</span><span class="n">get_legend_handles_labels</span><span class="p">()</span>
+
+        <span class="n">v2</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span>
+            <span class="n">handles_v1</span> <span class="o">+</span> <span class="n">handles_v2</span><span class="p">,</span> <span class="n">labels_v1</span> <span class="o">+</span> <span class="n">labels_v2</span><span class="p">,</span> <span class="n">loc</span><span class="o">=</span><span class="s2">&quot;upper center&quot;</span>
+        <span class="p">)</span>  <span class="c1"># This position avoids overlap with beginning and end of track</span>
+
+    <span class="c1"># plot the track trimming points so it can be verified before trimming. zorder &gt;&gt; big</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">track</span><span class="o">.</span><span class="n">trimmed</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">pd</span><span class="o">.</span><span class="n">isnull</span><span class="p">(</span><span class="n">track</span><span class="o">.</span><span class="n">trim_start</span><span class="p">):</span>
+            <span class="n">t</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="n">track</span><span class="o">.</span><span class="n">trim_start</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s2">&quot;dashdot&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;lime&quot;</span><span class="p">,</span> <span class="n">zorder</span><span class="o">=</span><span class="mi">100</span><span class="p">)</span>
+            <span class="n">r</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="n">track</span><span class="o">.</span><span class="n">trim_start</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s2">&quot;dashdot&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;lime&quot;</span><span class="p">,</span> <span class="n">zorder</span><span class="o">=</span><span class="mi">100</span><span class="p">)</span>
+            <span class="n">v</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="n">track</span><span class="o">.</span><span class="n">trim_start</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s2">&quot;dashdot&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;lime&quot;</span><span class="p">,</span> <span class="n">zorder</span><span class="o">=</span><span class="mi">100</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">pd</span><span class="o">.</span><span class="n">isnull</span><span class="p">(</span><span class="n">track</span><span class="o">.</span><span class="n">trim_end</span><span class="p">):</span>
+            <span class="n">t</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span>
+                <span class="n">track</span><span class="o">.</span><span class="n">trim_end</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s2">&quot;dashdot&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;tab:orange&quot;</span><span class="p">,</span> <span class="n">zorder</span><span class="o">=</span><span class="mi">100</span>
+            <span class="p">)</span>
+            <span class="n">r</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span>
+                <span class="n">track</span><span class="o">.</span><span class="n">trim_end</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s2">&quot;dashdot&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;tab:orange&quot;</span><span class="p">,</span> <span class="n">zorder</span><span class="o">=</span><span class="mi">100</span>
+            <span class="p">)</span>
+            <span class="n">v</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span>
+                <span class="n">track</span><span class="o">.</span><span class="n">trim_end</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s2">&quot;dashdot&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;tab:orange&quot;</span><span class="p">,</span> <span class="n">zorder</span><span class="o">=</span><span class="mi">100</span>
+            <span class="p">)</span>
+
+    <span class="n">fig</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">track</span><span class="o">.</span><span class="n">platform_id</span><span class="si">}</span><span class="s2"> trim plot&quot;</span><span class="p">,</span>
+        <span class="n">fontweight</span><span class="o">=</span><span class="s2">&quot;bold&quot;</span><span class="p">,</span>
+        <span class="n">fontsize</span><span class="o">=</span><span class="mi">18</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="c1"># plt.xticks(rotation=45, horizontalalignment=&quot;center&quot;)</span>
+    <span class="n">v</span><span class="o">.</span><span class="n">tick_params</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="n">rotation</span><span class="o">=</span><span class="mi">45</span><span class="p">)</span>
+    <span class="n">v</span><span class="o">.</span><span class="n">text</span><span class="p">(</span>
+        <span class="mi">0</span><span class="p">,</span>
+        <span class="o">-</span><span class="mf">0.61</span><span class="p">,</span>
+        <span class="sa">f</span><span class="s2">&quot;Start (*): </span><span class="si">{</span><span class="n">track</span><span class="o">.</span><span class="n">data_start</span><span class="si">:</span><span class="s2">%Y-%m-%d %H:%M:%S</span><span class="si">}</span><span class="s2"> UTC, End: </span><span class="si">{</span><span class="n">track</span><span class="o">.</span><span class="n">data_end</span><span class="si">:</span><span class="s2">%Y-%m-%d %H:%M:%S</span><span class="si">}</span><span class="s2"> UTC</span><span class="se">\n</span><span class="s2">&quot;</span>
+        <span class="sa">f</span><span class="s2">&quot;Duration: </span><span class="si">{</span><span class="n">track</span><span class="o">.</span><span class="n">duration</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> days, Distance: </span><span class="si">{</span><span class="n">track</span><span class="o">.</span><span class="n">distance_travelled</span><span class="si">:</span><span class="s2">,.2f</span><span class="si">}</span><span class="s2"> km, &quot;</span>
+        <span class="sa">f</span><span class="s2">&quot;Observations: </span><span class="si">{</span><span class="n">track</span><span class="o">.</span><span class="n">observations</span><span class="si">:</span><span class="s2">,</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+        <span class="n">transform</span><span class="o">=</span><span class="n">v</span><span class="o">.</span><span class="n">transAxes</span><span class="p">,</span>
+        <span class="n">color</span><span class="o">=</span><span class="s2">&quot;black&quot;</span><span class="p">,</span>
+        <span class="n">fontsize</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span>
+        <span class="n">fontweight</span><span class="o">=</span><span class="s2">&quot;regular&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">fig</span><span class="o">.</span><span class="n">align_ylabels</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">interactive</span><span class="p">:</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">savefig</span><span class="p">(</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">path_output</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">track</span><span class="o">.</span><span class="n">platform_id</span><span class="si">}</span><span class="s2">_trim.png&quot;</span><span class="p">),</span>
+            <span class="n">dpi</span><span class="o">=</span><span class="n">dpi</span><span class="p">,</span>
+            <span class="n">transparent</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">bbox_inches</span><span class="o">=</span><span class="s2">&quot;tight&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Plotting trim complete&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="plot_dist">
+<a class="viewcode-back" href="../api.html#track_fig.plot_dist">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">plot_dist</span><span class="p">(</span><span class="n">track</span><span class="p">,</span> <span class="n">path_output</span><span class="o">=</span><span class="s2">&quot;.&quot;</span><span class="p">,</span> <span class="n">dpi</span><span class="o">=</span><span class="mi">300</span><span class="p">,</span> <span class="n">interactive</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">log</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Create a graph of the track&#39;s statistical distributions.</span>
+
+<span class="sd">    This figure has a histogram for iceberg speed on the left and a polar plot of velocity</span>
+<span class="sd">    on the right.  The histogram has bars that are 0.05 m/s wide (0.18 km/h). It goes up</span>
+<span class="sd">    to 2.5 m/s (9 km/h) consistently so that tracks can be compared.  If there are</span>
+<span class="sd">    positions that exceed the uppermost bin, this is written on the graph.  The cumulative</span>
+<span class="sd">    histogram is plotted in blue.  This is also known as an exceedence plot showing the</span>
+<span class="sd">    percentage of time the iceberg speed is at or below a given level.</span>
+
+<span class="sd">    The polar plot shows speed and direction of the iceberg.  This plot scales with data</span>
+<span class="sd">    so cannot be intercompared as easily.</span>
+
+<span class="sd">    This figure can be produced as a png or it can be viewed interactively.</span>
+
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    track : track object</span>
+<span class="sd">        Standardized beacon track object.</span>
+<span class="sd">    path_output : str, optional</span>
+<span class="sd">        Path to save output. The default is &quot;.&quot;.</span>
+<span class="sd">    dpi : int, optional</span>
+<span class="sd">        Resolution of the graph in dots per inch. The default is 300.</span>
+<span class="sd">    interactive : bool, optional</span>
+<span class="sd">        If true, the plot can be viewed interactively.</span>
+<span class="sd">    log : logger</span>
+<span class="sd">        A logger instance.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    None.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># set up the logger to output nowhere if None</span>
+    <span class="k">if</span> <span class="n">log</span> <span class="o">==</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">log</span> <span class="o">=</span> <span class="n">nolog</span><span class="p">()</span>
+
+    <span class="c1"># quiet these loggers a bit..</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s2">&quot;PIL&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">WARNING</span><span class="p">)</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s2">&quot;matplotlib&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">WARNING</span><span class="p">)</span>
+
+    <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Plotting dist&quot;</span><span class="p">)</span>
+
+    <span class="n">fig</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">5</span><span class="p">))</span>  <span class="c1"># , constrained_layout=True)</span>
+    <span class="n">h</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="mi">121</span><span class="p">)</span>
+    <span class="n">p</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="mi">122</span><span class="p">,</span> <span class="n">projection</span><span class="o">=</span><span class="s2">&quot;polar&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Histogram of the speed</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Deal with high speeds -- this should not be needed, so commented out. (but kept here in case someone want to use it )</span>
+<span class="sd">    Filters for unreasonably high speeds &gt;2.8 m/s Garbo thesis, &gt; 8 m/s Dalton thesis </span>
+<span class="sd">    Dalton&#39;s fastest was 2.3 m/s</span>
+<span class="sd">    # code to remove data</span>
+<span class="sd">    track.data.replace([np.inf, -np.inf], np.nan, inplace=True)</span>
+<span class="sd">    track.data.loc[track.data[&quot;platform_speed_wrt_ground&quot;] &gt; 2.4] = np.nan  </span>
+
+<span class="sd">    Create histogram</span>
+<span class="sd">    here we are scaling under the assumption that there will not be any speeds greater </span>
+<span class="sd">    than 2.5 m/s by setting the same lower and upper limit, the histograms are comparable</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">xlowerlim</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">xupperlim</span> <span class="o">=</span> <span class="mf">2.5</span>
+    <span class="n">nbins</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="mi">10</span> <span class="o">*</span> <span class="p">(</span><span class="n">xupperlim</span> <span class="o">-</span> <span class="n">xlowerlim</span><span class="p">)</span> <span class="o">/</span> <span class="mf">0.5</span><span class="p">)</span>  <span class="c1"># this sets the number of bins</span>
+
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Here bins start with 0 to 0.05 m/s. That represents a displacement of 180 m so there is</span>
+<span class="sd">    likely true motion within that bin, but much of it is likely positional error.</span>
+<span class="sd">    Dalton examined a stationary gps beacon and found mean + 1 SD = 0.04 m/s.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># calcuate bins and values</span>
+    <span class="n">values</span><span class="p">,</span> <span class="n">bins</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">histogram</span><span class="p">(</span>
+        <span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">platform_speed_wrt_ground</span><span class="p">[</span>
+            <span class="o">~</span><span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">platform_speed_wrt_ground</span><span class="p">)</span>
+        <span class="p">],</span>
+        <span class="nb">range</span><span class="o">=</span><span class="p">(</span><span class="n">xlowerlim</span><span class="p">,</span> <span class="n">xupperlim</span><span class="p">),</span>
+        <span class="n">bins</span><span class="o">=</span><span class="n">nbins</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="c1"># convert to fraction of all obs</span>
+    <span class="n">frac</span> <span class="o">=</span> <span class="n">values</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span>
+        <span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">platform_speed_wrt_ground</span><span class="p">[</span>
+            <span class="o">~</span><span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">platform_speed_wrt_ground</span><span class="p">)</span>
+        <span class="p">]</span>
+    <span class="p">)</span>
+    <span class="n">cumfrac</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span><span class="n">frac</span><span class="p">)</span>
+
+    <span class="c1"># here we set the y axis (left) limits - they represent fraction of obs within each bin</span>
+    <span class="n">ylowerlim</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">yupperlim</span> <span class="o">=</span> <span class="mi">100</span>
+
+    <span class="n">h</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s2">&quot;Speed (m/s)&quot;</span><span class="p">)</span>
+    <span class="n">h</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">&quot;Observations (%)&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;red&quot;</span><span class="p">)</span>
+
+    <span class="n">h</span><span class="o">.</span><span class="n">hist</span><span class="p">(</span><span class="n">bins</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">bins</span><span class="p">,</span> <span class="n">weights</span><span class="o">=</span><span class="n">frac</span> <span class="o">*</span> <span class="mi">100</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;red&quot;</span><span class="p">)</span>
+    <span class="n">h</span><span class="o">.</span><span class="n">tick_params</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="n">labelcolor</span><span class="o">=</span><span class="s2">&quot;red&quot;</span><span class="p">)</span>
+    <span class="n">h</span><span class="o">.</span><span class="n">set_ylim</span><span class="p">([</span><span class="n">ylowerlim</span><span class="p">,</span> <span class="n">yupperlim</span> <span class="o">*</span> <span class="mf">1.01</span><span class="p">])</span>
+    <span class="n">h</span><span class="o">.</span><span class="n">set_xlim</span><span class="p">([</span><span class="n">xlowerlim</span><span class="p">,</span> <span class="n">xupperlim</span><span class="p">])</span>
+
+    <span class="c1"># plot exceedence hist on right y axis</span>
+    <span class="n">h2</span> <span class="o">=</span> <span class="n">h</span><span class="o">.</span><span class="n">twinx</span><span class="p">()</span>
+
+    <span class="n">h2</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">&quot;Exceedence probability (%)&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;blue&quot;</span><span class="p">,</span> <span class="n">rotation</span><span class="o">=</span><span class="mi">270</span><span class="p">,</span> <span class="n">labelpad</span><span class="o">=</span><span class="mi">15</span><span class="p">)</span>
+
+    <span class="c1"># since the cumulative fraction is descending, we need to use the stairs function.</span>
+    <span class="n">h2</span><span class="o">.</span><span class="n">stairs</span><span class="p">(</span>
+        <span class="mi">100</span> <span class="o">-</span> <span class="n">cumfrac</span> <span class="o">*</span> <span class="mi">100</span><span class="p">,</span>
+        <span class="n">bins</span><span class="p">,</span>
+        <span class="n">color</span><span class="o">=</span><span class="s2">&quot;blue&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">h2</span><span class="o">.</span><span class="n">tick_params</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="n">labelcolor</span><span class="o">=</span><span class="s2">&quot;blue&quot;</span><span class="p">)</span>
+    <span class="n">h2</span><span class="o">.</span><span class="n">set_ylim</span><span class="p">([</span><span class="n">ylowerlim</span><span class="p">,</span> <span class="n">yupperlim</span> <span class="o">*</span> <span class="mf">1.01</span><span class="p">])</span>
+
+    <span class="c1"># Calculate the number of observations to right edge to the histogram and print that</span>
+    <span class="c1"># only really works if speed_limit is higher than the graph x limit</span>
+    <span class="n">out_of_range</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">platform_speed_wrt_ground</span> <span class="o">&gt;</span> <span class="n">xupperlim</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">out_of_range</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">text</span><span class="p">(</span>
+            <span class="mf">0.4</span><span class="p">,</span>
+            <span class="mi">95</span><span class="p">,</span>
+            <span class="sa">f</span><span class="s2">&quot;Warning: </span><span class="si">{</span><span class="n">out_of_range</span><span class="si">}</span><span class="s2"> values exceed </span><span class="si">{</span><span class="n">xupperlim</span><span class="si">}</span><span class="s2"> m/s&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="c1"># Polar plot of speed and direction</span>
+    <span class="n">p</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">deg2rad</span><span class="p">(</span><span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">platform_course</span><span class="p">),</span>
+        <span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">platform_speed_wrt_ground</span><span class="p">,</span>
+        <span class="n">marker</span><span class="o">=</span><span class="s2">&quot;o&quot;</span><span class="p">,</span>
+        <span class="n">markerfacecolor</span><span class="o">=</span><span class="s2">&quot;b&quot;</span><span class="p">,</span>
+        <span class="n">markeredgecolor</span><span class="o">=</span><span class="s2">&quot;k&quot;</span><span class="p">,</span>
+        <span class="n">linestyle</span><span class="o">=</span><span class="s2">&quot;None&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">p</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="n">zorder</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
+    <span class="n">p</span><span class="o">.</span><span class="n">set_theta_direction</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>  <span class="c1"># turn clockwise</span>
+    <span class="n">p</span><span class="o">.</span><span class="n">set_theta_zero_location</span><span class="p">(</span><span class="s2">&quot;N&quot;</span><span class="p">)</span>  <span class="c1"># north up</span>
+    <span class="n">p</span><span class="o">.</span><span class="n">set_rlabel_position</span><span class="p">(</span><span class="mf">200.5</span><span class="p">)</span>  <span class="c1"># Move radial labels away from plotted line</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">text</span><span class="p">(</span><span class="mf">0.05</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.05</span><span class="p">,</span> <span class="s2">&quot;Speed (m/s)&quot;</span><span class="p">,</span> <span class="n">transform</span><span class="o">=</span><span class="n">p</span><span class="o">.</span><span class="n">transAxes</span><span class="p">)</span>
+
+    <span class="n">fig</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">track</span><span class="o">.</span><span class="n">platform_id</span><span class="si">}</span><span class="s2"> distribution plot&quot;</span><span class="p">,</span> <span class="n">fontweight</span><span class="o">=</span><span class="s2">&quot;bold&quot;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">18</span>
+    <span class="p">)</span>
+
+    <span class="n">h</span><span class="o">.</span><span class="n">text</span><span class="p">(</span>
+        <span class="mf">0.0</span><span class="p">,</span>
+        <span class="o">-</span><span class="mf">0.275</span><span class="p">,</span>
+        <span class="sa">f</span><span class="s2">&quot;Start (*): </span><span class="si">{</span><span class="n">track</span><span class="o">.</span><span class="n">data_start</span><span class="si">:</span><span class="s2">%Y-%m-%d %H:%M:%S</span><span class="si">}</span><span class="s2"> UTC, End: </span><span class="si">{</span><span class="n">track</span><span class="o">.</span><span class="n">data_end</span><span class="si">:</span><span class="s2">%Y-%m-%d %H:%M:%S</span><span class="si">}</span><span class="s2"> UTC</span><span class="se">\n</span><span class="s2">&quot;</span>
+        <span class="sa">f</span><span class="s2">&quot;Duration: </span><span class="si">{</span><span class="n">track</span><span class="o">.</span><span class="n">duration</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> days, Distance: </span><span class="si">{</span><span class="n">track</span><span class="o">.</span><span class="n">distance_travelled</span><span class="si">:</span><span class="s2">,.2f</span><span class="si">}</span><span class="s2"> km, &quot;</span>
+        <span class="sa">f</span><span class="s2">&quot;Observations: </span><span class="si">{</span><span class="n">track</span><span class="o">.</span><span class="n">observations</span><span class="si">:</span><span class="s2">,</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+        <span class="n">transform</span><span class="o">=</span><span class="n">h</span><span class="o">.</span><span class="n">transAxes</span><span class="p">,</span>
+        <span class="n">color</span><span class="o">=</span><span class="s2">&quot;black&quot;</span><span class="p">,</span>
+        <span class="n">fontsize</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span>
+        <span class="n">fontweight</span><span class="o">=</span><span class="s2">&quot;regular&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">plt</span><span class="o">.</span><span class="n">subplots_adjust</span><span class="p">(</span><span class="n">wspace</span><span class="o">=</span><span class="mf">0.3</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">interactive</span><span class="p">:</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">savefig</span><span class="p">(</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">path_output</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">track</span><span class="o">.</span><span class="n">platform_id</span><span class="si">}</span><span class="s2">_dist.png&quot;</span><span class="p">),</span>
+            <span class="n">dpi</span><span class="o">=</span><span class="n">dpi</span><span class="p">,</span>
+            <span class="n">transparent</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">bbox_inches</span><span class="o">=</span><span class="s2">&quot;tight&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">plt</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+    <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Plotting dist complete&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="plot_time">
+<a class="viewcode-back" href="../api.html#track_fig.plot_time">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">plot_time</span><span class="p">(</span><span class="n">track</span><span class="p">,</span> <span class="n">path_output</span><span class="o">=</span><span class="s2">&quot;.&quot;</span><span class="p">,</span> <span class="n">dpi</span><span class="o">=</span><span class="mi">300</span><span class="p">,</span> <span class="n">interactive</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">log</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Create a graph of variables with respect to time.</span>
+
+<span class="sd">    There are 3 panels:</span>
+<span class="sd">        Temperature (of the air, surface or internal, depending on what is available)</span>
+<span class="sd">        Distance (scatter plot)</span>
+<span class="sd">        Speed and direction (quiver)</span>
+
+<span class="sd">    All graphs scale with the data.  The temperature plot is straightforward.  The</span>
+<span class="sd">    distance plot shows only up to a certain percentile of the data since this variable</span>
+<span class="sd">    is often highly skewed.  The quiver plot is very challenging to scale for all the</span>
+<span class="sd">    various tracks. It is at a level that works most of the time.</span>
+
+<span class="sd">    This plot can be produced as a png or it can be viewed interactively.</span>
+
+<span class="sd">    If the track has been trimmed, there will be a green dot at the trim_start and an</span>
+<span class="sd">    orange dot at trim_end.</span>
+
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    track : track object</span>
+<span class="sd">        Standardized beacon track object.</span>
+<span class="sd">    path_output : str, optional</span>
+<span class="sd">        Path to save output. The default is &quot;.&quot;.</span>
+<span class="sd">    dpi : int, optional</span>
+<span class="sd">        Resolution of the graph in dots per inch. The default is 300.</span>
+<span class="sd">    interactive : bool, optional</span>
+<span class="sd">        If true, the plot can be viewed interactively.</span>
+<span class="sd">    log : logger</span>
+<span class="sd">        A logger instance.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    None.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># set up the logger to output nowhere if None</span>
+    <span class="k">if</span> <span class="n">log</span> <span class="o">==</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">log</span> <span class="o">=</span> <span class="n">nolog</span><span class="p">()</span>
+
+    <span class="c1"># quiet these loggers a bit..</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s2">&quot;PIL&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">WARNING</span><span class="p">)</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s2">&quot;matplotlib&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">WARNING</span><span class="p">)</span>
+
+    <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Plotting timeseries&quot;</span><span class="p">)</span>
+
+    <span class="c1"># get the temperature</span>
+    <span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;temperature&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;air_temperature&quot;</span><span class="p">]</span> <span class="o">-</span> <span class="mf">273.15</span>  <span class="c1"># plot Celsius</span>
+    <span class="n">temp_type</span> <span class="o">=</span> <span class="s2">&quot;Air&quot;</span>
+    <span class="k">if</span> <span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;air_temperature&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">isnull</span><span class="p">()</span><span class="o">.</span><span class="n">all</span><span class="p">():</span>
+        <span class="n">temp_type</span> <span class="o">=</span> <span class="s2">&quot;Surface&quot;</span>
+        <span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;temperature&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;surface_temperature&quot;</span><span class="p">]</span> <span class="o">-</span> <span class="mf">273.15</span>
+        <span class="p">)</span>  <span class="c1"># plot Celsius</span>
+        <span class="k">if</span> <span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;surface_temperature&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">isnull</span><span class="p">()</span><span class="o">.</span><span class="n">all</span><span class="p">():</span>
+            <span class="n">temp_type</span> <span class="o">=</span> <span class="s2">&quot;Internal&quot;</span>
+            <span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;temperature&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;internal_temperature&quot;</span><span class="p">]</span> <span class="o">-</span> <span class="mf">273.15</span>
+            <span class="p">)</span>  <span class="c1"># plot Celsius</span>
+            <span class="k">if</span> <span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;internal_temperature&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">isnull</span><span class="p">()</span><span class="o">.</span><span class="n">all</span><span class="p">():</span>
+                <span class="n">temp_type</span> <span class="o">=</span> <span class="s2">&quot;No&quot;</span>
+                <span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;temperature&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="c1"># plotting</span>
+    <span class="n">fig</span><span class="p">,</span> <span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">d</span><span class="p">,</span> <span class="n">q</span><span class="p">)</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span>
+        <span class="mi">3</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">8</span><span class="p">),</span> <span class="n">sharex</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">constrained_layout</span><span class="o">=</span><span class="kc">True</span>
+    <span class="p">)</span>
+
+    <span class="c1"># Temperature plot</span>
+    <span class="n">t</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="n">ls</span><span class="o">=</span><span class="s2">&quot;dotted&quot;</span><span class="p">,</span> <span class="n">zorder</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
+    <span class="n">sns</span><span class="o">.</span><span class="n">lineplot</span><span class="p">(</span>
+        <span class="n">ax</span><span class="o">=</span><span class="n">t</span><span class="p">,</span>
+        <span class="n">x</span><span class="o">=</span><span class="s2">&quot;timestamp&quot;</span><span class="p">,</span>
+        <span class="n">y</span><span class="o">=</span><span class="s2">&quot;temperature&quot;</span><span class="p">,</span>
+        <span class="n">data</span><span class="o">=</span><span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="p">,</span>
+        <span class="n">errorbar</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">color</span><span class="o">=</span><span class="s2">&quot;b&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">t</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">xlabel</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">ylabel</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">temp_type</span><span class="si">}</span><span class="s2"> temperature (°C)&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">temp_type</span> <span class="o">==</span> <span class="s2">&quot;NA&quot;</span><span class="p">:</span>
+        <span class="n">t</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">xlabel</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">ylabel</span><span class="o">=</span><span class="s2">&quot;No temperature available (°C)&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Distance plot</span>
+    <span class="n">d</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="n">ls</span><span class="o">=</span><span class="s2">&quot;dotted&quot;</span><span class="p">,</span> <span class="n">zorder</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
+    <span class="n">sns</span><span class="o">.</span><span class="n">lineplot</span><span class="p">(</span>
+        <span class="n">ax</span><span class="o">=</span><span class="n">d</span><span class="p">,</span>
+        <span class="n">x</span><span class="o">=</span><span class="s2">&quot;timestamp&quot;</span><span class="p">,</span>
+        <span class="n">y</span><span class="o">=</span><span class="s2">&quot;platform_displacement&quot;</span><span class="p">,</span>
+        <span class="n">data</span><span class="o">=</span><span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="p">,</span>
+        <span class="n">errorbar</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">color</span><span class="o">=</span><span class="s2">&quot;r&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">d</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">xlabel</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">ylabel</span><span class="o">=</span><span class="s2">&quot;Displacement (m)&quot;</span><span class="p">)</span>
+    <span class="n">d</span><span class="o">.</span><span class="n">set_ylim</span><span class="p">(</span>
+        <span class="mi">0</span><span class="p">,</span>
+        <span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">platform_displacement</span><span class="o">.</span><span class="n">quantile</span><span class="p">(</span><span class="mf">0.99</span><span class="p">),</span>
+    <span class="p">)</span>
+    <span class="c1"># quiver plot</span>
+    <span class="n">q</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="n">ls</span><span class="o">=</span><span class="s2">&quot;dotted&quot;</span><span class="p">,</span> <span class="n">zorder</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
+    <span class="n">u</span> <span class="o">=</span> <span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">platform_speed_wrt_ground</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">radians</span><span class="p">(</span><span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">platform_course</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="n">v</span> <span class="o">=</span> <span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">platform_speed_wrt_ground</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">radians</span><span class="p">(</span><span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">platform_course</span><span class="p">)</span>
+    <span class="p">)</span>
+
+    <span class="n">time_numeric</span> <span class="o">=</span> <span class="n">mdates</span><span class="o">.</span><span class="n">date2num</span><span class="p">(</span><span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;timestamp&quot;</span><span class="p">])</span>
+    <span class="n">q_ax</span> <span class="o">=</span> <span class="n">q</span><span class="o">.</span><span class="n">quiver</span><span class="p">(</span>
+        <span class="n">time_numeric</span><span class="p">,</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">time_numeric</span><span class="p">),</span>
+        <span class="n">u</span><span class="p">,</span>
+        <span class="n">v</span><span class="p">,</span>
+        <span class="n">scale</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>  <span class="c1"># scale 1 will scale arrows the same as q.set_ylim()</span>
+        <span class="n">angles</span><span class="o">=</span><span class="s2">&quot;uv&quot;</span><span class="p">,</span>  <span class="c1"># select uv since you are plotting along time (not space)</span>
+        <span class="n">scale_units</span><span class="o">=</span><span class="s2">&quot;y&quot;</span><span class="p">,</span>  <span class="c1"># scale as per the q.set_ylim</span>
+        <span class="n">width</span><span class="o">=</span><span class="mf">0.002</span><span class="p">,</span>  <span class="c1"># width of the arrow (keep small)</span>
+    <span class="p">)</span>
+    <span class="c1"># this sets the y axis limits and therefore the scale of the arrows</span>
+    <span class="c1"># setting this to 90th percentile</span>
+    <span class="n">q</span><span class="o">.</span><span class="n">set_ylim</span><span class="p">(</span>
+        <span class="o">-</span><span class="mi">1</span> <span class="o">*</span> <span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">platform_speed_wrt_ground</span><span class="o">.</span><span class="n">quantile</span><span class="p">(</span><span class="mf">0.99</span><span class="p">),</span>
+        <span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">platform_speed_wrt_ground</span><span class="o">.</span><span class="n">quantile</span><span class="p">(</span><span class="mf">0.99</span><span class="p">),</span>
+    <span class="p">)</span>
+
+    <span class="n">q</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">xlabel</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">ylabel</span><span class="o">=</span><span class="s2">&quot;Velocity (m/s)&quot;</span><span class="p">)</span>
+
+    <span class="c1"># 2 reference arrows</span>
+    <span class="k">if</span> <span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">platform_speed_wrt_ground</span><span class="o">.</span><span class="n">quantile</span><span class="p">(</span><span class="mf">0.99</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">ref_arrow</span> <span class="o">=</span> <span class="mf">0.2</span>
+    <span class="k">if</span> <span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">platform_speed_wrt_ground</span><span class="o">.</span><span class="n">quantile</span><span class="p">(</span><span class="mf">0.99</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">ref_arrow</span> <span class="o">=</span> <span class="mf">0.1</span>
+    <span class="k">if</span> <span class="n">track</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">platform_speed_wrt_ground</span><span class="o">.</span><span class="n">quantile</span><span class="p">(</span><span class="mf">0.99</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mf">0.1</span><span class="p">:</span>
+        <span class="n">ref_arrow</span> <span class="o">=</span> <span class="mf">0.02</span>
+    <span class="n">q</span><span class="o">.</span><span class="n">quiverkey</span><span class="p">(</span>
+        <span class="n">q_ax</span><span class="p">,</span>
+        <span class="n">X</span><span class="o">=</span><span class="mf">0.9</span><span class="p">,</span>
+        <span class="n">Y</span><span class="o">=</span><span class="mf">0.9</span><span class="p">,</span>
+        <span class="n">U</span><span class="o">=</span><span class="n">ref_arrow</span><span class="p">,</span>
+        <span class="n">label</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">ref_arrow</span><span class="si">}</span><span class="s2"> m/s&quot;</span><span class="p">,</span>
+        <span class="n">color</span><span class="o">=</span><span class="s2">&quot;grey&quot;</span><span class="p">,</span>
+        <span class="n">labelpos</span><span class="o">=</span><span class="s2">&quot;E&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">fig</span><span class="o">.</span><span class="n">align_ylabels</span><span class="p">()</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">xticks</span><span class="p">(</span><span class="n">rotation</span><span class="o">=</span><span class="mi">45</span><span class="p">,</span> <span class="n">horizontalalignment</span><span class="o">=</span><span class="s2">&quot;center&quot;</span><span class="p">)</span>
+
+    <span class="n">fig</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">track</span><span class="o">.</span><span class="n">platform_id</span><span class="si">}</span><span class="s2"> time plot&quot;</span><span class="p">,</span> <span class="n">fontweight</span><span class="o">=</span><span class="s2">&quot;bold&quot;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">18</span><span class="p">)</span>
+
+    <span class="n">q</span><span class="o">.</span><span class="n">text</span><span class="p">(</span>
+        <span class="mi">0</span><span class="p">,</span>
+        <span class="o">-</span><span class="mf">0.61</span><span class="p">,</span>
+        <span class="sa">f</span><span class="s2">&quot;Start (*): </span><span class="si">{</span><span class="n">track</span><span class="o">.</span><span class="n">data_start</span><span class="si">:</span><span class="s2">%Y-%m-%d %H:%M:%S</span><span class="si">}</span><span class="s2"> UTC, End: </span><span class="si">{</span><span class="n">track</span><span class="o">.</span><span class="n">data_end</span><span class="si">:</span><span class="s2">%Y-%m-%d %H:%M:%S</span><span class="si">}</span><span class="s2"> UTC</span><span class="se">\n</span><span class="s2">&quot;</span>
+        <span class="sa">f</span><span class="s2">&quot;Duration: </span><span class="si">{</span><span class="n">track</span><span class="o">.</span><span class="n">duration</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> days, Distance: </span><span class="si">{</span><span class="n">track</span><span class="o">.</span><span class="n">distance_travelled</span><span class="si">:</span><span class="s2">,.2f</span><span class="si">}</span><span class="s2"> km, &quot;</span>
+        <span class="sa">f</span><span class="s2">&quot;Observations: </span><span class="si">{</span><span class="n">track</span><span class="o">.</span><span class="n">observations</span><span class="si">:</span><span class="s2">,</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+        <span class="n">transform</span><span class="o">=</span><span class="n">q</span><span class="o">.</span><span class="n">transAxes</span><span class="p">,</span>
+        <span class="n">color</span><span class="o">=</span><span class="s2">&quot;black&quot;</span><span class="p">,</span>
+        <span class="n">fontsize</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span>
+        <span class="n">fontweight</span><span class="o">=</span><span class="s2">&quot;regular&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="c1"># plot the track trimming points so it can be verified before trimming.</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">track</span><span class="o">.</span><span class="n">trimmed</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">pd</span><span class="o">.</span><span class="n">isnull</span><span class="p">(</span><span class="n">track</span><span class="o">.</span><span class="n">trim_start</span><span class="p">):</span>
+            <span class="n">t</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="n">track</span><span class="o">.</span><span class="n">trim_start</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s2">&quot;dashdot&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;lime&quot;</span><span class="p">)</span>
+            <span class="n">d</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="n">track</span><span class="o">.</span><span class="n">trim_start</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s2">&quot;dashdot&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;lime&quot;</span><span class="p">)</span>
+            <span class="n">q</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="n">track</span><span class="o">.</span><span class="n">trim_start</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s2">&quot;dashdot&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;lime&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">pd</span><span class="o">.</span><span class="n">isnull</span><span class="p">(</span><span class="n">track</span><span class="o">.</span><span class="n">trim_end</span><span class="p">):</span>
+            <span class="n">t</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="n">track</span><span class="o">.</span><span class="n">trim_end</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s2">&quot;dashdot&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;tab:orange&quot;</span><span class="p">)</span>
+            <span class="n">d</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="n">track</span><span class="o">.</span><span class="n">trim_end</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s2">&quot;dashdot&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;tab:orange&quot;</span><span class="p">)</span>
+            <span class="n">q</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="n">track</span><span class="o">.</span><span class="n">trim_end</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s2">&quot;dashdot&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;tab:orange&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">interactive</span><span class="p">:</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">savefig</span><span class="p">(</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">path_output</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">track</span><span class="o">.</span><span class="n">platform_id</span><span class="si">}</span><span class="s2">_time.png&quot;</span><span class="p">),</span>
+            <span class="n">dpi</span><span class="o">=</span><span class="n">dpi</span><span class="p">,</span>
+            <span class="n">transparent</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">bbox_inches</span><span class="o">=</span><span class="s2">&quot;tight&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+    <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Plotting timeseries complete&quot;</span><span class="p">)</span></div>
+
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">Iceberg Beacon Track Database (IBTD) Tools</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../README.html">Iceberg Beacon Track Database (IBTD) Tools</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api.html">Scripts</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api.html#api-reference">API Reference</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2025, WIRL.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

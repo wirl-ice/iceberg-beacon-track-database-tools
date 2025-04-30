@@ -34,23 +34,1856 @@
             
   <section id="scripts">
 <h1>Scripts<a class="headerlink" href="#scripts" title="Link to this heading">¶</a></h1>
-<section id="track-process-py">
-<h2>track_process.py<a class="headerlink" href="#track-process-py" title="Link to this heading">¶</a></h2>
+<section id="module-track_process">
+<span id="track-process-py"></span><h2>track_process.py<a class="headerlink" href="#module-track_process" title="Link to this heading">¶</a></h2>
+<p>track_proceessing.py</p>
+<p>Stand-alone script to process tracks for the IBTD (Iceberg Beacon Track Database)</p>
+<p>–or–</p>
+<p>If you have standardized data already, it can be used to make plots and output data</p>
+<p>Author: Derek Mueller, Water and Ice Research Laboratory (WIRL), Carleton University</p>
+<p>Copyright (C) 2025  WIRL</p>
+<blockquote>
+<div><p>This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.</p>
+<p>This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.</p>
+<p>You should have received a copy of the GNU General Public License
+along with this program.  If not, see &lt;<a class="reference external" href="https://www.gnu.org/licenses/">https://www.gnu.org/licenses/</a>&gt;.</p>
+</div></blockquote>
+<dl class="py function">
+<dt class="sig sig-object py" id="track_process.main">
+<span class="sig-prename descclassname"><span class="pre">track_process.</span></span><span class="sig-name descname"><span class="pre">main</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/track_process.html#main"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#track_process.main" title="Link to this definition">¶</a></dt>
+<dd><p>Run main function.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="track_process.process">
+<span class="sig-prename descclassname"><span class="pre">track_process.</span></span><span class="sig-name descname"><span class="pre">process</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data_file</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">metadata</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reader</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">specs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">trim_start</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">trim_end</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_types</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_plots</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interactive</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">trim</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'accept'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">raw_data</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">meta_export</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">meta_verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/track_process.html#process"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#track_process.process" title="Link to this definition">¶</a></dt>
+<dd><p>Process a raw track: standardize, purge, trim and output.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>data_file</strong><span class="classifier">str</span></dt><dd><p>Path to the track data file to be processed.</p>
+</dd>
+<dt><strong>output_path</strong><span class="classifier">str</span></dt><dd><p>Path where output files will be written.</p>
+</dd>
+<dt><strong>metadata</strong><span class="classifier">Meta object, optional</span></dt><dd><p>Metadata object containing track information. The default is None.</p>
+</dd>
+<dt><strong>reader</strong><span class="classifier">str, optional</span></dt><dd><p>Name of the reader function to use. The default is None.</p>
+</dd>
+<dt><strong>model</strong><span class="classifier">str, optional</span></dt><dd><p>Beacon model name. The default is None.</p>
+</dd>
+<dt><strong>specs</strong><span class="classifier">Models object, optional</span></dt><dd><p>Object containing model specifications. The default is None.</p>
+</dd>
+<dt><strong>trim_start</strong><span class="classifier">str, optional</span></dt><dd><p>Timestamp to trim the start of the track in UTC format. The default is None.</p>
+</dd>
+<dt><strong>trim_end</strong><span class="classifier">str, optional</span></dt><dd><p>Timestamp to trim the end of the track in UTC format. The default is None.</p>
+</dd>
+<dt><strong>output_name</strong><span class="classifier">str, optional</span></dt><dd><p>Name for the output file. The default (None) will result in naming based on platform_id.</p>
+</dd>
+<dt><strong>output_types</strong><span class="classifier">list, optional</span></dt><dd><p>List of output file types to produce. The default is None.</p>
+</dd>
+<dt><strong>output_plots</strong><span class="classifier">list, optional</span></dt><dd><p>List of plot types to generate. The default is None.</p>
+</dd>
+<dt><strong>interactive</strong><span class="classifier">bool, optional</span></dt><dd><p>Whether to create interactive plots. The default is False.</p>
+</dd>
+<dt><strong>trim</strong><span class="classifier">str, optional</span></dt><dd><p>Trim directive. Choice of: accept, decline, preview-accept, preview-decline. The default is accept.</p>
+</dd>
+<dt><strong>raw_data</strong><span class="classifier">bool, optional</span></dt><dd><p>Whether the input is raw data (not standardized). The default is False.</p>
+</dd>
+<dt><strong>meta_export</strong><span class="classifier">str, optional</span></dt><dd><p>Format for metadata export (‘pandas’, ‘json’, or ‘both’). The default is None.</p>
+</dd>
+<dt><strong>meta_verbose</strong><span class="classifier">bool, optional</span></dt><dd><p>Whether to include all available metadata fields in the track metadata. If True,
+metadata categories like processing details and valid range information are included.
+The default is False.</p>
+</dd>
+<dt><strong>log</strong><span class="classifier">logger instance</span></dt><dd><p>A logger instance.  The default is None.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>trk_meta</strong><span class="classifier">pandas Dataframe</span></dt><dd><p>Track metadata (one row) in a dataframe.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="track_process.read_args">
+<span class="sig-prename descclassname"><span class="pre">track_process.</span></span><span class="sig-name descname"><span class="pre">read_args</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/track_process.html#read_args"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#track_process.read_args" title="Link to this definition">¶</a></dt>
+<dd><p>Read arguments from command line, checks them, reads some files.</p>
+<p>This function facilitates the command line operation of the workflow. Note that most
+of the arguments are not required, since they have defaults. There are some choices:</p>
+<ul class="simple">
+<li><p>The user can specify the reader, beacon model, trim start and end times (for trimming),</p></li>
+<li><p>or leave them blank (which may limit what steps can be accomplished),</p></li>
+<li><p>or they can provide the path to the track metadata file. If this file is present, the
+keywords mentioned above will be overwritten.</p></li>
+</ul>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt>list</dt><dd></dd>
+<dt>A list containing the following arguments in order:</dt><dd></dd>
+<dt><strong>- data_file</strong><span class="classifier">str</span></dt><dd><p>Path to the track data file.</p>
+</dd>
+<dt><strong>- output_path</strong><span class="classifier">str</span></dt><dd><p>Directory path where output files will be written.</p>
+</dd>
+<dt><strong>- metadata</strong><span class="classifier">Meta object or None</span></dt><dd><p>Metadata file containing track information if provided.</p>
+</dd>
+<dt><strong>- reader</strong><span class="classifier">str</span></dt><dd><p>Name of the reader function to use.</p>
+</dd>
+<dt><strong>- model</strong><span class="classifier">str</span></dt><dd><p>Beacon model name.</p>
+</dd>
+<dt><strong>- specs</strong><span class="classifier">Models object or None</span></dt><dd><p>File containing model specifications if provided.</p>
+</dd>
+<dt><strong>- trim_start</strong><span class="classifier">str or None</span></dt><dd><p>Timestamp to trim the start of the track in UTC format.</p>
+</dd>
+<dt><strong>- trim_end</strong><span class="classifier">str or None</span></dt><dd><p>Timestamp to trim the end of the track in UTC format.</p>
+</dd>
+<dt><strong>- output_name</strong><span class="classifier">str or None</span></dt><dd><p>Name for the output file.</p>
+</dd>
+<dt><strong>- output_types</strong><span class="classifier">list or None</span></dt><dd><p>List of output file types to produce.</p>
+</dd>
+<dt><strong>- output_plots</strong><span class="classifier">list or None</span></dt><dd><p>List of plot types to generate.</p>
+</dd>
+<dt><strong>- interactive</strong><span class="classifier">bool</span></dt><dd><p>Whether to create interactive plots.</p>
+</dd>
+<dt><strong>- trim</strong><span class="classifier">str</span></dt><dd><p>Trim directive. Choice of: accept, decline, preview-accept, preview-decline.</p>
+</dd>
+<dt><strong>- raw_data</strong><span class="classifier">bool</span></dt><dd><p>Whether the input is raw data (not standardized).</p>
+</dd>
+<dt><strong>- meta_export</strong><span class="classifier">str</span></dt><dd><p>Format for metadata export (‘pandas’, ‘json’, or ‘both’).</p>
+</dd>
+<dt><strong>- log</strong><span class="classifier">str</span></dt><dd><p>chose ‘quiet’ for no loggging, ‘info’ for regular logging or ‘debug’ for verbose logging.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="track_process.read_meta_files">
+<span class="sig-prename descclassname"><span class="pre">track_process.</span></span><span class="sig-name descname"><span class="pre">read_meta_files</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">spec_file</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">meta_file</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/track_process.html#read_meta_files"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#track_process.read_meta_files" title="Link to this definition">¶</a></dt>
+<dd><p>Read track metadata file and beacon spec file.</p>
+<p>Reads in the metadata and specs files</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>spec_file</strong><span class="classifier">str</span></dt><dd><p>Full path to the beacon_specs file.</p>
+</dd>
+<dt><strong>meta_file</strong><span class="classifier">str</span></dt><dd><p>Full path to the track_metadata file.</p>
+</dd>
+<dt><strong>log</strong><span class="classifier">logger instance</span></dt><dd><p>A logger instance.  The default is None.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>metadata</strong><span class="classifier">Meta object, optional</span></dt><dd><p>Metadata object containing track information. The default is None.</p>
+</dd>
+<dt><strong>specs</strong><span class="classifier">Models object, optional</span></dt><dd><p>Object containing model specifications. The default is None.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="track_process.tracklog">
+<span class="sig-prename descclassname"><span class="pre">track_process.</span></span><span class="sig-name descname"><span class="pre">tracklog</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">platform_id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">path_output</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">level</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'INFO'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/track_process.html#tracklog"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#track_process.tracklog" title="Link to this definition">¶</a></dt>
+<dd><p>Set up logging.</p>
+<p>The level is the standard logging levels with DEBUG being the most verbose, INFO
+being the recommended level and WARNING capturing only bad news.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>platform_id</strong><span class="classifier">str</span></dt><dd><p>the beacon id - used for naming log</p>
+</dd>
+<dt><strong>path_output</strong><span class="classifier">str</span></dt><dd><p>path to the output file</p>
+</dd>
+<dt><strong>level</strong><span class="classifier">str, optional</span></dt><dd><p>the logging level for the file. The default is “INFO”.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>track_log</strong><span class="classifier">logging.Logger</span></dt><dd><p>An instance of the logger class</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
 </section>
-<section id="track-collate-py">
-<h2>track_collate.py<a class="headerlink" href="#track-collate-py" title="Link to this heading">¶</a></h2>
+<section id="module-track_collate">
+<span id="track-collate-py"></span><h2>track_collate.py<a class="headerlink" href="#module-track_collate" title="Link to this heading">¶</a></h2>
+<p>track_collation.py</p>
+<p>Batch process many tracks and/or collate many tracks into a larger database</p>
+<p>Note you must have a track metadata file and a beacon model file to run this</p>
+<p>The file structure of the raw data folders (scandir) is preserved. Some functions can
+be used to move files into a different arrangement.</p>
+<p>Author: Derek Mueller, Water and Ice Research Laboratory (WIRL), Carleton University</p>
+<p>Copyright (C) 2025  WIRL</p>
+<blockquote>
+<div><p>This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.</p>
+<p>This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.</p>
+<p>You should have received a copy of the GNU General Public License
+along with this program.  If not, see &lt;<a class="reference external" href="https://www.gnu.org/licenses/">https://www.gnu.org/licenses/</a>&gt;.</p>
+</div></blockquote>
+<dl class="py function">
+<dt class="sig sig-object py" id="track_collate.combine_data">
+<span class="sig-prename descclassname"><span class="pre">track_collate.</span></span><span class="sig-name descname"><span class="pre">combine_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">indir</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">outdir</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">run_name</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/track_collate.html#combine_data"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#track_collate.combine_data" title="Link to this definition">¶</a></dt>
+<dd><p>Walk through source folder looking for standard track data csv files, concatenate and output.</p>
+<dl class="simple">
+<dt>Note that this function creates 3 files:</dt><dd><ol class="arabic simple">
+<li><p>a csv of all track points found</p></li>
+<li><p>a geopackage file of all the track points</p></li>
+<li><p>a geopackage file of all the track lines</p></li>
+</ol>
+</dd>
+</dl>
+<p>Assumes that all csv files in the lowest directories in the tree are standard track
+data files.  This will be the case after running the main part of this script.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>indir</strong><span class="classifier">str</span></dt><dd><p>Directory to scan for standard track data csv files.</p>
+</dd>
+<dt><strong>outdir</strong><span class="classifier">str</span></dt><dd><p>Directory to put output files.</p>
+</dd>
+<dt><strong>run_name</strong><span class="classifier">str</span></dt><dd><p>Basename of the output files.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>alltrack_data</strong><span class="classifier">GeoPandas.GeoDataFrame</span></dt><dd><p>A geodatafame of all the track points and attributes.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<p>Scan the processed data directory, combine all tracks, and save outputs with basename “ibtd_v1”
+combined_data = combine_data(“/path/to/processed_tracks”, “/path/to/output”, “ibtd_v1”)</p>
+<p>This will create:
+- /path/to/output/ibtd_v1.csv (all track points)
+- /path/to/output/ibtd_v1_pt.gpkg (geopackage of track points)
+- /path/to/output/ibtd_v1_ln.gpkg (geopackage of track lines)</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="track_collate.database_stats">
+<span class="sig-prename descclassname"><span class="pre">track_collate.</span></span><span class="sig-name descname"><span class="pre">database_stats</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ibtd_df</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">metadata</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">modeldata</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">run_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">outdir</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/track_collate.html#database_stats"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#track_collate.database_stats" title="Link to this definition">¶</a></dt>
+<dd><p>Output summary statistics, tables and figure about the Database for reporting.</p>
+<p>In particular, draft (unformatted) tables are ouptut for the Documentation along with
+a map of all the tracks.</p>
+<p>-“Tracks contributed to the Database by organization”
+-“Tracks by source of iceberg in the Database”
+-“Beacon model characteristics and number of tracks”
+-“Iceberg drift tracks in the Iceberg Beacon Track Database version 1”</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>ibtd_df</strong><span class="classifier">Geopandas.GeoDataFrame</span></dt><dd><p>The entire database - track point data.</p>
+</dd>
+<dt><strong>metadata</strong><span class="classifier">IBTD.Meta</span></dt><dd><p>An instance of Meta, the track metadata class for the Database.</p>
+</dd>
+<dt><strong>modeldata</strong><span class="classifier">IBTD.Models</span></dt><dd><p>An instance of Models class for the Database.</p>
+</dd>
+<dt><strong>run_name</strong><span class="classifier">str</span></dt><dd><p>The name of the database run.</p>
+</dd>
+<dt><strong>outdir</strong><span class="classifier">str</span></dt><dd><p>The output directory</p>
+</dd>
+<dt><strong>log</strong><span class="classifier">log instance</span></dt><dd><p>log to output to</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>None.</dt><dd></dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="track_collate.file_mover">
+<span class="sig-prename descclassname"><span class="pre">track_collate.</span></span><span class="sig-name descname"><span class="pre">file_mover</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">src</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dest</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ext</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">levelup</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">copy</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/track_collate.html#file_mover"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#track_collate.file_mover" title="Link to this definition">¶</a></dt>
+<dd><p>Move files of a certain type to a new directory, and optionally simplify the tree.</p>
+<p>Note that you cannot have the dest directory inside the src directory.</p>
+<p>Levelup is used to simpliy the directory structure:
+levelup =0 put files in the same dir structure as the source folder (&lt;dest&gt;/year/track/track_file)
+levelup =1 put files from all tracks together by year (&lt;dest&gt;/year/track_files)
+levelup =2 put files from all tracks in the same dest folder (&lt;dest&gt;/track_files)</p>
+<p>Warning: No clobber protection. Defaults to copy (not move) for safety.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>src</strong><span class="classifier">str or Path</span></dt><dd><p>Source directory path containing the files to be moved/copied</p>
+</dd>
+<dt><strong>dest</strong><span class="classifier">str or Path</span></dt><dd><p>Destination directory path where files will be moved/copied to</p>
+</dd>
+<dt><strong>ext</strong><span class="classifier">str</span></dt><dd><p>File extension to match (e.g., ‘.png’, ‘.csv’ or even ‘map.png’, etc)</p>
+</dd>
+<dt><strong>levelup</strong><span class="classifier">int, optional</span></dt><dd><p>Number of directory levels to move up when recreating structure.
+The default is 0.</p>
+</dd>
+<dt><strong>copy</strong><span class="classifier">bool, optional</span></dt><dd><p>If True, copy files instead of moving them. The default is True</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>None.</dt><dd></dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="track_collate.main">
+<span class="sig-prename descclassname"><span class="pre">track_collate.</span></span><span class="sig-name descname"><span class="pre">main</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/track_collate.html#main"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#track_collate.main" title="Link to this definition">¶</a></dt>
+<dd><p>Run script with the following hardcoded parameters.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt>None.</dt><dd></dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
 </section>
 </section>
 <section id="api-reference">
 <h1>API Reference<a class="headerlink" href="#api-reference" title="Link to this heading">¶</a></h1>
-<section id="ibtd-py">
-<h2>ibtd.py<a class="headerlink" href="#ibtd-py" title="Link to this heading">¶</a></h2>
+<section id="module-ibtd">
+<span id="ibtd-py"></span><h2>ibtd.py<a class="headerlink" href="#module-ibtd" title="Link to this heading">¶</a></h2>
+<p>ibtd.py</p>
+<p>Main module for the Iceberg Beacon Track Database (IBTD).</p>
+<dl>
+<dt>Defines the class:</dt><dd><p>‘Track’ containing an individual iceberg track along with methods and properties.</p>
+<p>‘Meta’ containing the track metadata</p>
+<p>‘Specs’ containing beacon model specifications, used for purging bad data and adding properties</p>
+</dd>
+<dt>Note that creating an instance of a Track that _is_ in the standard format assumes the track</dt><dd><p>has been processed, which means all the steps in a workflow for standardizing, purging, filtering
+and adding derived data are complete.</p>
+</dd>
+</dl>
+<p>The functions to read the various raw_data formats and define the standard format are in track_readers.py
+The functions to plot figures are in track_fig.py</p>
+<p>The Database itself is created using this code base.  To (re-)create the Database use track_collate.py</p>
+<p>Author: Derek Mueller, Water and Ice Research Laboratory (WIRL), Carleton University</p>
+<p>Copyright (C) 2025  WIRL</p>
+<blockquote>
+<div><p>This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.</p>
+<p>This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.</p>
+<p>You should have received a copy of the GNU General Public License
+along with this program.  If not, see &lt;<a class="reference external" href="https://www.gnu.org/licenses/">https://www.gnu.org/licenses/</a>&gt;.</p>
+</div></blockquote>
+<dl class="py class">
+<dt class="sig sig-object py" id="ibtd.Meta">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ibtd.</span></span><span class="sig-name descname"><span class="pre">Meta</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">meta_file</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">logger</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ibtd.html#Meta"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ibtd.Meta" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Class that reads a metadata file and stores all rows in a dataframe.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="ibtd.Specs">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ibtd.</span></span><span class="sig-name descname"><span class="pre">Specs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">specs_file</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">logger</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ibtd.html#Specs"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ibtd.Specs" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Class that holds info/specifications for all beacon models.</p>
+<p>Currently this is the valid range (min, max) of various sensors and some beacon attributes
+but this could be expanded to hold any data related to the model.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="ibtd.Track">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ibtd.</span></span><span class="sig-name descname"><span class="pre">Track</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data_file</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reader</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'standard'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">trim_start</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">trim_end</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">metadata</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">raw_data</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">logger</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ibtd.html#Track"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ibtd.Track" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Class representing an iceberg beacon track.</p>
+<p>This track could be a raw data file or a track that has been processed into a
+the standard format.</p>
+<p>Tracks have many properties and methods for data purging, filtering, inspection and analysis.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Attributes<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>datafile</strong><span class="classifier">str</span></dt><dd><p>Path to the raw or standardized data file.</p>
+</dd>
+<dt><strong>platform_id</strong><span class="classifier">str</span></dt><dd><p>Identifier for the platform (from filename stem).</p>
+</dd>
+<dt><strong>year</strong><span class="classifier">str</span></dt><dd><p>Year of the platform deployment (from filename).</p>
+</dd>
+<dt><strong>id</strong><span class="classifier">str</span></dt><dd><p>Unique identifier for the beacon (from filename).</p>
+</dd>
+<dt><strong>data</strong><span class="classifier">pandas.DataFrame</span></dt><dd><p>DataFrame containing the track data (timestamp, latitude, longitude, etc.).</p>
+</dd>
+<dt><strong>raw_data</strong><span class="classifier">bool</span></dt><dd><p>True if track is from raw data, False if standardized.</p>
+</dd>
+<dt><strong>reader</strong><span class="classifier">str</span></dt><dd><p>Name of the reader function used to load the data.</p>
+</dd>
+<dt><strong>model</strong><span class="classifier">str or None</span></dt><dd><p>Name of the beacon model.</p>
+</dd>
+<dt><strong>trim_start</strong><span class="classifier">pandas.Timestamp or None</span></dt><dd><p>Timestamp for the start trim of the track.</p>
+</dd>
+<dt><strong>trim_end</strong><span class="classifier">pandas.Timestamp or None</span></dt><dd><p>Timestamp for the end trim of the track.</p>
+</dd>
+<dt><strong>data_start</strong><span class="classifier">pandas.Timestamp</span></dt><dd><p>Timestamp of the first data point in the file.</p>
+</dd>
+<dt><strong>data_end</strong><span class="classifier">pandas.Timestamp</span></dt><dd><p>Timestamp of the last data point in the file.</p>
+</dd>
+<dt><strong>track_start</strong><span class="classifier">pandas.Timestamp</span></dt><dd><p>Timestamp of the first valid data point after trimming/filtering.</p>
+</dd>
+<dt><strong>track_end</strong><span class="classifier">pandas.Timestamp</span></dt><dd><p>Timestamp of the last valid data point after trimming/filtering.</p>
+</dd>
+<dt><strong>duration</strong><span class="classifier">float</span></dt><dd><p>Duration of the track in days.</p>
+</dd>
+<dt><strong>observations</strong><span class="classifier">int</span></dt><dd><p>Number of valid data points in the track.</p>
+</dd>
+<dt><strong>latitude_start</strong><span class="classifier">float or None</span></dt><dd><p>Starting latitude (after sorting).</p>
+</dd>
+<dt><strong>longitude_start</strong><span class="classifier">float or None</span></dt><dd><p>Starting longitude (after sorting).</p>
+</dd>
+<dt><strong>latitude_end</strong><span class="classifier">float or None</span></dt><dd><p>Ending latitude (after sorting).</p>
+</dd>
+<dt><strong>longitude_end</strong><span class="classifier">float or None</span></dt><dd><p>Ending longitude (after sorting).</p>
+</dd>
+<dt><strong>distance_travelled</strong><span class="classifier">float or None</span></dt><dd><p>Total distance travelled by the platform (km).</p>
+</dd>
+<dt><strong>purged</strong><span class="classifier">bool</span></dt><dd><p>True if bad data have been purged.</p>
+</dd>
+<dt><strong>sorted</strong><span class="classifier">bool</span></dt><dd><p>True if the data have been sorted chronologically.</p>
+</dd>
+<dt><strong>speeded</strong><span class="classifier">bool</span></dt><dd><p>True if speed/displacement calculations have been performed.</p>
+</dd>
+<dt><strong>speedlimited</strong><span class="classifier">bool</span></dt><dd><p>True if speed limit filtering has been applied.</p>
+</dd>
+<dt><strong>trimmed</strong><span class="classifier">bool</span></dt><dd><p>True if the track has been trimmed.</p>
+</dd>
+<dt><strong>trimmed_start</strong><span class="classifier">bool</span></dt><dd><p>True if the start of the track has been trimmed.</p>
+</dd>
+<dt><strong>trimmed_end</strong><span class="classifier">bool</span></dt><dd><p>True if the end of the track has been trimmed.</p>
+</dd>
+<dt><strong>geoed</strong><span class="classifier">bool</span></dt><dd><p>True if geospatial objects have been created.</p>
+</dd>
+<dt><strong>trackpoints</strong><span class="classifier">geopandas.GeoDataFrame or None</span></dt><dd><p>Geodataframe of track points (created by geo()).</p>
+</dd>
+<dt><strong>trackline</strong><span class="classifier">geopandas.GeoSeries or None</span></dt><dd><p>Geospatial line representing the track (created by geo()).</p>
+</dd>
+<dt><strong>meta_dict</strong><span class="classifier">dict</span></dt><dd><p>Additional metadata loaded from the Meta object.</p>
+</dd>
+<dt><strong>log</strong><span class="classifier">logging.Logger or NoOpLogger</span></dt><dd><p>Logger instance used for logging messages.</p>
+</dd>
+<dt><strong># Beacon/model specification attributes (if loaded via load_model_specs)</strong></dt><dd></dd>
+<dt><strong>make</strong><span class="classifier">str</span></dt><dd><p>Beacon manufacturer.</p>
+</dd>
+<dt><strong>transmitter</strong><span class="classifier">str</span></dt><dd><p>Transmitter type/model.</p>
+</dd>
+<dt><strong>air_deployable</strong><span class="classifier">bool</span></dt><dd><p>Whether the beacon is air deployable.</p>
+</dd>
+<dt><strong>buoyant</strong><span class="classifier">bool</span></dt><dd><p>Whether the beacon is buoyant.</p>
+</dd>
+<dt><strong>has_internal_temperature</strong><span class="classifier">bool</span></dt><dd><p>If the beacon has an internal temperature sensor.</p>
+</dd>
+<dt><strong>has_surface_temperature</strong><span class="classifier">bool</span></dt><dd><p>If the beacon has a surface temperature sensor.</p>
+</dd>
+<dt><strong>has_air_temperature</strong><span class="classifier">bool</span></dt><dd><p>If the beacon has an air temperature sensor.</p>
+</dd>
+<dt><strong>has_air_pressure</strong><span class="classifier">bool</span></dt><dd><p>If the beacon has an air pressure sensor.</p>
+</dd>
+<dt><strong>has_platform_pitch</strong><span class="classifier">bool</span></dt><dd><p>If the beacon has a pitch sensor.</p>
+</dd>
+<dt><strong>has_platform_roll</strong><span class="classifier">bool</span></dt><dd><p>If the beacon has a roll sensor.</p>
+</dd>
+<dt><strong>has_platform_orientation</strong><span class="classifier">bool</span></dt><dd><p>If the beacon has an orientation sensor.</p>
+</dd>
+<dt><strong>has_voltage_battery_volts</strong><span class="classifier">bool</span></dt><dd><p>If the beacon has a battery voltage sensor.</p>
+</dd>
+<dt><strong># Valid range attributes (if loaded via load_model_specs)</strong></dt><dd></dd>
+<dt><strong>latitude_min, latitude_max</strong><span class="classifier">float</span></dt><dd><p>Valid range for latitude.</p>
+</dd>
+<dt><strong>longitude_min, longitude_max</strong><span class="classifier">float</span></dt><dd><p>Valid range for longitude.</p>
+</dd>
+<dt><strong>air_temperature_min, air_temperature_max</strong><span class="classifier">float</span></dt><dd><p>Valid range for air temperature.</p>
+</dd>
+<dt><strong>internal_temperature_min, internal_temperature_max</strong><span class="classifier">float</span></dt><dd><p>Valid range for internal temperature.</p>
+</dd>
+<dt><strong>surface_temperature_min, surface_temperature_max</strong><span class="classifier">float</span></dt><dd><p>Valid range for surface temperature.</p>
+</dd>
+<dt><strong>air_pressure_min, air_pressure_max</strong><span class="classifier">float</span></dt><dd><p>Valid range for air pressure.</p>
+</dd>
+<dt><strong>platform_pitch_min, platform_pitch_max</strong><span class="classifier">float</span></dt><dd><p>Valid range for platform pitch.</p>
+</dd>
+<dt><strong>platform_roll_min, platform_roll_max</strong><span class="classifier">float</span></dt><dd><p>Valid range for platform roll.</p>
+</dd>
+<dt><strong>platform_orientation_min, platform_orientation_max</strong><span class="classifier">float</span></dt><dd><p>Valid range for platform orientation.</p>
+</dd>
+<dt><strong>voltage_battery_volts_min, voltage_battery_volts_max</strong><span class="classifier">float</span></dt><dd><p>Valid range for battery voltage.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p class="rubric">Methods</p>
+<table class="docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><strong>geo()</strong></p></td>
+<td><p>Add a geodataframe of track points and a track line to the track object.</p></td>
+</tr>
+<tr class="row-even"><td><p><strong>load_metadata(Meta)</strong></p></td>
+<td><p>Read the metadata record for this track and overwrite track properties.</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>load_model_specs(Specs)</strong></p></td>
+<td><p>Load the specific specifications for this beacon and write them to track properties.</p></td>
+</tr>
+<tr class="row-even"><td><p><strong>purge()</strong></p></td>
+<td><p>Purge bad data by assigning NaN to values that exceed the min/max range.</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>sort()</strong></p></td>
+<td><p>Order the track chronologically and remove redundant entries.</p></td>
+</tr>
+<tr class="row-even"><td><p><strong>speed()</strong></p></td>
+<td><p>Calculate displacement, speed, and course bearing between iceberg positions.</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>speed_limit(threshold=2.5)</strong></p></td>
+<td><p>Remove gross speeding violations from data.</p></td>
+</tr>
+<tr class="row-even"><td><p><strong>trim()</strong></p></td>
+<td><p>Trim a track from data_start/end with trim_start/end to yield a track from track_start to _end.</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>output(types=[‘csv’], path_output=’.’, file_name=None)</strong></p></td>
+<td><p>Output the track to a file in various formats.</p></td>
+</tr>
+<tr class="row-even"><td><p><strong>resample(timestep=’D’, agg_function=None, first=True)</strong></p></td>
+<td><p>Resample track to a given time step.</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>track_metadata(path_output=’.’, meta_export=None, verbose=False)</strong></p></td>
+<td><p>Make a dataframe and dictionary of the known track metadata for export.</p></td>
+</tr>
+<tr class="row-even"><td><p><strong>plot_map(path_output=’.’, interactive=False, dpi=300)</strong></p></td>
+<td><p>Plot a map of the track.</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>plot_trim(path_output=’.’, interactive=False, dpi=300)</strong></p></td>
+<td><p>Plot a trim diagnostic graph for the track.</p></td>
+</tr>
+<tr class="row-even"><td><p><strong>plot_dist(path_output=’.’, interactive=False, dpi=300)</strong></p></td>
+<td><p>Plot distributions along the track.</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>plot_time(path_output=’.’, interactive=False, dpi=300)</strong></p></td>
+<td><p>Plot a timeseries of the track.</p></td>
+</tr>
+</tbody>
+</table>
+<dl class="py method">
+<dt class="sig sig-object py" id="ibtd.Track.geo">
+<span class="sig-name descname"><span class="pre">geo</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/ibtd.html#Track.geo"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ibtd.Track.geo" title="Link to this definition">¶</a></dt>
+<dd><p>Add a geodataframe of track points and a track line to the track object.</p>
+<p>This method converts track data into a geospatial points (self.trackpoints) and
+linestring (self.trackline).</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ibtd.Track.load_metadata">
+<span class="sig-name descname"><span class="pre">load_metadata</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">Meta</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ibtd.html#Track.load_metadata"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ibtd.Track.load_metadata" title="Link to this definition">¶</a></dt>
+<dd><p>Read the metadata record for this track and overwrite track properties.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>Meta</strong><span class="classifier">Meta object</span></dt><dd><p>An instance of the class Meta representing a dataframe of metadata.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ibtd.Track.load_model_specs">
+<span class="sig-name descname"><span class="pre">load_model_specs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">Specs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ibtd.html#Track.load_model_specs"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ibtd.Track.load_model_specs" title="Link to this definition">¶</a></dt>
+<dd><p>Load the specific specifications for this beacon and write them to track properties.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>Specs</strong><span class="classifier">Specs class</span></dt><dd><p>Specifications for all beacon models</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>None.</dt><dd></dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ibtd.Track.output">
+<span class="sig-name descname"><span class="pre">output</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">types</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">['csv']</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">path_output</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'.'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ibtd.html#Track.output"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ibtd.Track.output" title="Link to this definition">¶</a></dt>
+<dd><p>Output the track to a file.</p>
+<p>Note the default is a csv (non-spatial) format.  Other options include track points
+(_pt) or track lines (_ln) in a gpkg or kml file [let’s move on from shapefiles, eh!].
+See types option below.</p>
+<p>The script checks for an existing file. If one is there, that will be logged.
+The file will not be overwritten and data export will fail.</p>
+<dl class="simple">
+<dt>Notes about data formats:</dt><dd><ul class="simple">
+<li><p>the csv file is the output format ‘of record’</p></li>
+<li><p>the gpkg _ln and _pt files are the recommended geospatial format. The _pt
+version contains and attribute table. Since the _pt data is a far larger
+file, it seemed like a good idea to keep _ln and _pt data separate.</p></li>
+<li><dl class="simple">
+<dt>the kml _ln and _pt files are meant for a quick look only (convienient to view):</dt><dd><ul>
+<li><p>there is no fancy symbology in the kml output.</p></li>
+<li><p>the kml_pt output is restricted to platform_id and the timestamp.</p></li>
+<li><p>sometimes the kml_pt file loads slowly.</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+</ul>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>types</strong><span class="classifier">list of output types to generate [‘csv’, ‘pt_kml’, ‘ln_kml’, ‘pt_gpkg’,’ln_gpkg’]. The default is ‘csv’.</span></dt><dd></dd>
+<dt><strong>path_output</strong><span class="classifier">str, optional</span></dt><dd><p>Path to put the output. The default is the current directory</p>
+</dd>
+<dt><strong>file_name</strong><span class="classifier">str, optional</span></dt><dd><p>filename of output. The default is None, which will autogenerate on the platform_id</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>None.</dt><dd></dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ibtd.Track.plot_dist">
+<span class="sig-name descname"><span class="pre">plot_dist</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path_output</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'.'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interactive</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dpi</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">300</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ibtd.html#Track.plot_dist"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ibtd.Track.plot_dist" title="Link to this definition">¶</a></dt>
+<dd><p>Plot distributions along the track.</p>
+<p>See track_fig.py for more details.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>path_output</strong><span class="classifier">str, optional</span></dt><dd><p>Path to save output. The default is the current directory.</p>
+</dd>
+<dt><strong>dpi</strong><span class="classifier">int, optional</span></dt><dd><p>Resolution of the graph in dots per inch. The default is 300.</p>
+</dd>
+<dt><strong>interactive: bool</strong></dt><dd><p>Create an interactive map that can be panned and zoomed.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>None.</dt><dd></dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ibtd.Track.plot_map">
+<span class="sig-name descname"><span class="pre">plot_map</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path_output</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'.'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interactive</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dpi</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">300</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ibtd.html#Track.plot_map"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ibtd.Track.plot_map" title="Link to this definition">¶</a></dt>
+<dd><p>Plot a map of the track.</p>
+<p>See track_fig.py for more details.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>path_output</strong><span class="classifier">str, optional</span></dt><dd><p>Path to save output. The default is the current directory.</p>
+</dd>
+<dt><strong>dpi</strong><span class="classifier">int, optional</span></dt><dd><p>Resolution of the graph in dots per inch. The default is 300.</p>
+</dd>
+<dt><strong>interactive: bool</strong></dt><dd><p>Create an interactive map that can be panned and zoomed.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>None.</dt><dd></dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ibtd.Track.plot_time">
+<span class="sig-name descname"><span class="pre">plot_time</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path_output</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'.'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interactive</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dpi</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">300</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ibtd.html#Track.plot_time"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ibtd.Track.plot_time" title="Link to this definition">¶</a></dt>
+<dd><p>Plot a timeseries of the track.</p>
+<p>See track_fig.py for more details.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>path_output</strong><span class="classifier">str, optional</span></dt><dd><p>Path to save output. The default is the current directory.</p>
+</dd>
+<dt><strong>dpi</strong><span class="classifier">int, optional</span></dt><dd><p>Resolution of the graph in dots per inch. The default is 300.</p>
+</dd>
+<dt><strong>interactive: bool</strong></dt><dd><p>Create an interactive map that can be panned and zoomed.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>None.</dt><dd></dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ibtd.Track.plot_trim">
+<span class="sig-name descname"><span class="pre">plot_trim</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path_output</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'.'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interactive</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dpi</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">300</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ibtd.html#Track.plot_trim"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ibtd.Track.plot_trim" title="Link to this definition">¶</a></dt>
+<dd><p>Plot a trim diagnostic graph for the track.</p>
+<p>See track_fig.py for more details.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>path_output</strong><span class="classifier">str, optional</span></dt><dd><p>Path to save output. The default is the current directory.</p>
+</dd>
+<dt><strong>dpi</strong><span class="classifier">int, optional</span></dt><dd><p>Resolution of the graph in dots per inch. The default is 300.</p>
+</dd>
+<dt><strong>interactive: bool</strong></dt><dd><p>Create an interactive map that can be panned and zoomed.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>None.</dt><dd></dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ibtd.Track.purge">
+<span class="sig-name descname"><span class="pre">purge</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/ibtd.html#Track.purge"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ibtd.Track.purge" title="Link to this definition">¶</a></dt>
+<dd><p>Purge bad data by assigning NaN to values that exceed the min/max range.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ibtd.Track.refresh_stats">
+<span class="sig-name descname"><span class="pre">refresh_stats</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">speed</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ibtd.html#Track.refresh_stats"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ibtd.Track.refresh_stats" title="Link to this definition">¶</a></dt>
+<dd><p>Refresh track limits, stats, speed calcs and geodata.</p>
+<p>Do this after any changes in the dataframe. If you are running this after the speed
+function set speed=False or it will loop forever.</p>
+<ol class="arabic simple">
+<li><p>Ensure track_start and track_end represent the current range of valid track data.</p></li>
+</ol>
+<p>Also, in theory the trim_start should not be &lt;&lt; data_start and the trim_end should
+not be &gt;&gt; data_end.  If that is so, warn about this in the log.</p>
+<p>This could be due to an operator error (trim value for the wrong track for example)
+But this does not necessarily mean there is an issue! This can happen when the
+beacon is deployed but not activated or when data at the start or end of the
+track is deemed non-valid by various purging/filtering functions.</p>
+<ol class="arabic simple" start="2">
+<li><dl class="simple">
+<dt>Rerun the speed method which calculates the speed_wrt_ground, displacement and course</dt><dd><p>between positions.</p>
+</dd>
+</dl>
+</li>
+<li><p>Recreate the geospatial tracklines and trackpoints for the track.</p></li>
+<li><dl class="simple">
+<dt>Calculate track stats, whcih includes the observations, duration and distance travelled</dt><dd><p>for the track, as well as the starting and ending latitude and longitude.</p>
+</dd>
+</dl>
+</li>
+</ol>
+<p>Be sure to run this after all purging/filtering steps after sorting the data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>speed</strong><span class="classifier">bool, optional</span></dt><dd><p>If true refresh_stats will recalculate speed. The default is True.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>None.</dt><dd></dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ibtd.Track.resample">
+<span class="sig-name descname"><span class="pre">resample</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">timestep</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'D'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">agg_function</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">first</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ibtd.html#Track.resample"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ibtd.Track.resample" title="Link to this definition">¶</a></dt>
+<dd><p>Resample track to a given time step.</p>
+<p>Timestep can be D for daily or h for hourly or multiples of D or h (eg ‘7D’, ‘12h’)
+After resampling other track properties will be refreshed.
+Other agg_fuctions might be wanted (max?, min?) but these are not implemented.
+One day maybe there will be interpolations?</p>
+<p>Since the track data and properies will be overwritten, it is a good idea to make
+a copy first:
+- track_6h = copy.deepcopy(track)
+- track_6h.resample(timestep=”6h”)</p>
+<p>Note this method has not been thoroughly tested!</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>timestep</strong><span class="classifier">str, optional</span></dt><dd><p>Give the code for the timestep to sample to. The default is “D”. See above.</p>
+</dd>
+<dt><strong>agg_function</strong><span class="classifier">str, optional</span></dt><dd><p>Aggregation function: median, mean, None. The default is None.</p>
+</dd>
+<dt><strong>first</strong><span class="classifier">bool, optional</span></dt><dd><dl class="simple">
+<dt>If agg_fuction is none, or for columns that cannot be aggregated,</dt><dd><p>take first (True) or last (False) value for the time period. The default
+is True.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>None.</dt><dd></dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ibtd.Track.sort">
+<span class="sig-name descname"><span class="pre">sort</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/ibtd.html#Track.sort"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ibtd.Track.sort" title="Link to this definition">¶</a></dt>
+<dd><p>Order the track chronologically and remove redundant entries.</p>
+<p>Some data formats are ordered in reverse, whereas others can have duplicates.
+This function takes care of these issues.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ibtd.Track.speed">
+<span class="sig-name descname"><span class="pre">speed</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/ibtd.html#Track.speed"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ibtd.Track.speed" title="Link to this definition">¶</a></dt>
+<dd><p>Calculate displacement, speed and course bearing between iceberg positions.</p>
+<ul class="simple">
+<li><p>platform_displacement : Distance from previous to current track position</p></li>
+<li><p>platform_speed_wrt_ground : Speed from previous to current track position</p></li>
+<li><p>platform_course :     Azimuth relative to true north from previous to current track position</p></li>
+</ul>
+<p>The speed is rounded to 3 decimal places and direction and distance are rounded
+to 0 decimal places which is plenty for sig figs. Since they are floating point values, they
+export like ##.0, implying a precision that does not exist.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ibtd.Track.speed_limit">
+<span class="sig-name descname"><span class="pre">speed_limit</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">threshold</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2.5</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ibtd.html#Track.speed_limit"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ibtd.Track.speed_limit" title="Link to this definition">¶</a></dt>
+<dd><p>Remove gross speeding violations from data.</p>
+<p>Note the intent here is to remove only the very worst rows from datasets.  It is
+a very crude way to cut down on <em>clearly wrong</em> position data.  Note high speeds are
+often due to inaccurate positions, but also inprecise positions over short periods
+of time. (eg., an Argos position 1-2 min apart may exceed a threshold even if
+precision is relatively good).</p>
+<p>The default value here is 2.5 m/s or 9 kph or 216 km/d (this is very conservative
+to avoid throwing away data.</p>
+<p>The algorithm removes the first point with the speed &gt; threshold and then
+recalculates the speed again for the track and reruns the filtering to remove the
+next point with speed &gt; threshold.</p>
+<p>This action is a good way to catch ‘flyers’ where random position errors cause a
+jump in speed away from the track and then, typically, the position then returns to
+along the original track.</p>
+<p>Note, speed represents the displacement/time _between_ 2 points, but is recorded
+in the same row as the second point (i.e., a row’s speed is the speed from the
+previous point up to the current point. Since the first row with speed &gt; threshold
+is removed, implicitly this assumes that the second point is invalid. This may
+not be true (point 1 or both point 1 and 2 might be at fault). Finding out what
+is going on is challenging.</p>
+<p>This scenario is a ‘track shift’ where the entire track shifts position and in the
+intervening time (between the new position and the old position) the speed was &gt;
+threshold.</p>
+<p>Track shifts can come in two forms:</p>
+<ol class="arabic simple">
+<li><dl class="simple">
+<dt>If the second point in the entire track has speed &gt; threshold, this could be due</dt><dd><p>to an invalid first point.</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>If there is a shift in the middle of the track, whereby the speed jumps &gt;</dt><dd><p>threshold but the next speed value is &lt; threshold.</p>
+</dd>
+</dl>
+</li>
+</ol>
+<p>In both cases, because the speed_limit function loops and is, by nature, greedy,
+a lot of potentially good data could be removed until the speed falls &lt; threshold.
+If either situation arises, a warning will be logged, but the row in question
+will still be removed.</p>
+<p>If the warning is repeated more than once in a row, the raw data should be investigated.
+Is the removal of data justified? Was the trimming done correctly?  For example,
+in an untrimmed track, this type of issue could be due to testing a beacon at
+an airport overnight, flying for 30 minutes and deploying it on an iceberg.
+Track shifts are not likely to arise naturally in the middle of a track.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>threshold</strong><span class="classifier">float, optional</span></dt><dd><p>A threshold, beyond which rows are removed (m/s). The default is 2.5.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ibtd.Track.track_metadata">
+<span class="sig-name descname"><span class="pre">track_metadata</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path_output</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'.'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">meta_export</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ibtd.html#Track.track_metadata"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ibtd.Track.track_metadata" title="Link to this definition">¶</a></dt>
+<dd><p>Make a dataframe and dictionary of the known track metadata for export.</p>
+<p>Put metadata into categories. The json is nested but the dataframe is not.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>path_output</strong><span class="classifier">str, optional</span></dt><dd><p>path where the output should be saved.  The default is the current directory.</p>
+</dd>
+<dt><strong>meta_export</strong><span class="classifier">str, optional</span></dt><dd><p>Specify ‘pandas’ or ‘json’ format or ‘both’. The default (None) does not export a file.</p>
+</dd>
+<dt><strong>verbose</strong><span class="classifier">Bool</span></dt><dd><p>If true, return/export all the metadata, otherwise only the most useful.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>track_meta</strong><span class="classifier">pandas dataframe</span></dt><dd><p>available track metadata.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ibtd.Track.trim">
+<span class="sig-name descname"><span class="pre">trim</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/ibtd.html#Track.trim"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ibtd.Track.trim" title="Link to this definition">¶</a></dt>
+<dd><p>Trim a track from data_start/end with trim_start/end to yield a track from track_start to _end.</p>
+<p>The trim_start and trim_end track properties are used to determine where to trim.
+These need to be provided intentionally (as an argument or read from track metadata)
+during the initialization of the track or they will be set to data_start and data_end</p>
+<p>Note that you will want to AFTER running the speed and speed limit, since the
+track_start and track_end will automatically be moved if bad data are found
+at the start and end of the track.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt>None.</dt><dd></dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="ibtd.json_serialize">
+<span class="sig-prename descclassname"><span class="pre">ibtd.</span></span><span class="sig-name descname"><span class="pre">json_serialize</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ibtd.html#json_serialize"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ibtd.json_serialize" title="Link to this definition">¶</a></dt>
+<dd><p>Check to see if the value is a type that json can’t serialize and, if so, convert it.</p>
+<p>In practice that means converting datetime to string and numpy boolean to regular T/F</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>value</strong><span class="classifier">Any variable</span></dt><dd><p>A variable.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>value</dt><dd><p>a value in a format json can serialize</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="ibtd.nolog">
+<span class="sig-prename descclassname"><span class="pre">ibtd.</span></span><span class="sig-name descname"><span class="pre">nolog</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/ibtd.html#nolog"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ibtd.nolog" title="Link to this definition">¶</a></dt>
+<dd><p>Create a logger instance that doesn’t do anything.</p>
+<p>Used to allow logging or not in the code below</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt>NoOpLogger</dt><dd><p>A named tuple that mimics a log instance.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
 </section>
-<section id="track-fig-py">
-<h2>track_fig.py<a class="headerlink" href="#track-fig-py" title="Link to this heading">¶</a></h2>
+<section id="module-track_fig">
+<span id="track-fig-py"></span><h2>track_fig.py<a class="headerlink" href="#module-track_fig" title="Link to this heading">¶</a></h2>
+<p>track_fig.py</p>
+<p>Functions to produce visualizations of beacon data after it
+has been ingested, purgred/filtered, and standardized.</p>
+<dl class="simple">
+<dt>Visualizations include:</dt><dd><p>map - a map of the iceberg track
+time - variables over time - temperature, displacement and velocity
+dist - statistical distributions - polar plot of direction, histogram of speed
+trim - time series of data that can be used for checking if beacon is still on target</p>
+</dd>
+</dl>
+<p>Author: Derek Mueller, July 2024-April 2025, modifying code from Adam Garbo from 2021,
+Water and Ice Research Laboratory (WIRL), Carleton University</p>
+<p>Copyright (C) 2025 WIRL</p>
+<blockquote>
+<div><p>This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.</p>
+<p>This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.</p>
+<p>You should have received a copy of the GNU General Public License
+along with this program.  If not, see &lt;<a class="reference external" href="https://www.gnu.org/licenses/">https://www.gnu.org/licenses/</a>&gt;.</p>
+</div></blockquote>
+<dl class="py function">
+<dt class="sig sig-object py" id="track_fig.nolog">
+<span class="sig-prename descclassname"><span class="pre">track_fig.</span></span><span class="sig-name descname"><span class="pre">nolog</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/track_fig.html#nolog"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#track_fig.nolog" title="Link to this definition">¶</a></dt>
+<dd><p>Create a logger instance that doesn’t do anything.</p>
+<p>Used to allow logging or not in the code below</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt>NoOpLogger</dt><dd><p>A named tuple that mimics a log instance.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="track_fig.plot_dist">
+<span class="sig-prename descclassname"><span class="pre">track_fig.</span></span><span class="sig-name descname"><span class="pre">plot_dist</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">track</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">path_output</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'.'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dpi</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">300</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interactive</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/track_fig.html#plot_dist"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#track_fig.plot_dist" title="Link to this definition">¶</a></dt>
+<dd><p>Create a graph of the track’s statistical distributions.</p>
+<p>This figure has a histogram for iceberg speed on the left and a polar plot of velocity
+on the right.  The histogram has bars that are 0.05 m/s wide (0.18 km/h). It goes up
+to 2.5 m/s (9 km/h) consistently so that tracks can be compared.  If there are
+positions that exceed the uppermost bin, this is written on the graph.  The cumulative
+histogram is plotted in blue.  This is also known as an exceedence plot showing the
+percentage of time the iceberg speed is at or below a given level.</p>
+<p>The polar plot shows speed and direction of the iceberg.  This plot scales with data
+so cannot be intercompared as easily.</p>
+<p>This figure can be produced as a png or it can be viewed interactively.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>track</strong><span class="classifier">track object</span></dt><dd><p>Standardized beacon track object.</p>
+</dd>
+<dt><strong>path_output</strong><span class="classifier">str, optional</span></dt><dd><p>Path to save output. The default is “.”.</p>
+</dd>
+<dt><strong>dpi</strong><span class="classifier">int, optional</span></dt><dd><p>Resolution of the graph in dots per inch. The default is 300.</p>
+</dd>
+<dt><strong>interactive</strong><span class="classifier">bool, optional</span></dt><dd><p>If true, the plot can be viewed interactively.</p>
+</dd>
+<dt><strong>log</strong><span class="classifier">logger</span></dt><dd><p>A logger instance.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>None.</dt><dd></dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="track_fig.plot_map">
+<span class="sig-prename descclassname"><span class="pre">track_fig.</span></span><span class="sig-name descname"><span class="pre">plot_map</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">track</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">path_output</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'.'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dpi</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">300</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interactive</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/track_fig.html#plot_map"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#track_fig.plot_map" title="Link to this definition">¶</a></dt>
+<dd><p>Create a map of the iceberg track.</p>
+<p>The map is in orthographic projection, zoomed in to the track extent. A red star
+indicates the start of the track.  Track points are plotted in blue with a thin grey
+line underneath.</p>
+<p>The map uses a generic coastline. Some track points are on land apparently but this
+is due to the resolution of the map (and the retreat of glaciers, sadly).</p>
+<p>This plot can be produced as a png or it can be viewed interactively.</p>
+<p>If the track has been trimmed, there will be a green dot at the trim_start and an
+orange dot at trim_end.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>track</strong><span class="classifier">track object</span></dt><dd><p>Standardized beacon track object.</p>
+</dd>
+<dt><strong>path_output</strong><span class="classifier">str, optional</span></dt><dd><p>Path to save output. The default is “.”.</p>
+</dd>
+<dt><strong>dpi</strong><span class="classifier">int, optional</span></dt><dd><p>Resolution of the graph in dots per inch. The default is 300.</p>
+</dd>
+<dt><strong>interactive</strong><span class="classifier">bool, optional</span></dt><dd><p>If true, the plot can be viewed interactively.</p>
+</dd>
+<dt><strong>log</strong><span class="classifier">logger</span></dt><dd><p>A logger instance.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>None.</dt><dd></dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="track_fig.plot_time">
+<span class="sig-prename descclassname"><span class="pre">track_fig.</span></span><span class="sig-name descname"><span class="pre">plot_time</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">track</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">path_output</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'.'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dpi</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">300</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interactive</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/track_fig.html#plot_time"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#track_fig.plot_time" title="Link to this definition">¶</a></dt>
+<dd><p>Create a graph of variables with respect to time.</p>
+<dl class="simple">
+<dt>There are 3 panels:</dt><dd><p>Temperature (of the air, surface or internal, depending on what is available)
+Distance (scatter plot)
+Speed and direction (quiver)</p>
+</dd>
+</dl>
+<p>All graphs scale with the data.  The temperature plot is straightforward.  The
+distance plot shows only up to a certain percentile of the data since this variable
+is often highly skewed.  The quiver plot is very challenging to scale for all the
+various tracks. It is at a level that works most of the time.</p>
+<p>This plot can be produced as a png or it can be viewed interactively.</p>
+<p>If the track has been trimmed, there will be a green dot at the trim_start and an
+orange dot at trim_end.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>track</strong><span class="classifier">track object</span></dt><dd><p>Standardized beacon track object.</p>
+</dd>
+<dt><strong>path_output</strong><span class="classifier">str, optional</span></dt><dd><p>Path to save output. The default is “.”.</p>
+</dd>
+<dt><strong>dpi</strong><span class="classifier">int, optional</span></dt><dd><p>Resolution of the graph in dots per inch. The default is 300.</p>
+</dd>
+<dt><strong>interactive</strong><span class="classifier">bool, optional</span></dt><dd><p>If true, the plot can be viewed interactively.</p>
+</dd>
+<dt><strong>log</strong><span class="classifier">logger</span></dt><dd><p>A logger instance.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>None.</dt><dd></dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="track_fig.plot_trim">
+<span class="sig-prename descclassname"><span class="pre">track_fig.</span></span><span class="sig-name descname"><span class="pre">plot_trim</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">track</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">path_output</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'.'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dpi</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">300</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interactive</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/track_fig.html#plot_trim"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#track_fig.plot_trim" title="Link to this definition">¶</a></dt>
+<dd><p>Create a timeseries graph of data from the beacon to assist in finding trim_start and trim_end.</p>
+<dl class="simple">
+<dt>There are 3 panels:</dt><dd><p>1) Temperature (of the air, surface or internal, depending on what is available), the
+air pressure, if available.</p>
+<ol class="arabic simple" start="2">
+<li><p>5 and 3 day rolling mean and standard deviation of temperature.</p></li>
+<li><p>Battery voltage along with pitch and roll, if available.</p></li>
+</ol>
+</dd>
+<dt>When beacons fall off their target into the water, the standard deviation of temperature should</dt><dd><p>decrease. Temperature should approach water temperature at the same time
+(typically decreasing).  The rolling average and std are optimized for
+determining trim_end, not trim_start (the window is left-aligned). When beacons
+are deployed, they may still be acclimatizing to ambient conditions. In this
+scenario, the rolling mean and std are less helpful because their windows are
+positioned on the left to capture a sudden change as it occurs.</p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>track</strong><span class="classifier">track object</span></dt><dd><p>Standardized beacon track object.</p>
+</dd>
+<dt><strong>path_output</strong><span class="classifier">str, optional</span></dt><dd><p>Path to save output. The default is “.”.</p>
+</dd>
+<dt><strong>dpi</strong><span class="classifier">int, optional</span></dt><dd><p>Resolution of the graph in dots per inch. The default is 300.</p>
+</dd>
+<dt><strong>interactive</strong><span class="classifier">bool, optional</span></dt><dd><p>If true, the plot can be viewed interactively.</p>
+</dd>
+<dt><strong>log</strong><span class="classifier">logger</span></dt><dd><p>A logger instance.</p>
+</dd>
+<dt><strong>This plot can be produced as a png or it can be viewed interactively.</strong></dt><dd></dd>
+<dt><strong>If the track has not been trimmed, there will be a green vertical line at the</strong></dt><dd></dd>
+<dt><strong>trim_start and an orange vertical line at trim_end.</strong></dt><dd></dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>None.</dt><dd></dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
 </section>
-<section id="track-readers-py">
-<h2>track_readers.py<a class="headerlink" href="#track-readers-py" title="Link to this heading">¶</a></h2>
+<section id="module-track_readers">
+<span id="track-readers-py"></span><h2>track_readers.py<a class="headerlink" href="#module-track_readers" title="Link to this heading">¶</a></h2>
+<p>track_readers.py.</p>
+<p>A collection of functions that convert from various beacon data formats to
+a standardized format.</p>
+<p>Note that the formats ingested by these functions (known as the raw data in the IBTD)
+are determined by the data owner/provider and do not necessarily represent the format of
+the original communication from the device itself.</p>
+<p>Each function takes the raw data file path/name and puts it into the standardized format
+At a minimum, the timestamp, latitude and longitude are required.  Other columns are
+optional.</p>
+<dl class="simple">
+<dt>A few variable names are somewhat terse, so defined here:</dt><dd><p>sdf - standard data frame
+rdf - raw data frame</p>
+</dd>
+</dl>
+<p>Created December 2022 by Adam Garbo based on R scripts from Derek Mueller, Anna Crawford
+and Jill Rajewicz at the Water and Ice Research Laboratory (WIRL), Carleton University
+Rewritten June-July 2024 by Derek Mueller, and further modified to Apr 2025</p>
+<p>Copyright (C) 2025 WIRL</p>
+<blockquote>
+<div><p>This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.</p>
+<p>This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.</p>
+<p>You should have received a copy of the GNU General Public License
+along with this program.  If not, see &lt;<a class="reference external" href="https://www.gnu.org/licenses/">https://www.gnu.org/licenses/</a>&gt;.</p>
+</div></blockquote>
+<dl class="py function">
+<dt class="sig sig-object py" id="track_readers.bio">
+<span class="sig-prename descclassname"><span class="pre">track_readers.</span></span><span class="sig-name descname"><span class="pre">bio</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">raw_data_file</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/track_readers.html#bio"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#track_readers.bio" title="Link to this definition">¶</a></dt>
+<dd><p>Convert raw data from BIO Icetracker2 format to standardized dataframe.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>raw_data_file</strong><span class="classifier">string</span></dt><dd><p>Path to raw data CSV file.</p>
+</dd>
+<dt><strong>log</strong><span class="classifier">logger</span></dt><dd><p>A logger instance.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>sdf</strong><span class="classifier">Pandas DataFrame</span></dt><dd><p>Standardized Pandas dataframe ready for processing.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>Raw Data Columns:</p>
+<ul class="simple">
+<li><p>BID</p></li>
+<li><p>VOLTAGE</p></li>
+<li><p>GPS_DATE (08-09-15 13:00:00.000000000 or 2011-03-20 13:00:00.0)</p></li>
+<li><p>LATITUDE</p></li>
+<li><p>LONGITUDE</p></li>
+</ul>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="track_readers.calib_argos">
+<span class="sig-prename descclassname"><span class="pre">track_readers.</span></span><span class="sig-name descname"><span class="pre">calib_argos</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">raw_data_file</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/track_readers.html#calib_argos"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#track_readers.calib_argos" title="Link to this definition">¶</a></dt>
+<dd><p>Convert raw data from CALIB ARGOS format to standardized dataframe.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>raw_data_file</strong><span class="classifier">string</span></dt><dd><p>Path to raw data CSV file.</p>
+</dd>
+<dt><strong>log</strong><span class="classifier">logger</span></dt><dd><p>A logger instance.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>sdf</strong><span class="classifier">Pandas DataFrame</span></dt><dd><p>Standardized Pandas dataframe ready for processing.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>A challenging format to read!</p>
+<dl class="simple">
+<dt>There are four types of lines -</dt><dd><p>blank line ‘n’
+obs1 = begining of the obs - starts with id
+obs2 = end of the obs - starts with ‘(’
+a comment  - none of the above</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="track_readers.canatec">
+<span class="sig-prename descclassname"><span class="pre">track_readers.</span></span><span class="sig-name descname"><span class="pre">canatec</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">raw_data_file</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/track_readers.html#canatec"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#track_readers.canatec" title="Link to this definition">¶</a></dt>
+<dd><p>Convert raw data from Canatec format to standardized dataframe.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>raw_data_file</strong><span class="classifier">string</span></dt><dd><p>Path to raw data CSV file.</p>
+</dd>
+<dt><strong>log</strong><span class="classifier">logger</span></dt><dd><p>A logger instance.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>sdf</strong><span class="classifier">Pandas DataFrame</span></dt><dd><p>Standardized Pandas dataframe ready for processing.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>Raw Data Columns:</p>
+<ul class="simple">
+<li><p>ReadingDate</p></li>
+<li><p>Latitude</p></li>
+<li><p>Longitude</p></li>
+<li><p>Elevation</p></li>
+<li><p>Heading</p></li>
+<li><p>Speed</p></li>
+<li><p>Fix</p></li>
+<li><p>Satellites</p></li>
+<li><p>HDOP</p></li>
+<li><p>VDOP</p></li>
+<li><p>VerticalVelocity</p></li>
+<li><p>Pressure</p></li>
+<li><p>TempExternal</p></li>
+<li><p>TempInternal</p></li>
+<li><p>BeaconAlarmState</p></li>
+<li><p>BatteryVoltage</p></li>
+<li><p>ModemVoltage</p></li>
+<li><p>WindSpeed</p></li>
+<li><p>WindDirection</p></li>
+</ul>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="track_readers.ceos">
+<span class="sig-prename descclassname"><span class="pre">track_readers.</span></span><span class="sig-name descname"><span class="pre">ceos</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">raw_data_file</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/track_readers.html#ceos"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#track_readers.ceos" title="Link to this definition">¶</a></dt>
+<dd><p>Convert raw data from CEOS format to standardized dataframe.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>raw_data_file</strong><span class="classifier">string</span></dt><dd><p>Path to raw data CSV file.</p>
+</dd>
+<dt><strong>log</strong><span class="classifier">logger</span></dt><dd><p>A logger instance.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>sdf</strong><span class="classifier">Pandas DataFrame</span></dt><dd><p>Standardized Pandas dataframe ready for processing.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>Raw Data Columns:
+- imei
+- unknown
+- unknown
+- date
+- time
+- lat
+- hemi
+- long
+- hemi
+- unknown
+- unknown
+- unknown
+- unknown</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="track_readers.create_sdf">
+<span class="sig-prename descclassname"><span class="pre">track_readers.</span></span><span class="sig-name descname"><span class="pre">create_sdf</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nrows</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/track_readers.html#create_sdf"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#track_readers.create_sdf" title="Link to this definition">¶</a></dt>
+<dd><p>Create an empty dataframe in the standardized format filled with NAs.</p>
+<p>Also the place to (re)define the standardized format if needed</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>nrows</strong><span class="classifier">int</span></dt><dd><p>Number of rows to make.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>sdf</strong><span class="classifier">Pandas Dataframe</span></dt><dd><p>Empty dataframe in standard format</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="track_readers.cryologger">
+<span class="sig-prename descclassname"><span class="pre">track_readers.</span></span><span class="sig-name descname"><span class="pre">cryologger</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">raw_data_file</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/track_readers.html#cryologger"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#track_readers.cryologger" title="Link to this definition">¶</a></dt>
+<dd><p>Convert raw data from Cryologger format to standardized dataframe.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>raw_data_file</strong><span class="classifier">string</span></dt><dd><p>Path to raw data CSV file.</p>
+</dd>
+<dt><strong>log</strong><span class="classifier">logger</span></dt><dd><p>A logger instance.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>sdf</strong><span class="classifier">Pandas DataFrame</span></dt><dd><p>Standardized Pandas dataframe ready for processing.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>See Cryologger_ITB in beacon model info for more details</p>
+<p>Raw Data columns (case sensitive):</p>
+<ul class="simple">
+<li><p>imei</p></li>
+<li><p>momsn</p></li>
+<li><p>transmit_time</p></li>
+<li><p>iridium_latitude</p></li>
+<li><p>iridium_longitude</p></li>
+<li><p>iridium_cep</p></li>
+<li><p>data</p></li>
+<li><p>unixtime</p></li>
+<li><p>temperature_int</p></li>
+<li><p>humidity_int</p></li>
+<li><p>pressure_int</p></li>
+<li><p>platform_pitch</p></li>
+<li><p>roll</p></li>
+<li><p>heading</p></li>
+<li><p>latitude</p></li>
+<li><p>longitude</p></li>
+<li><p>satellites</p></li>
+<li><p>hdop</p></li>
+<li><p>voltage</p></li>
+<li><p>transmitDuration</p></li>
+<li><p>messageCounter</p></li>
+</ul>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="track_readers.dms2dd">
+<span class="sig-prename descclassname"><span class="pre">track_readers.</span></span><span class="sig-name descname"><span class="pre">dms2dd</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">string</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/track_readers.html#dms2dd"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#track_readers.dms2dd" title="Link to this definition">¶</a></dt>
+<dd><p>Convert degrees, minutes and seconds from a string to dd.dddd as float.</p>
+<p>Assumes that the format is deg min sec or deg min, or deg.  Never deg sec, etc.
+Also assumes there will be no negative min or sec.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>string</strong><span class="classifier">str</span></dt><dd><p>A string containing deg, min, seconds like 71° 20’ 23.20800”</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>dd</strong><span class="classifier">float</span></dt><dd><p>decimal degree.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="track_readers.globalstar">
+<span class="sig-prename descclassname"><span class="pre">track_readers.</span></span><span class="sig-name descname"><span class="pre">globalstar</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">raw_data_file</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/track_readers.html#globalstar"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#track_readers.globalstar" title="Link to this definition">¶</a></dt>
+<dd><p>Convert raw data from GlobalStar format to standardized dataframe.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>raw_data_file</strong><span class="classifier">string</span></dt><dd><p>Path to raw data CSV file.</p>
+</dd>
+<dt><strong>log</strong><span class="classifier">logger</span></dt><dd><p>A logger instance.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>sdf</strong><span class="classifier">Pandas DataFrame</span></dt><dd><p>Standardized Pandas dataframe ready for processing.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>Raw Data Columns:  (from CCORE)</p>
+<ul class="simple">
+<li><p>INDEX</p></li>
+<li><p>BERG_ID</p></li>
+<li><p>DT_TAG_POS_UTC (2019-04-29T23:03UTC)</p></li>
+<li><p>LAT_TAG</p></li>
+<li><p>LON_TAG</p></li>
+</ul>
+<p>OR  (from IIP):</p>
+<ul class="simple">
+<li><p>INDEX</p></li>
+<li><p>ID</p></li>
+<li><p>DATETIME (2019-04-29T23:03UTC)</p></li>
+<li><p>LATITUDE</p></li>
+<li><p>LONGITUDE</p></li>
+</ul>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="track_readers.iabp">
+<span class="sig-prename descclassname"><span class="pre">track_readers.</span></span><span class="sig-name descname"><span class="pre">iabp</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">raw_data_file</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/track_readers.html#iabp"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#track_readers.iabp" title="Link to this definition">¶</a></dt>
+<dd><p>Convert raw data from IABP website format to standardized dataframe.</p>
+<p>Note: Many different beacon types report to the IABP repository</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>raw_data_file</strong><span class="classifier">string</span></dt><dd><p>Path to raw data CSV file.</p>
+</dd>
+<dt><strong>log</strong><span class="classifier">logger</span></dt><dd><p>A logger instance.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>sdf</strong><span class="classifier">Pandas DataFrame</span></dt><dd><p>Standardized Pandas dataframe ready for processing.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>Raw Data columns:</p>
+<ul class="simple">
+<li><p>BuoyID</p></li>
+<li><p>Date</p></li>
+<li><p>Year</p></li>
+<li><p>Hour</p></li>
+<li><p>Min</p></li>
+<li><p>DOY</p></li>
+<li><p>POS_DOY</p></li>
+<li><p>Lat</p></li>
+<li><p>Lon</p></li>
+<li><p>BP</p></li>
+<li><p>Ta</p></li>
+<li><p>Ts</p></li>
+</ul>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="track_readers.metocean">
+<span class="sig-prename descclassname"><span class="pre">track_readers.</span></span><span class="sig-name descname"><span class="pre">metocean</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">raw_data_file</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/track_readers.html#metocean"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#track_readers.metocean" title="Link to this definition">¶</a></dt>
+<dd><p>Convert raw data from Metocean SVP/iCALIB format to standardized dataframe.</p>
+<p>Some examples are:</p>
+<ul class="simple">
+<li><p>iCALIB beacons</p></li>
+<li><p>SVP-I-BXGS-LP beacons have BP, GPS, and SST</p></li>
+<li><p>SVP-I-XXGS-LP beacons have GPS and SST, no BP</p></li>
+<li><p>SVP-I-BXGSA-L-AD beacons have BP, GPS, SST, AT, lithium battery and are
+designed for air deployment in Arctic regions</p></li>
+</ul>
+<p>Note that variable names are slightly different so lots of if/elif or finding columns
+from a list of options or regex.</p>
+<p>Watch out for data vs transmission timestamps.  If in doubt, build them from
+year, month, day, hour, minute.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>raw_data_file</strong><span class="classifier">string</span></dt><dd><p>Path to raw data CSV file.</p>
+</dd>
+<dt><strong>log</strong><span class="classifier">logger</span></dt><dd><p>A logger instance.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>sdf</strong><span class="classifier">Pandas DataFrame</span></dt><dd><p>Standardized Pandas dataframe ready for processing.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>Raw Data Columns:</p>
+<ul class="simple">
+<li><p>Asset Name / Asset.Name</p></li>
+<li><p>Asset Id  / Asset.Id / Modem ID</p></li>
+<li><p>Data Date (UTC) / DataDate_UTC  / Date(GMT)</p></li>
+<li><p>Received Date (UTC) / Date (GMT)</p></li>
+<li><p>LATITUDE / LAT  # this is in dd.dddd format / GPS LATITUDE (DEGREES) # dd mm.mmmmmm</p></li>
+<li><p>LONGITUDE / LON # this is in dd.dddd format / GPS LONGITUDE (DEGREES) # dd mm.mmmmmm</p></li>
+<li><p>FMTID / FORMAT ID</p></li>
+<li><p>YEAR</p></li>
+<li><p>MONTH</p></li>
+<li><p>DAY / DAY (day)</p></li>
+<li><p>HOUR / HOUR (hr)</p></li>
+<li><p>JHOUR</p></li>
+<li><p>GPSFIXJHOUR</p></li>
+<li><p>MIN  / MINUTE (min)</p></li>
+<li><p>SST  / Sea Surface Temperature (�C)</p></li>
+<li><p>BP  / Barometric Pressure (mbar) / Ref Pressure</p></li>
+<li><p>BPT / Barometric Pressure Tendency (mbar)</p></li>
+<li><p>AT</p></li>
+<li><p>VBAT / Battery Voltage (V)</p></li>
+<li><p>GPSDELAY / Time Since Last GPS fix (min) (up to 4095)</p></li>
+<li><p>SNR  / GPS reported Signal to Noise ratio (dB)</p></li>
+<li><p>TTFF / Time to First fix (s)</p></li>
+<li><p>SBDTIME  / Iridium Transmission Duration (s)</p></li>
+<li><p>Report Body / Report.Body / Hex Data</p></li>
+</ul>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="track_readers.navidatum">
+<span class="sig-prename descclassname"><span class="pre">track_readers.</span></span><span class="sig-name descname"><span class="pre">navidatum</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">raw_data_file</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/track_readers.html#navidatum"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#track_readers.navidatum" title="Link to this definition">¶</a></dt>
+<dd><p>Convert raw data from Skywave DMR800L format to standardized dataframe.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>raw_data_file</strong><span class="classifier">string</span></dt><dd><p>Path to raw data CSV file.</p>
+</dd>
+<dt><strong>log</strong><span class="classifier">logger</span></dt><dd><p>A logger instance.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>sdf</strong><span class="classifier">Pandas DataFrame</span></dt><dd><p>Standardized Pandas dataframe ready for processing.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>Raw Data Columns:</p>
+<ul class="simple">
+<li><p>Date (02/08/2012 21:01)</p></li>
+<li><p>Latitude</p></li>
+<li><p>Longitude</p></li>
+</ul>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="track_readers.nolog">
+<span class="sig-prename descclassname"><span class="pre">track_readers.</span></span><span class="sig-name descname"><span class="pre">nolog</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/track_readers.html#nolog"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#track_readers.nolog" title="Link to this definition">¶</a></dt>
+<dd><p>Create a logger instance that doesn’t do anything.</p>
+<p>Used to allow logging or not in the code below</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt>NoOpLogger</dt><dd><p>A named tuple that mimics a log instance.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="track_readers.oceanetic">
+<span class="sig-prename descclassname"><span class="pre">track_readers.</span></span><span class="sig-name descname"><span class="pre">oceanetic</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">raw_data_file</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/track_readers.html#oceanetic"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#track_readers.oceanetic" title="Link to this definition">¶</a></dt>
+<dd><p>Convert raw data from Oceanetic format to standardized dataframe.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>raw_data_file</strong><span class="classifier">string</span></dt><dd><p>Path to raw data CSV file.</p>
+</dd>
+<dt><strong>log</strong><span class="classifier">logger</span></dt><dd><p>A logger instance.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>sdf</strong><span class="classifier">Pandas DataFrame</span></dt><dd><p>Standardized Pandas dataframe ready for processing.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>Raw Data Columns:</p>
+<ul class="simple">
+<li><p>beacon id</p></li>
+<li><p>yr</p></li>
+<li><p>mm</p></li>
+<li><p>dd</p></li>
+<li><p>hr</p></li>
+<li><p>lat</p></li>
+<li><p>long</p></li>
+</ul>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="track_readers.pathfinder_ccore">
+<span class="sig-prename descclassname"><span class="pre">track_readers.</span></span><span class="sig-name descname"><span class="pre">pathfinder_ccore</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">raw_data_file</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/track_readers.html#pathfinder_ccore"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#track_readers.pathfinder_ccore" title="Link to this definition">¶</a></dt>
+<dd><p>Convert raw data from Pathfinder C-CORE format to standardized dataframe.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>raw_data_file</strong><span class="classifier">string</span></dt><dd><p>Path to raw data CSV file.</p>
+</dd>
+<dt><strong>log</strong><span class="classifier">logger</span></dt><dd><p>A logger instance.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>sdf</strong><span class="classifier">Pandas DataFrame</span></dt><dd><p>Standardized Pandas dataframe ready for processing.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>Raw Data Columns (case sensitive):
+- Buoy Name
+- Time (2011 Jun 18 18:20:02 UTC)
+- Latitude
+- Longitude
+- Temperature
+- Drogue Depth (m)</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="track_readers.rockstar">
+<span class="sig-prename descclassname"><span class="pre">track_readers.</span></span><span class="sig-name descname"><span class="pre">rockstar</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">raw_data_file</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/track_readers.html#rockstar"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#track_readers.rockstar" title="Link to this definition">¶</a></dt>
+<dd><p>Convert raw data from Rockstar/Yellowbrick format to standardized dataframe.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>raw_data_file</strong><span class="classifier">string</span></dt><dd><p>Path to raw data CSV file.</p>
+</dd>
+<dt><strong>log</strong><span class="classifier">logger</span></dt><dd><p>A logger instance.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>sdf</strong><span class="classifier">Pandas DataFrame</span></dt><dd><p>Standardized Pandas dataframe ready for processing.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>Raw Data Columns:</p>
+<ul class="simple">
+<li><p>ID</p></li>
+<li><p>GPS Time (UTC)  (dd-mm-yyyy hh:mm:ss)</p></li>
+<li><p>GPS Time (UTC)  (dd/mm/yyyy hh:mm:ss)</p></li>
+<li><p>Latitude</p></li>
+<li><p>Longitude</p></li>
+<li><p>GPS SOG</p></li>
+<li><p>SOG</p></li>
+<li><p>COG</p></li>
+<li><p>GPS COG</p></li>
+<li><p>Altitude</p></li>
+<li><p>Ext. Power</p></li>
+<li><p>Battery</p></li>
+<li><p>Source</p></li>
+<li><p>CEP</p></li>
+<li><p>Temperature</p></li>
+<li><p>Reason</p></li>
+<li><p>GPS PDOP</p></li>
+<li><p>Nav Mode</p></li>
+</ul>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="track_readers.solara">
+<span class="sig-prename descclassname"><span class="pre">track_readers.</span></span><span class="sig-name descname"><span class="pre">solara</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">raw_data_file</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/track_readers.html#solara"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#track_readers.solara" title="Link to this definition">¶</a></dt>
+<dd><p>Convert raw data from Solara format to standardized dataframe.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>raw_data_file</strong><span class="classifier">string</span></dt><dd><p>Path to raw data CSV file.</p>
+</dd>
+<dt><strong>log</strong><span class="classifier">logger</span></dt><dd><p>A logger instance.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>sdf</strong><span class="classifier">Pandas DataFrame</span></dt><dd><p>Standardized Pandas dataframe ready for processing.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>Raw Data Columns:</p>
+<ul class="simple">
+<li><p>serial</p></li>
+<li><p>alias</p></li>
+<li><p>lat</p></li>
+<li><p>long</p></li>
+<li><p>timestamp</p>
+<ul>
+<li><p>format_1 = “%Y-%m-%d %H:%M:%S”</p></li>
+<li><p>format_2 = “%d/%m/%Y %H:%M:%S”</p></li>
+</ul>
+</li>
+</ul>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="track_readers.standard">
+<span class="sig-prename descclassname"><span class="pre">track_readers.</span></span><span class="sig-name descname"><span class="pre">standard</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">raw_data_file</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/track_readers.html#standard"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#track_readers.standard" title="Link to this definition">¶</a></dt>
+<dd><p>Convert standardized data format to standardized dataframe.</p>
+<p>This script doesn’t do anything to the data, but it allows users to use a
+standardized csv file to be read in and worked on within the same workflow
+as we have already.</p>
+<p>The script follows the same template, if there is a problem, like a raw file is used
+instead of a standardized one, you will hear about it.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>raw_data_file</strong><span class="classifier">string</span></dt><dd><p>Path to raw data CSV file (which in this case is in the standard format)</p>
+</dd>
+<dt><strong>log</strong><span class="classifier">logger</span></dt><dd><p>A logger instance</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>sdf</strong><span class="classifier">Pandas DataFrame</span></dt><dd><p>Standardized beacon track pandas dataframe.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>See create_sdf function for data format</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="track_readers.wirl_sbd">
+<span class="sig-prename descclassname"><span class="pre">track_readers.</span></span><span class="sig-name descname"><span class="pre">wirl_sbd</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">raw_data_file</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/track_readers.html#wirl_sbd"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#track_readers.wirl_sbd" title="Link to this definition">¶</a></dt>
+<dd><p>Convert raw data from WIRL SBD decode format to standardized dataframe.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>raw_data_file</strong><span class="classifier">string</span></dt><dd><p>Path to raw data CSV file.</p>
+</dd>
+<dt><strong>log</strong><span class="classifier">logger</span></dt><dd><p>A logger instance.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>sdf</strong><span class="classifier">Pandas DataFrame</span></dt><dd><p>Standardized Pandas dataframe ready for processing.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>Raw Data Columns:</p>
+<ul class="simple">
+<li><p>IMEI</p></li>
+<li><p>Year</p></li>
+<li><p>Month</p></li>
+<li><p>Day</p></li>
+<li><p>Hour</p></li>
+<li><p>Minute</p></li>
+<li><p>Latitude</p></li>
+<li><p>Longitude</p></li>
+<li><p>Temperature</p></li>
+<li><p>Voltage Battery</p></li>
+<li><p>AtmPress</p></li>
+<li><p>FormatID</p></li>
+</ul>
+</dd></dl>
+
 </section>
 </section>
 
@@ -84,14 +1917,14 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="README.html">Iceberg Beacon Track Database (IBTD) Tools</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Scripts</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#track-process-py">track_process.py</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#track-collate-py">track_collate.py</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-track_process">track_process.py</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-track_collate">track_collate.py</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="#api-reference">API Reference</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#ibtd-py">ibtd.py</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#track-fig-py">track_fig.py</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#track-readers-py">track_readers.py</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-ibtd">ibtd.py</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-track_fig">track_fig.py</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-track_readers">track_readers.py</a></li>
 </ul>
 </li>
 </ul>

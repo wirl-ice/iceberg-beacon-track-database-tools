@@ -1,0 +1,1741 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>track_readers &#8212; Iceberg Beacon Track Database (IBTD) Tools 1.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=27fed22d" />
+    <script src="../_static/documentation_options.js?v=8d563738"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for track_readers</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">track_readers.py.</span>
+
+<span class="sd">A collection of functions that convert from various beacon data formats to</span>
+<span class="sd">a standardized format.</span>
+
+<span class="sd">Note that the formats ingested by these functions (known as the raw data in the IBTD)</span>
+<span class="sd">are determined by the data owner/provider and do not necessarily represent the format of</span>
+<span class="sd">the original communication from the device itself.</span>
+
+<span class="sd">Each function takes the raw data file path/name and puts it into the standardized format</span>
+<span class="sd">At a minimum, the timestamp, latitude and longitude are required.  Other columns are</span>
+<span class="sd">optional.</span>
+
+<span class="sd">A few variable names are somewhat terse, so defined here:</span>
+<span class="sd">    sdf - standard data frame</span>
+<span class="sd">    rdf - raw data frame</span>
+
+
+<span class="sd">Created December 2022 by Adam Garbo based on R scripts from Derek Mueller, Anna Crawford</span>
+<span class="sd">and Jill Rajewicz at the Water and Ice Research Laboratory (WIRL), Carleton University</span>
+<span class="sd">Rewritten June-July 2024 by Derek Mueller, and further modified to Apr 2025</span>
+
+
+<span class="sd">Copyright (C) 2025 WIRL</span>
+
+<span class="sd">    This program is free software: you can redistribute it and/or modify</span>
+<span class="sd">    it under the terms of the GNU General Public License as published by</span>
+<span class="sd">    the Free Software Foundation, either version 3 of the License, or</span>
+<span class="sd">    (at your option) any later version.</span>
+
+<span class="sd">    This program is distributed in the hope that it will be useful,</span>
+<span class="sd">    but WITHOUT ANY WARRANTY; without even the implied warranty of</span>
+<span class="sd">    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the</span>
+<span class="sd">    GNU General Public License for more details.</span>
+
+<span class="sd">    You should have received a copy of the GNU General Public License</span>
+<span class="sd">    along with this program.  If not, see &lt;https://www.gnu.org/licenses/&gt;.</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">dt</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">collections</span><span class="w"> </span><span class="kn">import</span> <span class="n">namedtuple</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
+
+<span class="c1"># turn on the copy-on-write functionality</span>
+<span class="n">pd</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">mode</span><span class="o">.</span><span class="n">copy_on_write</span> <span class="o">=</span> <span class="kc">True</span>
+
+
+<div class="viewcode-block" id="nolog">
+<a class="viewcode-back" href="../api.html#track_readers.nolog">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">nolog</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Create a logger instance that doesn&#39;t do anything.</span>
+
+<span class="sd">    Used to allow logging or not in the code below</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    NoOpLogger</span>
+<span class="sd">        A named tuple that mimics a log instance.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">NoOpLogger</span> <span class="o">=</span> <span class="n">namedtuple</span><span class="p">(</span>
+        <span class="s2">&quot;NoOpLogger&quot;</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;debug&quot;</span><span class="p">,</span> <span class="s2">&quot;info&quot;</span><span class="p">,</span> <span class="s2">&quot;warning&quot;</span><span class="p">,</span> <span class="s2">&quot;error&quot;</span><span class="p">,</span> <span class="s2">&quot;critical&quot;</span><span class="p">]</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">NoOpLogger</span><span class="p">(</span><span class="o">*</span><span class="p">([</span><span class="k">lambda</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="kc">None</span><span class="p">]</span> <span class="o">*</span> <span class="mi">5</span><span class="p">))</span></div>
+
+
+
+<div class="viewcode-block" id="create_sdf">
+<a class="viewcode-back" href="../api.html#track_readers.create_sdf">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">create_sdf</span><span class="p">(</span><span class="n">nrows</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Create an empty dataframe in the standardized format filled with NAs.</span>
+
+<span class="sd">    Also the place to (re)define the standardized format if needed</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    nrows : int</span>
+<span class="sd">        Number of rows to make.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    sdf : Pandas Dataframe</span>
+<span class="sd">        Empty dataframe in standard format</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># define the column names</span>
+    <span class="n">columns</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="s2">&quot;platform_id&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;timestamp&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;latitude&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;longitude&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;air_temperature&quot;</span><span class="p">,</span>  <span class="c1"># in Kelvin</span>
+        <span class="s2">&quot;internal_temperature&quot;</span><span class="p">,</span>  <span class="c1"># in Kelvin</span>
+        <span class="s2">&quot;surface_temperature&quot;</span><span class="p">,</span>  <span class="c1"># in Kelvin</span>
+        <span class="s2">&quot;air_pressure&quot;</span><span class="p">,</span>  <span class="c1"># in Pascals</span>
+        <span class="s2">&quot;platform_pitch&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;platform_roll&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;platform_orientation&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;voltage_battery_volts&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;platform_displacement&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;platform_speed_wrt_ground&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;platform_course&quot;</span><span class="p">,</span>
+    <span class="p">]</span>
+
+    <span class="n">col_dtypes</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;platform_id&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="s2">&quot;timestamp&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">(</span><span class="s2">&quot;datetime64[ns]&quot;</span><span class="p">),</span>
+        <span class="s2">&quot;latitude&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+        <span class="s2">&quot;longitude&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+        <span class="s2">&quot;air_temperature&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+        <span class="s2">&quot;internal_temperature&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+        <span class="s2">&quot;surface_temperature&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+        <span class="s2">&quot;air_pressure&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+        <span class="s2">&quot;platform_pitch&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+        <span class="s2">&quot;platform_roll&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+        <span class="s2">&quot;platform_orientation&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+        <span class="s2">&quot;voltage_battery_volts&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+        <span class="s2">&quot;platform_displacement&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+        <span class="s2">&quot;platform_speed_wrt_ground&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+        <span class="s2">&quot;platform_course&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+    <span class="p">}</span>
+
+    <span class="c1"># define sdf as dtype Int64 (which can contain NA)</span>
+    <span class="n">sdf</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">nrows</span><span class="p">),</span> <span class="n">columns</span><span class="o">=</span><span class="n">columns</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">pd</span><span class="o">.</span><span class="n">Int64Dtype</span><span class="p">()</span>
+    <span class="p">)</span>
+
+    <span class="c1"># change dtype of all other columns as required</span>
+    <span class="n">sdf</span> <span class="o">=</span> <span class="n">sdf</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">col_dtypes</span><span class="p">)</span>
+
+    <span class="c1"># explicitly set these as UTC (tz aware)</span>
+    <span class="n">sdf</span><span class="o">.</span><span class="n">timestamp</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_datetime</span><span class="p">(</span><span class="n">sdf</span><span class="o">.</span><span class="n">timestamp</span><span class="p">,</span> <span class="n">utc</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">sdf</span></div>
+
+
+
+<span class="c1">#### Helper functions</span>
+
+
+<div class="viewcode-block" id="dms2dd">
+<a class="viewcode-back" href="../api.html#track_readers.dms2dd">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">dms2dd</span><span class="p">(</span><span class="n">string</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Convert degrees, minutes and seconds from a string to dd.dddd as float.</span>
+
+<span class="sd">    Assumes that the format is deg min sec or deg min, or deg.  Never deg sec, etc.</span>
+<span class="sd">    Also assumes there will be no negative min or sec.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    string : str</span>
+<span class="sd">        A string containing deg, min, seconds like 71° 20&#39; 23.20800&quot;</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    dd : float</span>
+<span class="sd">        decimal degree.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Find all numbers in the string (all integers and floating point numbers in string)</span>
+    <span class="n">dms</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;\d+\.\d+|-?\d+&quot;</span><span class="p">,</span> <span class="n">string</span><span class="p">)</span>
+    <span class="c1"># convert them all to floating point numbers</span>
+    <span class="n">dms</span> <span class="o">=</span> <span class="p">[</span><span class="nb">float</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">dms</span><span class="p">]</span>
+    <span class="c1"># how many are there?</span>
+    <span class="k">match</span> <span class="nb">len</span><span class="p">(</span><span class="n">dms</span><span class="p">):</span>
+        <span class="k">case</span> <span class="mi">3</span><span class="p">:</span>
+            <span class="k">pass</span>
+        <span class="k">case</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="n">dms</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+        <span class="k">case</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">dms</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+            <span class="n">dms</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+        <span class="k">case</span><span class="w"> </span><span class="k">_</span><span class="p">:</span>
+            <span class="n">dms</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span>
+    <span class="n">degs</span><span class="p">,</span> <span class="n">mins</span><span class="p">,</span> <span class="n">secs</span> <span class="o">=</span> <span class="n">dms</span>
+
+    <span class="n">decSec</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">secs</span><span class="p">)</span> <span class="o">/</span> <span class="mi">3600</span>
+    <span class="n">decMin</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">mins</span><span class="p">)</span> <span class="o">/</span> <span class="mi">60</span>
+    <span class="n">dd</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">degs</span><span class="p">)</span> <span class="o">+</span> <span class="n">decMin</span> <span class="o">+</span> <span class="n">decSec</span>
+    <span class="k">if</span> <span class="n">degs</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">dd</span> <span class="o">=</span> <span class="n">dd</span> <span class="o">*</span> <span class="o">-</span><span class="mi">1</span>
+    <span class="k">return</span> <span class="n">dd</span></div>
+
+
+
+<span class="c1"># Standardization functions</span>
+
+
+<div class="viewcode-block" id="standard">
+<a class="viewcode-back" href="../api.html#track_readers.standard">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">standard</span><span class="p">(</span><span class="n">raw_data_file</span><span class="p">,</span> <span class="n">log</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Convert standardized data format to standardized dataframe.</span>
+
+<span class="sd">    This script doesn&#39;t do anything to the data, but it allows users to use a</span>
+<span class="sd">    standardized csv file to be read in and worked on within the same workflow</span>
+<span class="sd">    as we have already.</span>
+
+<span class="sd">    The script follows the same template, if there is a problem, like a raw file is used</span>
+<span class="sd">    instead of a standardized one, you will hear about it.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    raw_data_file : string</span>
+<span class="sd">        Path to raw data CSV file (which in this case is in the standard format)</span>
+<span class="sd">    log : logger</span>
+<span class="sd">        A logger instance</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    sdf : Pandas DataFrame</span>
+<span class="sd">        Standardized beacon track pandas dataframe.</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    See create_sdf function for data format</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># set up the logger to output nowhere if None</span>
+    <span class="k">if</span> <span class="n">log</span> <span class="o">==</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">log</span> <span class="o">=</span> <span class="n">nolog</span><span class="p">()</span>
+
+    <span class="c1"># read in the raw data frame - rdf</span>
+    <span class="n">rdf</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">raw_data_file</span><span class="p">,</span> <span class="n">index_col</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">skipinitialspace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="c1"># create an empty standard data frame - sdf - filled with NAs</span>
+    <span class="n">sdf</span> <span class="o">=</span> <span class="n">create_sdf</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">rdf</span><span class="p">))</span>
+
+    <span class="c1"># Unique beacon identifier</span>
+    <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;platform_id&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">raw_data_file</span><span class="p">)</span><span class="o">.</span><span class="n">stem</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;timestamp&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_datetime</span><span class="p">(</span><span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;timestamp&quot;</span><span class="p">],</span> <span class="n">utc</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;latitude&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;latitude&quot;</span><span class="p">]</span>
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;longitude&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;longitude&quot;</span><span class="p">]</span>
+
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;air_temperature&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;air_temperature&quot;</span><span class="p">]</span>
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;internal_temperature&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;internal_temperature&quot;</span><span class="p">]</span>
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;surface_temperature&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;surface_temperature&quot;</span><span class="p">]</span>
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;air_pressure&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;air_pressure&quot;</span><span class="p">]</span>
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;platform_pitch&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;platform_pitch&quot;</span><span class="p">]</span>
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;platform_roll&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;platform_roll&quot;</span><span class="p">]</span>
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;platform_orientation&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;platform_orientation&quot;</span><span class="p">]</span>
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;voltage_battery_volts&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;voltage_battery_volts&quot;</span><span class="p">]</span>
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;platform_displacement&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;platform_displacement&quot;</span><span class="p">]</span>
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;platform_speed_wrt_ground&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;platform_speed_wrt_ground&quot;</span><span class="p">]</span>
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;platform_course&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;platform_course&quot;</span><span class="p">]</span>
+
+    <span class="k">except</span><span class="p">:</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Problem with standard data file </span><span class="si">{</span><span class="n">raw_data_file</span><span class="si">}</span><span class="s2">, check formatting&quot;</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">sdf</span></div>
+
+
+
+<div class="viewcode-block" id="calib_argos">
+<a class="viewcode-back" href="../api.html#track_readers.calib_argos">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">calib_argos</span><span class="p">(</span><span class="n">raw_data_file</span><span class="p">,</span> <span class="n">log</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Convert raw data from CALIB ARGOS format to standardized dataframe.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    raw_data_file : string</span>
+<span class="sd">        Path to raw data CSV file.</span>
+<span class="sd">    log : logger</span>
+<span class="sd">        A logger instance.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    sdf : Pandas DataFrame</span>
+<span class="sd">        Standardized Pandas dataframe ready for processing.</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    A challenging format to read!</span>
+
+<span class="sd">    There are four types of lines -</span>
+<span class="sd">        blank line &#39;\n&#39;</span>
+<span class="sd">        obs1 = begining of the obs - starts with id</span>
+<span class="sd">        obs2 = end of the obs - starts with &#39;(&#39;</span>
+<span class="sd">        a comment  - none of the above</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># set up the logger to output nowhere if None</span>
+    <span class="k">if</span> <span class="n">log</span> <span class="o">==</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">log</span> <span class="o">=</span> <span class="n">nolog</span><span class="p">()</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="c1"># Read the whole file:</span>
+        <span class="n">f</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="n">raw_data_file</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;r&quot;</span><span class="p">,</span> <span class="n">errors</span><span class="o">=</span><span class="s2">&quot;replace&quot;</span><span class="p">)</span>
+        <span class="n">fp</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">readlines</span><span class="p">()</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+        <span class="c1"># get the id of the beacon from the file name and the year</span>
+        <span class="n">year</span><span class="p">,</span> <span class="n">ID</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">raw_data_file</span><span class="p">)</span><span class="o">.</span><span class="n">stem</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">)</span>
+
+        <span class="c1"># empty lists to fill with data</span>
+        <span class="n">latitude</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">longitude</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">loc_accuracy</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">datetime_transmit</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">timestamp</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">message_index</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">pressure</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">voltage</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">internal_temperature</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">comments</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="c1"># obs1 and 2 hold the index for each one of the 2 data lines</span>
+        <span class="n">obs1</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">obs2</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">line</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">fp</span><span class="p">):</span>
+            <span class="n">fields</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">()</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">fields</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>  <span class="c1"># nothing on the line</span>
+                <span class="k">continue</span>
+            <span class="k">elif</span> <span class="n">ID</span> <span class="ow">in</span> <span class="n">fields</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span>
+                <span class="k">if</span> <span class="p">(</span>
+                    <span class="n">fields</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">!=</span> <span class="s2">&quot;NO&quot;</span>
+                <span class="p">):</span>  <span class="c1"># sometimes NO LOCATION happens... then the record needs to be ignored.</span>
+                    <span class="n">obs1</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="s2">&quot;(&quot;</span> <span class="ow">in</span> <span class="n">fields</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span>  <span class="c1"># hope that no comment lines start with &#39;(&#39;</span>
+                <span class="n">obs2</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+            <span class="c1"># all other non-blank lines are comments</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">comments</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+
+        <span class="c1"># need to keep track of the year (for both trans and data)</span>
+        <span class="n">trans_year</span> <span class="o">=</span> <span class="n">year</span>
+        <span class="n">data_year</span> <span class="o">=</span> <span class="n">year</span>
+        <span class="n">trans_doy</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">data_doy</span> <span class="o">=</span> <span class="mi">0</span>
+
+        <span class="c1"># pass through again and load up the lists</span>
+        <span class="k">for</span> <span class="n">o1</span> <span class="ow">in</span> <span class="n">obs1</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">o1</span> <span class="o">+</span> <span class="mi">1</span> <span class="ow">in</span> <span class="n">obs2</span><span class="p">:</span>  <span class="c1"># this makes sure that the obs1 is followed by obs2</span>
+                <span class="n">fields</span> <span class="o">=</span> <span class="n">fp</span><span class="p">[</span><span class="n">o1</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">()</span>
+
+                <span class="c1"># Lat and Lon:</span>
+                <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">):</span>
+                    <span class="n">strLoc</span> <span class="o">=</span> <span class="n">fields</span><span class="p">[</span><span class="n">j</span><span class="p">]</span>
+                    <span class="k">if</span> <span class="n">strLoc</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">:]</span> <span class="o">==</span> <span class="s2">&quot;S&quot;</span> <span class="ow">or</span> <span class="n">strLoc</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">:]</span> <span class="o">==</span> <span class="s2">&quot;W&quot;</span><span class="p">:</span>
+                        <span class="n">numLoc</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">strLoc</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span> <span class="o">*</span> <span class="o">-</span><span class="mi">1</span>
+                    <span class="k">elif</span> <span class="n">strLoc</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">:]</span> <span class="o">==</span> <span class="s2">&quot;N&quot;</span> <span class="ow">or</span> <span class="n">strLoc</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">:]</span> <span class="o">==</span> <span class="s2">&quot;E&quot;</span><span class="p">:</span>
+                        <span class="n">numLoc</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">strLoc</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">j</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                        <span class="n">latitude</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">numLoc</span><span class="p">)</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">longitude</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">numLoc</span><span class="p">)</span>
+                <span class="c1"># location quality</span>
+                <span class="n">loc_accuracy</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">fields</span><span class="p">[</span><span class="mi">3</span><span class="p">]))</span>
+
+                <span class="c1"># dates/times</span>
+                <span class="n">trans_time</span><span class="p">,</span> <span class="n">data_time</span> <span class="o">=</span> <span class="n">fields</span><span class="p">[</span><span class="mi">4</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;-&quot;</span><span class="p">)</span>
+
+                <span class="c1"># trans time is time of transmission</span>
+                <span class="k">if</span> <span class="n">trans_time</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;?&quot;</span><span class="p">:</span>
+                    <span class="n">datetime_transmit</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="p">(</span>
+                        <span class="n">trans_doy</span> <span class="o">&gt;</span> <span class="mi">350</span> <span class="ow">and</span> <span class="nb">int</span><span class="p">(</span><span class="n">trans_time</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">)[</span><span class="mi">0</span><span class="p">])</span> <span class="o">&lt;</span> <span class="mi">15</span>
+                    <span class="p">):</span>  <span class="c1"># happy new year!</span>
+                        <span class="n">trans_year</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">trans_year</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+                    <span class="n">trans_doy</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">trans_time</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">)[</span><span class="mi">0</span><span class="p">])</span>
+                    <span class="n">datetime_transmit</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                        <span class="n">dt</span><span class="o">.</span><span class="n">datetime</span><span class="o">.</span><span class="n">strptime</span><span class="p">(</span>
+                            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">trans_year</span><span class="si">}</span><span class="s2">-</span><span class="si">{</span><span class="n">trans_time</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="s2">&quot;%Y-%j/%H%MZ&quot;</span>
+                        <span class="p">)</span>
+                    <span class="p">)</span>
+
+                <span class="c1"># data time is position time</span>
+                <span class="k">if</span> <span class="n">data_time</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;?&quot;</span><span class="p">:</span>
+                    <span class="n">timestamp</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+
+                    <span class="c1"># There is no year recorded in the data, only DOY</span>
+                    <span class="c1"># Detect and deal with year rollover in December/January</span>
+                    <span class="c1"># this here looks to see if the year is about to roll over.</span>
+                    <span class="c1"># the approach is not perfect since if the data is missing over a large</span>
+                    <span class="c1"># part of Dec and January these conditions won&#39;t match</span>
+                    <span class="k">if</span> <span class="n">data_doy</span> <span class="o">&gt;</span> <span class="mi">350</span> <span class="ow">and</span> <span class="nb">int</span><span class="p">(</span><span class="n">data_time</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">)[</span><span class="mi">0</span><span class="p">])</span> <span class="o">&lt;</span> <span class="mi">15</span><span class="p">:</span>
+                        <span class="n">data_year</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">data_year</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+                    <span class="n">data_doy</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">data_time</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">)[</span><span class="mi">0</span><span class="p">])</span>
+                    <span class="n">timestamp</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                        <span class="n">dt</span><span class="o">.</span><span class="n">datetime</span><span class="o">.</span><span class="n">strptime</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">data_year</span><span class="si">}</span><span class="s2">-</span><span class="si">{</span><span class="n">data_time</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="s2">&quot;%Y-%j/%H%M&quot;</span><span class="p">)</span>
+                    <span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">o2</span> <span class="ow">in</span> <span class="n">obs2</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">o2</span> <span class="o">-</span> <span class="mi">1</span> <span class="ow">in</span> <span class="n">obs1</span><span class="p">:</span>  <span class="c1"># this makes sure that the obs2 is preceded by obs1</span>
+
+                <span class="n">fields</span> <span class="o">=</span> <span class="n">fp</span><span class="p">[</span><span class="n">o2</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">()</span>
+
+                <span class="c1"># sometimes there are &quot;?&quot; in the data but they are not meaningful</span>
+                <span class="n">fields</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span>
+                    <span class="nb">filter</span><span class="p">(</span><span class="k">lambda</span> <span class="n">item</span><span class="p">:</span> <span class="n">item</span> <span class="o">!=</span> <span class="s2">&quot;?&quot;</span><span class="p">,</span> <span class="n">fields</span><span class="p">)</span>
+                <span class="p">)</span>  <span class="c1"># sometimes &quot;?&quot; are present</span>
+                <span class="n">fields</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span>
+                    <span class="nb">filter</span><span class="p">(</span><span class="k">lambda</span> <span class="n">item</span><span class="p">:</span> <span class="n">item</span> <span class="o">!=</span> <span class="s2">&quot;(&quot;</span><span class="p">,</span> <span class="n">fields</span><span class="p">)</span>
+                <span class="p">)</span>  <span class="c1"># remove this from list</span>
+
+                <span class="n">message_index</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="nb">int</span><span class="p">(</span><span class="n">fields</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;(&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)[:</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+                <span class="p">)</span>  <span class="c1"># remove the &quot;(&quot; in 2 digit values</span>
+
+                <span class="c1"># These sensors are either floating points (in scientific notation) or</span>
+                <span class="c1"># They are hex values  or they are integers.</span>
+                <span class="c1"># See manual for how to map values.  The problem is distinguishing int and hex</span>
+                <span class="c1"># For temperatures &gt; -20 there will be 3 digits for int and only 2 for hex</span>
+                <span class="c1">#  this is the best guess, may not work always</span>
+
+                <span class="c1"># pressure</span>
+                <span class="k">if</span> <span class="s2">&quot;E+&quot;</span> <span class="ow">in</span> <span class="n">fields</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="ow">or</span> <span class="s2">&quot;E-&quot;</span> <span class="ow">in</span> <span class="n">fields</span><span class="p">[</span><span class="mi">1</span><span class="p">]:</span>
+                    <span class="n">pressure</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">fields</span><span class="p">[</span><span class="mi">1</span><span class="p">]))</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">fields</span><span class="p">[</span><span class="mi">3</span><span class="p">])</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+                        <span class="n">pressure</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">fields</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="o">*</span> <span class="mf">0.1511</span> <span class="o">+</span> <span class="mi">920</span><span class="p">)</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">pressure</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">fields</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="mi">16</span><span class="p">)</span> <span class="o">*</span> <span class="mf">0.1511</span> <span class="o">+</span> <span class="mi">920</span><span class="p">)</span>
+
+                <span class="c1"># voltage</span>
+                <span class="k">if</span> <span class="s2">&quot;E+&quot;</span> <span class="ow">in</span> <span class="n">fields</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="ow">or</span> <span class="s2">&quot;E-&quot;</span> <span class="ow">in</span> <span class="n">fields</span><span class="p">[</span><span class="mi">2</span><span class="p">]:</span>
+                    <span class="n">voltage</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">fields</span><span class="p">[</span><span class="mi">2</span><span class="p">]))</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">fields</span><span class="p">[</span><span class="mi">3</span><span class="p">])</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+                        <span class="n">voltage</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">fields</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span> <span class="o">*</span> <span class="mf">0.2</span> <span class="o">+</span> <span class="mi">6</span><span class="p">)</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">voltage</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">fields</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="mi">16</span><span class="p">)</span> <span class="o">*</span> <span class="mf">0.2</span> <span class="o">+</span> <span class="mi">6</span><span class="p">)</span>
+
+                <span class="c1"># temperature</span>
+                <span class="k">if</span> <span class="s2">&quot;E+&quot;</span> <span class="ow">in</span> <span class="n">fields</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span> <span class="ow">or</span> <span class="s2">&quot;E-&quot;</span> <span class="ow">in</span> <span class="n">fields</span><span class="p">[</span><span class="mi">3</span><span class="p">]:</span>
+                    <span class="n">internal_temperature</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">fields</span><span class="p">[</span><span class="mi">3</span><span class="p">]))</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">fields</span><span class="p">[</span><span class="mi">3</span><span class="p">])</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+                        <span class="n">internal_temperature</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">fields</span><span class="p">[</span><span class="mi">3</span><span class="p">])</span> <span class="o">*</span> <span class="mf">0.3</span> <span class="o">-</span> <span class="mi">50</span><span class="p">)</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">internal_temperature</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">fields</span><span class="p">[</span><span class="mi">3</span><span class="p">],</span> <span class="mi">16</span><span class="p">)</span> <span class="o">*</span> <span class="mf">0.3</span> <span class="o">-</span> <span class="mi">50</span><span class="p">)</span>
+
+        <span class="c1"># create an empty standard data frame - sdf - filled with NAs</span>
+        <span class="n">sdf</span> <span class="o">=</span> <span class="n">create_sdf</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">latitude</span><span class="p">))</span>
+
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;platform_id&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">raw_data_file</span><span class="p">)</span><span class="o">.</span><span class="n">stem</span>
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;timestamp&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_datetime</span><span class="p">(</span><span class="n">timestamp</span><span class="p">,</span> <span class="n">utc</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;latitude&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">latitude</span>
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;longitude&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">longitude</span>
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;internal_temperature&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">internal_temperature</span>
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;internal_temperature&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;internal_temperature&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="mf">273.15</span>
+        <span class="p">)</span>  <span class="c1"># from Celsius to Kelvin</span>
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;air_pressure&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pressure</span>
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;air_pressure&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;air_pressure&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="mi">100</span>  <span class="c1"># from hPa to Pa</span>
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;voltage_battery_volts&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">voltage</span>
+
+        <span class="c1"># add this field temporarily.</span>
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;argo_position_accuracy&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">loc_accuracy</span>
+
+        <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Track rows: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">sdf</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">sdf</span><span class="p">[</span><span class="s1">&#39;argo_position_accuracy&#39;</span><span class="p">]</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="mi">3</span><span class="p">])</span><span class="si">}</span><span class="s2"> rows &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;(</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">sdf</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">sdf</span><span class="p">[</span><span class="s1">&#39;argo_position_accuracy&#39;</span><span class="p">]</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="mi">3</span><span class="p">])</span><span class="o">/</span><span class="nb">len</span><span class="p">(</span><span class="n">sdf</span><span class="p">)</span><span class="si">:</span><span class="s2">.1%</span><span class="si">}</span><span class="s2">) &quot;</span>
+            <span class="s2">&quot;removed due to unacceptable argo_position_accuracy.&quot;</span>
+        <span class="p">)</span>
+
+        <span class="c1"># remove all positions with quality less than 3</span>
+        <span class="n">sdf</span> <span class="o">=</span> <span class="n">sdf</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;argo_position_accuracy&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="mi">3</span><span class="p">]</span>
+
+        <span class="c1"># remove column now.</span>
+        <span class="n">sdf</span> <span class="o">=</span> <span class="n">sdf</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="s2">&quot;argo_position_accuracy&quot;</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="c1"># print comments to log</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">comments</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Start of comments from raw Argos file:&quot;</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">comment</span> <span class="ow">in</span> <span class="n">comments</span><span class="p">:</span>
+                <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">comment</span><span class="p">)</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;End of comments from raw Argos file:&quot;</span><span class="p">)</span>
+    <span class="k">except</span><span class="p">:</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Problem with raw data file </span><span class="si">{</span><span class="n">raw_data_file</span><span class="si">}</span><span class="s2">, check formatting&quot;</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">sdf</span></div>
+
+
+
+<div class="viewcode-block" id="canatec">
+<a class="viewcode-back" href="../api.html#track_readers.canatec">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">canatec</span><span class="p">(</span><span class="n">raw_data_file</span><span class="p">,</span> <span class="n">log</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Convert raw data from Canatec format to standardized dataframe.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    raw_data_file : string</span>
+<span class="sd">        Path to raw data CSV file.</span>
+<span class="sd">    log : logger</span>
+<span class="sd">        A logger instance.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    sdf : Pandas DataFrame</span>
+<span class="sd">        Standardized Pandas dataframe ready for processing.</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    Raw Data Columns:</span>
+
+<span class="sd">    - ReadingDate</span>
+<span class="sd">    - Latitude</span>
+<span class="sd">    - Longitude</span>
+<span class="sd">    - Elevation</span>
+<span class="sd">    - Heading</span>
+<span class="sd">    - Speed</span>
+<span class="sd">    - Fix</span>
+<span class="sd">    - Satellites</span>
+<span class="sd">    - HDOP</span>
+<span class="sd">    - VDOP</span>
+<span class="sd">    - VerticalVelocity</span>
+<span class="sd">    - Pressure</span>
+<span class="sd">    - TempExternal</span>
+<span class="sd">    - TempInternal</span>
+<span class="sd">    - BeaconAlarmState</span>
+<span class="sd">    - BatteryVoltage</span>
+<span class="sd">    - ModemVoltage</span>
+<span class="sd">    - WindSpeed</span>
+<span class="sd">    - WindDirection</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># set up the logger to output nowhere if None</span>
+    <span class="k">if</span> <span class="n">log</span> <span class="o">==</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">log</span> <span class="o">=</span> <span class="n">nolog</span><span class="p">()</span>
+
+    <span class="c1"># read in the raw data frame - rdf</span>
+    <span class="n">rdf</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">raw_data_file</span><span class="p">,</span> <span class="n">index_col</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">skipinitialspace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="c1"># create an empty standard data frame - sdf - filled with NAs</span>
+    <span class="n">sdf</span> <span class="o">=</span> <span class="n">create_sdf</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">rdf</span><span class="p">))</span>
+
+    <span class="c1"># Unique beacon identifier</span>
+    <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;platform_id&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">raw_data_file</span><span class="p">)</span><span class="o">.</span><span class="n">stem</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;timestamp&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_datetime</span><span class="p">(</span>
+            <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;ReadingDate&quot;</span><span class="p">],</span> <span class="n">utc</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">yearfirst</span><span class="o">=</span><span class="s2">&quot;True&quot;</span>
+        <span class="p">)</span>
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;latitude&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;Latitude&quot;</span><span class="p">]</span>
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;longitude&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;Longitude&quot;</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="s2">&quot;TempExternal&quot;</span> <span class="ow">in</span> <span class="n">rdf</span><span class="p">:</span>
+            <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;air_temperature&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;TempExternal&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="mf">273.15</span>  <span class="c1"># to Kelvin</span>
+
+        <span class="k">if</span> <span class="s2">&quot;TempInternal&quot;</span> <span class="ow">in</span> <span class="n">rdf</span><span class="p">:</span>
+            <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;internal_temperature&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;TempInternal&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="mf">273.15</span>  <span class="c1"># to Kelvin</span>
+
+        <span class="k">if</span> <span class="s2">&quot;Pressure&quot;</span> <span class="ow">in</span> <span class="n">rdf</span><span class="p">:</span>
+            <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;air_pressure&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;Pressure&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="mi">100</span>  <span class="c1"># from hPa to Pa</span>
+
+        <span class="k">if</span> <span class="s2">&quot;BatteryVoltage&quot;</span> <span class="ow">in</span> <span class="n">rdf</span><span class="p">:</span>
+            <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;voltage_battery_volts&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;BatteryVoltage&quot;</span><span class="p">]</span>
+
+    <span class="k">except</span><span class="p">:</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Problem with raw data file </span><span class="si">{</span><span class="n">raw_data_file</span><span class="si">}</span><span class="s2">, check formatting&quot;</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">sdf</span></div>
+
+
+
+<div class="viewcode-block" id="pathfinder_ccore">
+<a class="viewcode-back" href="../api.html#track_readers.pathfinder_ccore">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">pathfinder_ccore</span><span class="p">(</span><span class="n">raw_data_file</span><span class="p">,</span> <span class="n">log</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Convert raw data from Pathfinder C-CORE format to standardized dataframe.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    raw_data_file : string</span>
+<span class="sd">        Path to raw data CSV file.</span>
+<span class="sd">    log : logger</span>
+<span class="sd">        A logger instance.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    sdf : Pandas DataFrame</span>
+<span class="sd">        Standardized Pandas dataframe ready for processing.</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    Raw Data Columns (case sensitive):</span>
+<span class="sd">    - Buoy Name</span>
+<span class="sd">    - Time (2011 Jun 18 18:20:02 UTC)</span>
+<span class="sd">    - Latitude</span>
+<span class="sd">    - Longitude</span>
+<span class="sd">    - Temperature</span>
+<span class="sd">    - Drogue Depth (m)</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># set up the logger to output nowhere if None</span>
+    <span class="k">if</span> <span class="n">log</span> <span class="o">==</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">log</span> <span class="o">=</span> <span class="n">nolog</span><span class="p">()</span>
+
+    <span class="c1"># read in the raw data frame - rdf</span>
+    <span class="n">rdf</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">raw_data_file</span><span class="p">,</span> <span class="n">index_col</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">skipinitialspace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="c1"># create an empty standard data frame - sdf - filled with NAs</span>
+    <span class="n">sdf</span> <span class="o">=</span> <span class="n">create_sdf</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">rdf</span><span class="p">))</span>
+
+    <span class="c1"># Unique beacon identifier</span>
+    <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;platform_id&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">raw_data_file</span><span class="p">)</span><span class="o">.</span><span class="n">stem</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;timestamp&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_datetime</span><span class="p">(</span>
+            <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;Time&quot;</span><span class="p">],</span> <span class="nb">format</span><span class="o">=</span><span class="s2">&quot;%Y %b </span><span class="si">%d</span><span class="s2"> %H:%M:%S UTC&quot;</span><span class="p">,</span> <span class="n">utc</span><span class="o">=</span><span class="kc">True</span>
+        <span class="p">)</span>
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;latitude&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;Latitude&quot;</span><span class="p">]</span>
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;longitude&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;Longitude&quot;</span><span class="p">]</span>
+
+    <span class="k">except</span><span class="p">:</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Problem with raw data file </span><span class="si">{</span><span class="n">raw_data_file</span><span class="si">}</span><span class="s2">, check formatting&quot;</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">sdf</span></div>
+
+
+
+<div class="viewcode-block" id="cryologger">
+<a class="viewcode-back" href="../api.html#track_readers.cryologger">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">cryologger</span><span class="p">(</span><span class="n">raw_data_file</span><span class="p">,</span> <span class="n">log</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Convert raw data from Cryologger format to standardized dataframe.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    raw_data_file : string</span>
+<span class="sd">        Path to raw data CSV file.</span>
+<span class="sd">    log : logger</span>
+<span class="sd">        A logger instance.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    sdf : Pandas DataFrame</span>
+<span class="sd">        Standardized Pandas dataframe ready for processing.</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    See Cryologger_ITB in beacon model info for more details</span>
+
+<span class="sd">    Raw Data columns (case sensitive):</span>
+
+<span class="sd">    - imei</span>
+<span class="sd">    - momsn</span>
+<span class="sd">    - transmit_time</span>
+<span class="sd">    - iridium_latitude</span>
+<span class="sd">    - iridium_longitude</span>
+<span class="sd">    - iridium_cep</span>
+<span class="sd">    - data</span>
+<span class="sd">    - unixtime</span>
+<span class="sd">    - temperature_int</span>
+<span class="sd">    - humidity_int</span>
+<span class="sd">    - pressure_int</span>
+<span class="sd">    - platform_pitch</span>
+<span class="sd">    - roll</span>
+<span class="sd">    - heading</span>
+<span class="sd">    - latitude</span>
+<span class="sd">    - longitude</span>
+<span class="sd">    - satellites</span>
+<span class="sd">    - hdop</span>
+<span class="sd">    - voltage</span>
+<span class="sd">    - transmitDuration</span>
+<span class="sd">    - messageCounter</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># set up the logger to output nowhere if None</span>
+    <span class="k">if</span> <span class="n">log</span> <span class="o">==</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">log</span> <span class="o">=</span> <span class="n">nolog</span><span class="p">()</span>
+
+    <span class="c1"># read in the raw data frame - rdf</span>
+    <span class="n">rdf</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">raw_data_file</span><span class="p">,</span> <span class="n">index_col</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">skipinitialspace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="c1"># create an empty standard data frame - sdf - filled with NAs</span>
+    <span class="n">sdf</span> <span class="o">=</span> <span class="n">create_sdf</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">rdf</span><span class="p">))</span>
+
+    <span class="c1"># Unique beacon identifier</span>
+    <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;platform_id&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">raw_data_file</span><span class="p">)</span><span class="o">.</span><span class="n">stem</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;timestamp&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_datetime</span><span class="p">(</span><span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;unixtime&quot;</span><span class="p">],</span> <span class="n">unit</span><span class="o">=</span><span class="s2">&quot;s&quot;</span><span class="p">,</span> <span class="n">utc</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;latitude&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;latitude&quot;</span><span class="p">]</span>
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;longitude&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;longitude&quot;</span><span class="p">]</span>
+
+        <span class="c1">#  Battery voltage</span>
+        <span class="k">if</span> <span class="s2">&quot;voltage&quot;</span> <span class="ow">in</span> <span class="n">rdf</span><span class="p">:</span>
+            <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;voltage_battery_volts&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;voltage&quot;</span><span class="p">]</span>
+
+        <span class="c1"># Internal temperature</span>
+        <span class="k">if</span> <span class="s2">&quot;temperature_int&quot;</span> <span class="ow">in</span> <span class="n">rdf</span><span class="p">:</span>
+            <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;internal_temperature&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;temperature_int&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="mf">273.15</span>  <span class="c1"># to Kelvin</span>
+
+        <span class="c1">#  Barometric pressure</span>
+        <span class="k">if</span> <span class="s2">&quot;pressure_int&quot;</span> <span class="ow">in</span> <span class="n">rdf</span><span class="p">:</span>
+            <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;air_pressure&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;pressure_int&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="mi">100</span>  <span class="c1"># from hPa to Pa</span>
+
+        <span class="c1"># Pitch</span>
+        <span class="k">if</span> <span class="s2">&quot;pitch&quot;</span> <span class="ow">in</span> <span class="n">rdf</span><span class="p">:</span>
+            <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;platform_pitch&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;pitch&quot;</span><span class="p">]</span>
+
+        <span class="c1"># Roll</span>
+        <span class="k">if</span> <span class="s2">&quot;roll&quot;</span> <span class="ow">in</span> <span class="n">rdf</span><span class="p">:</span>
+            <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;platform_roll&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;roll&quot;</span><span class="p">]</span>
+
+        <span class="c1"># Tilt-compensated heading</span>
+        <span class="k">if</span> <span class="s2">&quot;heading&quot;</span> <span class="ow">in</span> <span class="n">rdf</span><span class="p">:</span>
+            <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;platform_orientation&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;heading&quot;</span><span class="p">]</span>
+
+    <span class="k">except</span><span class="p">:</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Problem with raw data file </span><span class="si">{</span><span class="n">raw_data_file</span><span class="si">}</span><span class="s2">, check formatting&quot;</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">sdf</span></div>
+
+
+
+<div class="viewcode-block" id="iabp">
+<a class="viewcode-back" href="../api.html#track_readers.iabp">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">iabp</span><span class="p">(</span><span class="n">raw_data_file</span><span class="p">,</span> <span class="n">log</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Convert raw data from IABP website format to standardized dataframe.</span>
+
+<span class="sd">    Note: Many different beacon types report to the IABP repository</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    raw_data_file : string</span>
+<span class="sd">        Path to raw data CSV file.</span>
+<span class="sd">    log : logger</span>
+<span class="sd">        A logger instance.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    sdf : Pandas DataFrame</span>
+<span class="sd">        Standardized Pandas dataframe ready for processing.</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    Raw Data columns:</span>
+
+<span class="sd">    - BuoyID</span>
+<span class="sd">    - Date</span>
+<span class="sd">    - Year</span>
+<span class="sd">    - Hour</span>
+<span class="sd">    - Min</span>
+<span class="sd">    - DOY</span>
+<span class="sd">    - POS_DOY</span>
+<span class="sd">    - Lat</span>
+<span class="sd">    - Lon</span>
+<span class="sd">    - BP</span>
+<span class="sd">    - Ta</span>
+<span class="sd">    - Ts</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># set up the logger to output nowhere if None</span>
+    <span class="k">if</span> <span class="n">log</span> <span class="o">==</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">log</span> <span class="o">=</span> <span class="n">nolog</span><span class="p">()</span>
+
+    <span class="c1"># read in the raw data frame - rdf</span>
+    <span class="n">rdf</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">raw_data_file</span><span class="p">,</span> <span class="n">index_col</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">skipinitialspace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="c1"># create an empty standard data frame - sdf - filled with NAs</span>
+    <span class="n">sdf</span> <span class="o">=</span> <span class="n">create_sdf</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">rdf</span><span class="p">))</span>
+
+    <span class="c1"># Unique beacon identifier</span>
+    <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;platform_id&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">raw_data_file</span><span class="p">)</span><span class="o">.</span><span class="n">stem</span>
+
+    <span class="k">try</span><span class="p">:</span>
+
+        <span class="c1"># use the position doy for the timestamp (along with year) - subtract 1 to make Jan 1 = 0</span>
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;timestamp&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_datetime</span><span class="p">(</span><span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;Year&quot;</span><span class="p">],</span> <span class="nb">format</span><span class="o">=</span><span class="s2">&quot;%Y&quot;</span><span class="p">,</span> <span class="n">utc</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="o">+</span> <span class="n">rdf</span><span class="p">[</span>
+            <span class="s2">&quot;POS_DOY&quot;</span>
+        <span class="p">]</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">Timedelta</span><span class="p">,</span> <span class="n">unit</span><span class="o">=</span><span class="s2">&quot;D&quot;</span><span class="p">)</span>
+        <span class="c1"># round to the nearest second</span>
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;timestamp&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;timestamp&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">dt</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">freq</span><span class="o">=</span><span class="s2">&quot;s&quot;</span><span class="p">)</span>
+
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;latitude&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;Lat&quot;</span><span class="p">]</span>
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;longitude&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;Lon&quot;</span><span class="p">]</span>
+
+        <span class="c1"># Air temperature</span>
+        <span class="k">if</span> <span class="s2">&quot;Ta&quot;</span> <span class="ow">in</span> <span class="n">rdf</span><span class="p">:</span>
+            <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;air_temperature&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;Ta&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="mf">273.15</span>  <span class="c1"># to Kelvin</span>
+
+        <span class="c1"># Surface temperature</span>
+        <span class="k">if</span> <span class="s2">&quot;Ts&quot;</span> <span class="ow">in</span> <span class="n">rdf</span><span class="p">:</span>
+            <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;surface_temperature&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;Ts&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="mf">273.15</span>  <span class="c1"># to Kelvin</span>
+
+        <span class="c1"># Pressure</span>
+        <span class="k">if</span> <span class="s2">&quot;BP&quot;</span> <span class="ow">in</span> <span class="n">rdf</span><span class="p">:</span>
+            <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;air_pressure&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;BP&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="mi">100</span>  <span class="c1"># from hPa to Pa</span>
+
+    <span class="k">except</span><span class="p">:</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Problem with raw data file </span><span class="si">{</span><span class="n">raw_data_file</span><span class="si">}</span><span class="s2">, check formatting&quot;</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">sdf</span></div>
+
+
+
+<div class="viewcode-block" id="globalstar">
+<a class="viewcode-back" href="../api.html#track_readers.globalstar">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">globalstar</span><span class="p">(</span><span class="n">raw_data_file</span><span class="p">,</span> <span class="n">log</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Convert raw data from GlobalStar format to standardized dataframe.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    raw_data_file : string</span>
+<span class="sd">        Path to raw data CSV file.</span>
+<span class="sd">    log : logger</span>
+<span class="sd">        A logger instance.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    sdf : Pandas DataFrame</span>
+<span class="sd">        Standardized Pandas dataframe ready for processing.</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    Raw Data Columns:  (from CCORE)</span>
+
+<span class="sd">    - INDEX</span>
+<span class="sd">    - BERG_ID</span>
+<span class="sd">    - DT_TAG_POS_UTC (2019-04-29T23:03UTC)</span>
+<span class="sd">    - LAT_TAG</span>
+<span class="sd">    - LON_TAG</span>
+
+<span class="sd">    OR  (from IIP):</span>
+
+<span class="sd">    - INDEX</span>
+<span class="sd">    - ID</span>
+<span class="sd">    - DATETIME (2019-04-29T23:03UTC)</span>
+<span class="sd">    - LATITUDE</span>
+<span class="sd">    - LONGITUDE</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># set up the logger to output nowhere if None</span>
+    <span class="k">if</span> <span class="n">log</span> <span class="o">==</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">log</span> <span class="o">=</span> <span class="n">nolog</span><span class="p">()</span>
+
+    <span class="c1"># read in the raw data frame - rdf</span>
+    <span class="n">rdf</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">raw_data_file</span><span class="p">,</span> <span class="n">index_col</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">skipinitialspace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="c1"># create an empty standard data frame - sdf - filled with NAs</span>
+    <span class="n">sdf</span> <span class="o">=</span> <span class="n">create_sdf</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">rdf</span><span class="p">))</span>
+
+    <span class="c1"># Unique beacon identifier</span>
+    <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;platform_id&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">raw_data_file</span><span class="p">)</span><span class="o">.</span><span class="n">stem</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="c1"># This is the C-CORE format</span>
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;timestamp&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_datetime</span><span class="p">(</span>
+            <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;DT_TAG_POS_UTC&quot;</span><span class="p">],</span> <span class="nb">format</span><span class="o">=</span><span class="s2">&quot;%Y-%m-</span><span class="si">%d</span><span class="s2">T%H:%MUTC&quot;</span><span class="p">,</span> <span class="n">utc</span><span class="o">=</span><span class="kc">True</span>
+        <span class="p">)</span>
+
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;latitude&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;LAT_TAG&quot;</span><span class="p">]</span>
+
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;longitude&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;LON_TAG&quot;</span><span class="p">]</span>
+
+    <span class="k">except</span><span class="p">:</span>
+
+        <span class="c1"># This is the IIP format</span>
+        <span class="k">try</span><span class="p">:</span>
+
+            <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;timestamp&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_datetime</span><span class="p">(</span>
+                <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;DATETIME&quot;</span><span class="p">],</span> <span class="nb">format</span><span class="o">=</span><span class="s2">&quot;%Y-%m-</span><span class="si">%d</span><span class="s2">T%H:%MUTC&quot;</span><span class="p">,</span> <span class="n">utc</span><span class="o">=</span><span class="kc">True</span>
+            <span class="p">)</span>
+
+            <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;latitude&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;LATITUDE&quot;</span><span class="p">]</span>
+
+            <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;longitude&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;LONGITUDE&quot;</span><span class="p">]</span>
+
+        <span class="k">except</span><span class="p">:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Problem with raw data file </span><span class="si">{</span><span class="n">raw_data_file</span><span class="si">}</span><span class="s2">, check formatting&quot;</span><span class="p">)</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">sdf</span></div>
+
+
+
+<div class="viewcode-block" id="oceanetic">
+<a class="viewcode-back" href="../api.html#track_readers.oceanetic">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">oceanetic</span><span class="p">(</span><span class="n">raw_data_file</span><span class="p">,</span> <span class="n">log</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Convert raw data from Oceanetic format to standardized dataframe.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    raw_data_file : string</span>
+<span class="sd">        Path to raw data CSV file.</span>
+<span class="sd">    log : logger</span>
+<span class="sd">        A logger instance.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    sdf : Pandas DataFrame</span>
+<span class="sd">        Standardized Pandas dataframe ready for processing.</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    Raw Data Columns:</span>
+
+<span class="sd">    - beacon id</span>
+<span class="sd">    - yr</span>
+<span class="sd">    - mm</span>
+<span class="sd">    - dd</span>
+<span class="sd">    - hr</span>
+<span class="sd">    - lat</span>
+<span class="sd">    - long</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># read in the raw data frame - rdf</span>
+    <span class="n">rdf</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">raw_data_file</span><span class="p">,</span> <span class="n">index_col</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">skipinitialspace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="c1"># create an empty standard data frame - sdf - filled with NAs</span>
+    <span class="n">sdf</span> <span class="o">=</span> <span class="n">create_sdf</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">rdf</span><span class="p">))</span>
+
+    <span class="c1"># Unique beacon identifier</span>
+    <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;platform_id&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">raw_data_file</span><span class="p">)</span><span class="o">.</span><span class="n">stem</span>
+
+    <span class="k">try</span><span class="p">:</span>
+
+        <span class="n">rdf</span><span class="o">.</span><span class="n">rename</span><span class="p">(</span>
+            <span class="n">columns</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;yr&quot;</span><span class="p">:</span> <span class="s2">&quot;year&quot;</span><span class="p">,</span> <span class="s2">&quot;mm&quot;</span><span class="p">:</span> <span class="s2">&quot;month&quot;</span><span class="p">,</span> <span class="s2">&quot;dd&quot;</span><span class="p">:</span> <span class="s2">&quot;day&quot;</span><span class="p">,</span> <span class="s2">&quot;hr&quot;</span><span class="p">:</span> <span class="s2">&quot;hour&quot;</span><span class="p">},</span>
+            <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;timestamp&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_datetime</span><span class="p">(</span>
+            <span class="n">rdf</span><span class="p">[[</span><span class="s2">&quot;year&quot;</span><span class="p">,</span> <span class="s2">&quot;month&quot;</span><span class="p">,</span> <span class="s2">&quot;day&quot;</span><span class="p">,</span> <span class="s2">&quot;hour&quot;</span><span class="p">]],</span> <span class="n">utc</span><span class="o">=</span><span class="kc">True</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Latitude</span>
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;latitude&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;lat&quot;</span><span class="p">]</span>
+
+        <span class="c1"># Longitude</span>
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;longitude&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;long&quot;</span><span class="p">]</span>
+
+    <span class="k">except</span><span class="p">:</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Problem with raw data file </span><span class="si">{</span><span class="n">raw_data_file</span><span class="si">}</span><span class="s2">, check formatting&quot;</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">sdf</span></div>
+
+
+
+<div class="viewcode-block" id="ceos">
+<a class="viewcode-back" href="../api.html#track_readers.ceos">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">ceos</span><span class="p">(</span><span class="n">raw_data_file</span><span class="p">,</span> <span class="n">log</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Convert raw data from CEOS format to standardized dataframe.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    raw_data_file : string</span>
+<span class="sd">        Path to raw data CSV file.</span>
+<span class="sd">    log : logger</span>
+<span class="sd">        A logger instance.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    sdf : Pandas DataFrame</span>
+<span class="sd">        Standardized Pandas dataframe ready for processing.</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    Raw Data Columns:</span>
+<span class="sd">    - imei</span>
+<span class="sd">    - unknown</span>
+<span class="sd">    - unknown</span>
+<span class="sd">    - date</span>
+<span class="sd">    - time</span>
+<span class="sd">    - lat</span>
+<span class="sd">    - hemi</span>
+<span class="sd">    - long</span>
+<span class="sd">    - hemi</span>
+<span class="sd">    - unknown</span>
+<span class="sd">    - unknown</span>
+<span class="sd">    - unknown</span>
+<span class="sd">    - unknown</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># read in the raw data frame - rdf</span>
+    <span class="n">rdf</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">raw_data_file</span><span class="p">,</span> <span class="n">index_col</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">skipinitialspace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="c1"># create an empty standard data frame - sdf - filled with NAs</span>
+    <span class="n">sdf</span> <span class="o">=</span> <span class="n">create_sdf</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">rdf</span><span class="p">))</span>
+
+    <span class="c1"># Unique beacon identifier</span>
+    <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;platform_id&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">raw_data_file</span><span class="p">)</span><span class="o">.</span><span class="n">stem</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;timestamp&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_datetime</span><span class="p">(</span>
+            <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;date&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">cat</span><span class="p">(</span><span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;time&quot;</span><span class="p">],</span> <span class="n">sep</span><span class="o">=</span><span class="s2">&quot; &quot;</span><span class="p">),</span> <span class="n">utc</span><span class="o">=</span><span class="kc">True</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Latitude</span>
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;latitude&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;lat&quot;</span><span class="p">]</span>
+
+        <span class="c1"># Longitude</span>
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;longitude&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;long&quot;</span><span class="p">]</span>
+
+    <span class="k">except</span><span class="p">:</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Problem with raw data file </span><span class="si">{</span><span class="n">raw_data_file</span><span class="si">}</span><span class="s2">, check formatting&quot;</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">sdf</span></div>
+
+
+
+<div class="viewcode-block" id="wirl_sbd">
+<a class="viewcode-back" href="../api.html#track_readers.wirl_sbd">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">wirl_sbd</span><span class="p">(</span><span class="n">raw_data_file</span><span class="p">,</span> <span class="n">log</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Convert raw data from WIRL SBD decode format to standardized dataframe.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    raw_data_file : string</span>
+<span class="sd">        Path to raw data CSV file.</span>
+<span class="sd">    log : logger</span>
+<span class="sd">        A logger instance.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    sdf : Pandas DataFrame</span>
+<span class="sd">        Standardized Pandas dataframe ready for processing.</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    Raw Data Columns:</span>
+
+<span class="sd">    - IMEI</span>
+<span class="sd">    - Year</span>
+<span class="sd">    - Month</span>
+<span class="sd">    - Day</span>
+<span class="sd">    - Hour</span>
+<span class="sd">    - Minute</span>
+<span class="sd">    - Latitude</span>
+<span class="sd">    - Longitude</span>
+<span class="sd">    - Temperature</span>
+<span class="sd">    - Voltage Battery</span>
+<span class="sd">    - AtmPress</span>
+<span class="sd">    - FormatID</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># set up the logger to output nowhere if None</span>
+    <span class="k">if</span> <span class="n">log</span> <span class="o">==</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">log</span> <span class="o">=</span> <span class="n">nolog</span><span class="p">()</span>
+
+    <span class="c1"># read in the raw data frame - rdf</span>
+    <span class="n">rdf</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">raw_data_file</span><span class="p">,</span> <span class="n">index_col</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">skipinitialspace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="c1"># create an empty standard data frame - sdf - filled with NAs</span>
+    <span class="n">sdf</span> <span class="o">=</span> <span class="n">create_sdf</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">rdf</span><span class="p">))</span>
+
+    <span class="c1"># Unique beacon identifier</span>
+    <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;platform_id&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">raw_data_file</span><span class="p">)</span><span class="o">.</span><span class="n">stem</span>
+
+    <span class="k">try</span><span class="p">:</span>
+
+        <span class="k">if</span> <span class="s2">&quot;Year&quot;</span> <span class="ow">in</span> <span class="n">rdf</span><span class="p">:</span>
+            <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;timestamp&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_datetime</span><span class="p">(</span>
+                <span class="n">rdf</span><span class="p">[[</span><span class="s2">&quot;Year&quot;</span><span class="p">,</span> <span class="s2">&quot;Month&quot;</span><span class="p">,</span> <span class="s2">&quot;Day&quot;</span><span class="p">,</span> <span class="s2">&quot;Hour&quot;</span><span class="p">,</span> <span class="s2">&quot;Minute&quot;</span><span class="p">]],</span> <span class="n">utc</span><span class="o">=</span><span class="kc">True</span>
+            <span class="p">)</span>
+
+        <span class="c1"># Latitude</span>
+        <span class="k">if</span> <span class="s2">&quot;Latitude&quot;</span> <span class="ow">in</span> <span class="n">rdf</span><span class="p">:</span>
+            <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;latitude&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;Latitude&quot;</span><span class="p">]</span>
+
+        <span class="c1"># Longitude</span>
+        <span class="k">if</span> <span class="s2">&quot;Longitude&quot;</span> <span class="ow">in</span> <span class="n">rdf</span><span class="p">:</span>
+            <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;longitude&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;Longitude&quot;</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="s2">&quot;Temperature&quot;</span> <span class="ow">in</span> <span class="n">rdf</span><span class="p">:</span>
+            <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;internal_temperature&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;Temperature&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="mf">273.15</span>  <span class="c1"># to Kelvin</span>
+            <span class="n">sdf</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;internal_temperature&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="o">-</span><span class="mi">99</span><span class="p">,</span> <span class="s2">&quot;internal_temperature&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span>
+
+        <span class="k">if</span> <span class="s2">&quot;AtmPress&quot;</span> <span class="ow">in</span> <span class="n">rdf</span><span class="p">:</span>
+            <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;air_pressure&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;AtmPress&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="mi">100</span>  <span class="c1"># from hPa to Pa</span>
+            <span class="c1"># convert to nan</span>
+            <span class="n">sdf</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;air_pressure&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="o">-</span><span class="mi">99</span> <span class="o">*</span> <span class="mi">100</span><span class="p">,</span> <span class="s2">&quot;air_pressure&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span>
+
+        <span class="k">if</span> <span class="s2">&quot;Voltage Battery&quot;</span> <span class="ow">in</span> <span class="n">rdf</span><span class="p">:</span>
+            <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;voltage_battery_volts&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;Voltage Battery&quot;</span><span class="p">]</span>
+
+    <span class="k">except</span><span class="p">:</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Problem with raw data file </span><span class="si">{</span><span class="n">raw_data_file</span><span class="si">}</span><span class="s2">, check formatting&quot;</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">sdf</span></div>
+
+
+
+<div class="viewcode-block" id="rockstar">
+<a class="viewcode-back" href="../api.html#track_readers.rockstar">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">rockstar</span><span class="p">(</span><span class="n">raw_data_file</span><span class="p">,</span> <span class="n">log</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Convert raw data from Rockstar/Yellowbrick format to standardized dataframe.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    raw_data_file : string</span>
+<span class="sd">        Path to raw data CSV file.</span>
+<span class="sd">    log : logger</span>
+<span class="sd">        A logger instance.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    sdf : Pandas DataFrame</span>
+<span class="sd">        Standardized Pandas dataframe ready for processing.</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    Raw Data Columns:</span>
+
+<span class="sd">    - ID</span>
+<span class="sd">    - GPS Time (UTC)  (dd-mm-yyyy hh:mm:ss)</span>
+<span class="sd">    - GPS Time (UTC)  (dd/mm/yyyy hh:mm:ss)</span>
+<span class="sd">    - Latitude</span>
+<span class="sd">    - Longitude</span>
+<span class="sd">    - GPS SOG</span>
+<span class="sd">    - SOG</span>
+<span class="sd">    - COG</span>
+<span class="sd">    - GPS COG</span>
+<span class="sd">    - Altitude</span>
+<span class="sd">    - Ext. Power</span>
+<span class="sd">    - Battery</span>
+<span class="sd">    - Source</span>
+<span class="sd">    - CEP</span>
+<span class="sd">    - Temperature</span>
+<span class="sd">    - Reason</span>
+<span class="sd">    - GPS PDOP</span>
+<span class="sd">    - Nav Mode</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># set up the logger to output nowhere if None</span>
+    <span class="k">if</span> <span class="n">log</span> <span class="o">==</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">log</span> <span class="o">=</span> <span class="n">nolog</span><span class="p">()</span>
+
+    <span class="c1"># read in the raw data frame - rdf</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">raw_data_file</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">fp</span><span class="p">:</span>
+        <span class="n">lines</span> <span class="o">=</span> <span class="n">fp</span><span class="o">.</span><span class="n">readlines</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">lines</span><span class="p">:</span>
+            <span class="n">word</span> <span class="o">=</span> <span class="s2">&quot;ID,GPS&quot;</span>  <span class="c1"># ------</span>
+            <span class="k">if</span> <span class="n">row</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="n">word</span><span class="p">)</span> <span class="o">!=</span> <span class="o">-</span><span class="mi">1</span><span class="p">:</span>
+                <span class="n">skip</span> <span class="o">=</span> <span class="n">lines</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">row</span><span class="p">)</span>
+                <span class="k">break</span>
+
+    <span class="k">if</span> <span class="n">skip</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Start of comments from raw RockSTAR file:&quot;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">skip</span><span class="p">):</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">lines</span><span class="p">[</span><span class="n">row</span><span class="p">])</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;End of comments from raw RockSTAR file:&quot;</span><span class="p">)</span>
+
+    <span class="n">rdf</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">raw_data_file</span><span class="p">,</span> <span class="n">index_col</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">skiprows</span><span class="o">=</span><span class="n">skip</span><span class="p">)</span>
+
+    <span class="c1"># use only data from source gps</span>
+    <span class="n">rdf</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;Source&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;GPS&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">reset_index</span><span class="p">()</span>
+
+    <span class="c1"># create an empty standard data frame - sdf - filled with NAs</span>
+    <span class="n">sdf</span> <span class="o">=</span> <span class="n">create_sdf</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">rdf</span><span class="p">))</span>
+
+    <span class="c1"># Unique beacon identifier</span>
+    <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;platform_id&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">raw_data_file</span><span class="p">)</span><span class="o">.</span><span class="n">stem</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="c1"># there are 2 columns with the same label.  they seem to be always the same...</span>
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;timestamp&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_datetime</span><span class="p">(</span>
+            <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;GPS Time (UTC)&quot;</span><span class="p">],</span> <span class="n">dayfirst</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">utc</span><span class="o">=</span><span class="kc">True</span>
+        <span class="p">)</span>
+
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;latitude&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;Latitude&quot;</span><span class="p">]</span>
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;longitude&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;Longitude&quot;</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="s2">&quot;Temperature&quot;</span> <span class="ow">in</span> <span class="n">rdf</span><span class="p">:</span>
+            <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;internal_temperature&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;Temperature&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="mf">273.15</span>  <span class="c1"># to Kelvin</span>
+
+    <span class="k">except</span><span class="p">:</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Problem with raw data file </span><span class="si">{</span><span class="n">raw_data_file</span><span class="si">}</span><span class="s2">, check formatting&quot;</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">sdf</span></div>
+
+
+
+<div class="viewcode-block" id="solara">
+<a class="viewcode-back" href="../api.html#track_readers.solara">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">solara</span><span class="p">(</span><span class="n">raw_data_file</span><span class="p">,</span> <span class="n">log</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Convert raw data from Solara format to standardized dataframe.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    raw_data_file : string</span>
+<span class="sd">        Path to raw data CSV file.</span>
+<span class="sd">    log : logger</span>
+<span class="sd">        A logger instance.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    sdf : Pandas DataFrame</span>
+<span class="sd">        Standardized Pandas dataframe ready for processing.</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    Raw Data Columns:</span>
+
+<span class="sd">    - serial</span>
+<span class="sd">    - alias</span>
+<span class="sd">    - lat</span>
+<span class="sd">    - long</span>
+<span class="sd">    - timestamp</span>
+
+<span class="sd">      - format_1 = &quot;%Y-%m-%d %H:%M:%S&quot;</span>
+<span class="sd">      - format_2 = &quot;%d/%m/%Y %H:%M:%S&quot;</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># set up the logger to output nowhere if None</span>
+    <span class="k">if</span> <span class="n">log</span> <span class="o">==</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">log</span> <span class="o">=</span> <span class="n">nolog</span><span class="p">()</span>
+
+    <span class="c1"># read in the raw data frame - rdf</span>
+    <span class="n">rdf</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">raw_data_file</span><span class="p">,</span> <span class="n">index_col</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">skipinitialspace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="c1"># create an empty standard data frame - sdf - filled with NAs</span>
+    <span class="n">sdf</span> <span class="o">=</span> <span class="n">create_sdf</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">rdf</span><span class="p">))</span>
+
+    <span class="c1"># Unique beacon identifier</span>
+    <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;platform_id&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">raw_data_file</span><span class="p">)</span><span class="o">.</span><span class="n">stem</span>
+
+    <span class="k">try</span><span class="p">:</span>
+
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;timestamp&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_datetime</span><span class="p">(</span><span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;timestamp&quot;</span><span class="p">],</span> <span class="n">utc</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;latitude&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;lat&quot;</span><span class="p">]</span>
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;longitude&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;long&quot;</span><span class="p">]</span>
+
+    <span class="k">except</span><span class="p">:</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Problem with raw data file </span><span class="si">{</span><span class="n">raw_data_file</span><span class="si">}</span><span class="s2">, check formatting&quot;</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">sdf</span></div>
+
+
+
+<div class="viewcode-block" id="metocean">
+<a class="viewcode-back" href="../api.html#track_readers.metocean">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">metocean</span><span class="p">(</span><span class="n">raw_data_file</span><span class="p">,</span> <span class="n">log</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Convert raw data from Metocean SVP/iCALIB format to standardized dataframe.</span>
+
+<span class="sd">    Some examples are:</span>
+
+<span class="sd">    - iCALIB beacons</span>
+<span class="sd">    - SVP-I-BXGS-LP beacons have BP, GPS, and SST</span>
+<span class="sd">    - SVP-I-XXGS-LP beacons have GPS and SST, no BP</span>
+<span class="sd">    - SVP-I-BXGSA-L-AD beacons have BP, GPS, SST, AT, lithium battery and are</span>
+<span class="sd">      designed for air deployment in Arctic regions</span>
+
+<span class="sd">    Note that variable names are slightly different so lots of if/elif or finding columns</span>
+<span class="sd">    from a list of options or regex.</span>
+
+<span class="sd">    Watch out for data vs transmission timestamps.  If in doubt, build them from</span>
+<span class="sd">    year, month, day, hour, minute.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    raw_data_file : string</span>
+<span class="sd">        Path to raw data CSV file.</span>
+<span class="sd">    log : logger</span>
+<span class="sd">        A logger instance.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    sdf : Pandas DataFrame</span>
+<span class="sd">        Standardized Pandas dataframe ready for processing.</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+
+<span class="sd">    Raw Data Columns:</span>
+
+<span class="sd">    - Asset Name / Asset.Name</span>
+<span class="sd">    - Asset Id  / Asset.Id / Modem ID</span>
+<span class="sd">    - Data Date (UTC) / DataDate_UTC  / Date(GMT)</span>
+<span class="sd">    - Received Date (UTC) / Date (GMT)</span>
+<span class="sd">    - LATITUDE / LAT  # this is in dd.dddd format / GPS LATITUDE (DEGREES) # dd mm.mmmmmm</span>
+<span class="sd">    - LONGITUDE / LON # this is in dd.dddd format / GPS LONGITUDE (DEGREES) # dd mm.mmmmmm</span>
+<span class="sd">    - FMTID / FORMAT ID</span>
+<span class="sd">    - YEAR</span>
+<span class="sd">    - MONTH</span>
+<span class="sd">    - DAY / DAY (day)</span>
+<span class="sd">    - HOUR / HOUR (hr)</span>
+<span class="sd">    - JHOUR</span>
+<span class="sd">    - GPSFIXJHOUR</span>
+<span class="sd">    - MIN  / MINUTE (min)</span>
+<span class="sd">    - SST  / Sea Surface Temperature (�C)</span>
+<span class="sd">    - BP  / Barometric Pressure (mbar) / Ref Pressure</span>
+<span class="sd">    - BPT / Barometric Pressure Tendency (mbar)</span>
+<span class="sd">    - AT</span>
+<span class="sd">    - VBAT / Battery Voltage (V)</span>
+<span class="sd">    - GPSDELAY / Time Since Last GPS fix (min) (up to 4095)</span>
+<span class="sd">    - SNR  / GPS reported Signal to Noise ratio (dB)</span>
+<span class="sd">    - TTFF / Time to First fix (s)</span>
+<span class="sd">    - SBDTIME  / Iridium Transmission Duration (s)</span>
+<span class="sd">    - Report Body / Report.Body / Hex Data</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># set up the logger to output nowhere if None</span>
+    <span class="k">if</span> <span class="n">log</span> <span class="o">==</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">log</span> <span class="o">=</span> <span class="n">nolog</span><span class="p">()</span>
+
+    <span class="c1"># read in the raw data frame - rdf</span>
+    <span class="n">rdf</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span>
+        <span class="n">raw_data_file</span><span class="p">,</span> <span class="n">index_col</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">skipinitialspace</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">encoding_errors</span><span class="o">=</span><span class="s2">&quot;replace&quot;</span>
+    <span class="p">)</span>
+
+    <span class="c1"># filtering steps before copying into the sdf</span>
+
+    <span class="c1"># Only use data that is current.  GPSDELAY tells you how stale the GPS data are</span>
+    <span class="k">if</span> <span class="s2">&quot;GPSDELAY&quot;</span> <span class="ow">in</span> <span class="n">rdf</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s1">&#39;Removing </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">rdf</span><span class="p">[</span><span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;GPSDELAY&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="p">])</span><span class="si">}</span><span class="s1"> positions where the GNSS data is old&#39;</span>
+        <span class="p">)</span>
+        <span class="n">rdf</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;GPSDELAY&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">reset_index</span><span class="p">()</span>
+
+    <span class="c1"># This is the same as above</span>
+    <span class="k">if</span> <span class="s2">&quot;Time Since Last GPS fix (min)&quot;</span> <span class="ow">in</span> <span class="n">rdf</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s1">&#39;Removing </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">rdf</span><span class="p">[</span><span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;Time Since Last GPS fix (min)&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="p">])</span><span class="si">}</span><span class="s1"> positions where the GNSS data is old&#39;</span>
+        <span class="p">)</span>
+        <span class="n">rdf</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;Time Since Last GPS fix (min)&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">reset_index</span><span class="p">()</span>
+
+    <span class="c1"># with this format when JHOUR matches GPSFIXJHOUR then the data are current, otherwise stale.</span>
+    <span class="k">if</span> <span class="s2">&quot;GPSFIXJHOUR&quot;</span> <span class="ow">in</span> <span class="n">rdf</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s1">&#39;Removing </span><span class="si">{</span><span class="nb">sum</span><span class="p">(</span><span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;JHOUR&quot;</span><span class="p">]</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;GPSFIXJHOUR&quot;</span><span class="p">])</span><span class="si">}</span><span class="s1"> positions where the GNSS data is old&#39;</span>
+        <span class="p">)</span>
+        <span class="n">rdf</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;JHOUR&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;GPSFIXJHOUR&quot;</span><span class="p">]]</span><span class="o">.</span><span class="n">reset_index</span><span class="p">()</span>
+
+    <span class="c1"># create an empty standard data frame - sdf - filled with NAs</span>
+    <span class="n">sdf</span> <span class="o">=</span> <span class="n">create_sdf</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">rdf</span><span class="p">))</span>
+
+    <span class="c1"># Unique beacon identifier</span>
+    <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;platform_id&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">raw_data_file</span><span class="p">)</span><span class="o">.</span><span class="n">stem</span>
+
+    <span class="k">try</span><span class="p">:</span>
+
+        <span class="c1"># Data timestamp  - these options cover different output formats from Joubeh/Linc.</span>
+        <span class="c1"># the first few are data timestamps:</span>
+        <span class="n">timestamp_cols1</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;DATA DATE (UTC)&quot;</span><span class="p">,</span> <span class="s2">&quot;Data Date (UTC)&quot;</span><span class="p">,</span> <span class="s2">&quot;DataDate_UTC&quot;</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">timestamp_cols1</span><span class="p">:</span>  <span class="c1"># if there is a match, it will assign the datetime</span>
+            <span class="k">if</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">rdf</span><span class="p">:</span>
+                <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;timestamp&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_datetime</span><span class="p">(</span><span class="n">rdf</span><span class="p">[</span><span class="n">col</span><span class="p">],</span> <span class="n">utc</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+                <span class="k">break</span>
+        <span class="n">timestamp_cols2</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="s2">&quot;Date(GMT)&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;Date (GMT)&quot;</span><span class="p">,</span>
+        <span class="p">]</span>  <span class="c1"># These are not necessarily data timestamps</span>
+        <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">timestamp_cols2</span><span class="p">:</span>  <span class="c1"># if there is a match, it will assign the datetime</span>
+            <span class="k">if</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">rdf</span><span class="p">:</span>
+                <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;timestamp&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_datetime</span><span class="p">(</span><span class="n">rdf</span><span class="p">[</span><span class="n">col</span><span class="p">],</span> <span class="n">utc</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+                <span class="k">break</span>
+
+        <span class="k">if</span> <span class="s2">&quot;DATA DATE (UTC)&quot;</span> <span class="ow">in</span> <span class="n">rdf</span><span class="p">:</span>
+            <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;timestamp&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_datetime</span><span class="p">(</span><span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;DATA DATE (UTC)&quot;</span><span class="p">],</span> <span class="n">utc</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="s2">&quot;Data Date (UTC)&quot;</span> <span class="ow">in</span> <span class="n">rdf</span><span class="p">:</span>
+            <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;timestamp&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_datetime</span><span class="p">(</span><span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;Data Date (UTC)&quot;</span><span class="p">],</span> <span class="n">utc</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="s2">&quot;DataDate_UTC&quot;</span> <span class="ow">in</span> <span class="n">rdf</span><span class="p">:</span>
+            <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;timestamp&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_datetime</span><span class="p">(</span><span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;DataDate_UTC&quot;</span><span class="p">],</span> <span class="n">utc</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="p">(</span>
+            <span class="s2">&quot;Date(GMT)&quot;</span> <span class="ow">in</span> <span class="n">rdf</span> <span class="ow">or</span> <span class="s2">&quot;Date (GMT)&quot;</span> <span class="ow">in</span> <span class="n">rdf</span>
+        <span class="p">):</span>  <span class="c1"># this is potentially a transmission timestamp</span>
+            <span class="k">if</span> <span class="s2">&quot;JHOUR&quot;</span> <span class="ow">in</span> <span class="n">rdf</span><span class="p">:</span>
+                <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;timestamp&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_datetime</span><span class="p">(</span>
+                    <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;YEAR&quot;</span><span class="p">],</span> <span class="nb">format</span><span class="o">=</span><span class="s2">&quot;%Y&quot;</span><span class="p">,</span> <span class="n">utc</span><span class="o">=</span><span class="kc">True</span>
+                <span class="p">)</span> <span class="o">+</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;JHOUR&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">Timedelta</span><span class="p">,</span> <span class="n">unit</span><span class="o">=</span><span class="s2">&quot;h&quot;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># Since there are various forms, rename columns accordingly.</span>
+                <span class="n">rdf</span><span class="o">.</span><span class="n">rename</span><span class="p">(</span>
+                    <span class="n">columns</span><span class="o">=</span><span class="p">{</span><span class="n">rdf</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">regex</span><span class="o">=</span><span class="sa">r</span><span class="s2">&quot;^DAY.*&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">columns</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span> <span class="s2">&quot;DAY&quot;</span><span class="p">},</span>
+                    <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="n">rdf</span><span class="o">.</span><span class="n">rename</span><span class="p">(</span>
+                    <span class="n">columns</span><span class="o">=</span><span class="p">{</span><span class="n">rdf</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">regex</span><span class="o">=</span><span class="sa">r</span><span class="s2">&quot;^HOUR.*&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">columns</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span> <span class="s2">&quot;HOUR&quot;</span><span class="p">},</span>
+                    <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="n">rdf</span><span class="o">.</span><span class="n">rename</span><span class="p">(</span>
+                    <span class="n">columns</span><span class="o">=</span><span class="p">{</span><span class="n">rdf</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">regex</span><span class="o">=</span><span class="sa">r</span><span class="s2">&quot;^MINUTE.*&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">columns</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span> <span class="s2">&quot;MINUTE&quot;</span><span class="p">},</span>
+                    <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="c1"># build a timestamp</span>
+                <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;timestamp&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_datetime</span><span class="p">(</span>
+                    <span class="n">rdf</span><span class="p">[[</span><span class="s2">&quot;YEAR&quot;</span><span class="p">,</span> <span class="s2">&quot;MONTH&quot;</span><span class="p">,</span> <span class="s2">&quot;DAY&quot;</span><span class="p">,</span> <span class="s2">&quot;HOUR&quot;</span><span class="p">,</span> <span class="s2">&quot;MINUTE&quot;</span><span class="p">]],</span> <span class="n">utc</span><span class="o">=</span><span class="kc">True</span>
+                <span class="p">)</span>
+
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Timestamp missing or not recognized&quot;</span><span class="p">)</span>
+            <span class="k">raise</span>
+
+        <span class="c1"># Data transmission timestamp</span>
+        <span class="c1"># if &quot;RECEIVED DATE (UTC)&quot; in rdf:</span>
+        <span class="c1">#     sdf[&quot;datetime_transmit&quot;] = pd.to_datetime(</span>
+        <span class="c1">#         rdf[&quot;RECEIVED DATE (UTC)&quot;], utc=True</span>
+        <span class="c1">#     )</span>
+        <span class="c1"># elif &quot;Received Date (UTC)&quot; in rdf:</span>
+        <span class="c1">#     sdf[&quot;datetime_transmit&quot;] = pd.to_datetime(</span>
+        <span class="c1">#         rdf[&quot;Received Date (UTC)&quot;], utc=True</span>
+        <span class="c1">#     )</span>
+
+        <span class="k">if</span> <span class="s2">&quot;GPS LATITUDE (DEGREES)&quot;</span> <span class="ow">in</span> <span class="n">rdf</span><span class="p">:</span>
+            <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;latitude&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;GPS LATITUDE (DEGREES)&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">dms2dd</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="s2">&quot;LAT&quot;</span> <span class="ow">in</span> <span class="n">rdf</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;latitude&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;LAT&quot;</span><span class="p">]</span>
+        <span class="k">elif</span> <span class="s2">&quot;LATITUDE&quot;</span> <span class="ow">in</span> <span class="n">rdf</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;latitude&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;LATITUDE&quot;</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Latitude missing or not recognized&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="s2">&quot;GPS LONGITUDE (DEGREES)&quot;</span> <span class="ow">in</span> <span class="n">rdf</span><span class="p">:</span>
+            <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;longitude&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;GPS LONGITUDE (DEGREES)&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">dms2dd</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="s2">&quot;LON&quot;</span> <span class="ow">in</span> <span class="n">rdf</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;longitude&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;LON&quot;</span><span class="p">]</span>
+        <span class="k">elif</span> <span class="s2">&quot;LONGITUDE&quot;</span> <span class="ow">in</span> <span class="n">rdf</span><span class="p">:</span>
+            <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;longitude&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;LONGITUDE&quot;</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Longitude missing or not recognized&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Air temperature</span>
+        <span class="k">if</span> <span class="s2">&quot;AT&quot;</span> <span class="ow">in</span> <span class="n">rdf</span><span class="p">:</span>
+            <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;air_temperature&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;AT&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="mf">273.15</span>  <span class="c1"># to Kelvin</span>
+
+        <span class="c1"># Surface temperature</span>
+        <span class="k">if</span> <span class="s2">&quot;SST&quot;</span> <span class="ow">in</span> <span class="n">rdf</span><span class="p">:</span>
+            <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;surface_temperature&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;SST&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="mf">273.15</span>  <span class="c1"># to Kelvin</span>
+        <span class="k">if</span> <span class="s2">&quot;Sea Surface Temperature (�C)&quot;</span> <span class="ow">in</span> <span class="n">rdf</span><span class="p">:</span>
+            <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;surface_temperature&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;Sea Surface Temperature (�C)&quot;</span><span class="p">]</span>
+
+        <span class="c1"># Barometric pressure</span>
+        <span class="k">if</span> <span class="s2">&quot;BP&quot;</span> <span class="ow">in</span> <span class="n">rdf</span><span class="p">:</span>
+            <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;air_pressure&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;BP&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="mi">100</span>  <span class="c1"># from hPa to Pa</span>
+        <span class="k">if</span> <span class="s2">&quot;Barometric Pressure (mbar)&quot;</span> <span class="ow">in</span> <span class="n">rdf</span><span class="p">:</span>
+            <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;air_pressure&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;Barometric Pressure (mbar)&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="mi">100</span>
+            <span class="p">)</span>  <span class="c1"># from hPa to Pa</span>
+        <span class="k">if</span> <span class="s2">&quot;Ref Pressure&quot;</span> <span class="ow">in</span> <span class="n">rdf</span><span class="p">:</span>
+            <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;air_pressure&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;Ref Pressure&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="mi">100</span>  <span class="c1"># from hPa to Pa</span>
+
+        <span class="c1"># Battery voltage</span>
+        <span class="k">if</span> <span class="s2">&quot;VBAT&quot;</span> <span class="ow">in</span> <span class="n">rdf</span><span class="p">:</span>
+            <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;voltage_battery_volts&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;VBAT&quot;</span><span class="p">]</span>
+        <span class="k">if</span> <span class="s2">&quot;Battery Voltage (V)&quot;</span> <span class="ow">in</span> <span class="n">rdf</span><span class="p">:</span>
+            <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;voltage_battery_volts&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;Battery Voltage (V)&quot;</span><span class="p">]</span>
+
+    <span class="k">except</span><span class="p">:</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Problem with raw data file </span><span class="si">{</span><span class="n">raw_data_file</span><span class="si">}</span><span class="s2">, check formatting&quot;</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">sdf</span></div>
+
+
+
+<div class="viewcode-block" id="bio">
+<a class="viewcode-back" href="../api.html#track_readers.bio">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">bio</span><span class="p">(</span><span class="n">raw_data_file</span><span class="p">,</span> <span class="n">log</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Convert raw data from BIO Icetracker2 format to standardized dataframe.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    raw_data_file : string</span>
+<span class="sd">        Path to raw data CSV file.</span>
+<span class="sd">    log : logger</span>
+<span class="sd">        A logger instance.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    sdf : Pandas DataFrame</span>
+<span class="sd">        Standardized Pandas dataframe ready for processing.</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    Raw Data Columns:</span>
+
+<span class="sd">    - BID</span>
+<span class="sd">    - VOLTAGE</span>
+<span class="sd">    - GPS_DATE (08-09-15 13:00:00.000000000 or 2011-03-20 13:00:00.0)</span>
+<span class="sd">    - LATITUDE</span>
+<span class="sd">    - LONGITUDE</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># set up the logger to output nowhere if None</span>
+    <span class="k">if</span> <span class="n">log</span> <span class="o">==</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">log</span> <span class="o">=</span> <span class="n">nolog</span><span class="p">()</span>
+
+    <span class="c1"># read in the raw data frame - rdf</span>
+    <span class="n">rdf</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">raw_data_file</span><span class="p">,</span> <span class="n">index_col</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">skipinitialspace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="c1"># create an empty standard data frame - sdf - filled with NAs</span>
+    <span class="n">sdf</span> <span class="o">=</span> <span class="n">create_sdf</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">rdf</span><span class="p">))</span>
+
+    <span class="c1"># Unique beacon identifier</span>
+    <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;platform_id&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">raw_data_file</span><span class="p">)</span><span class="o">.</span><span class="n">stem</span>
+
+    <span class="c1"># transfer the data from rdf to sdf</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;timestamp&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_datetime</span><span class="p">(</span>
+            <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;GPS_DATE&quot;</span><span class="p">],</span> <span class="nb">format</span><span class="o">=</span><span class="s2">&quot;%Y-%m-</span><span class="si">%d</span><span class="s2"> %H:%M:%S.</span><span class="si">%f</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">errors</span><span class="o">=</span><span class="s2">&quot;coerce&quot;</span><span class="p">,</span> <span class="n">utc</span><span class="o">=</span><span class="kc">True</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span>
+            <span class="n">pd</span><span class="o">.</span><span class="n">to_datetime</span><span class="p">(</span>
+                <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;GPS_DATE&quot;</span><span class="p">],</span>
+                <span class="nb">format</span><span class="o">=</span><span class="s2">&quot;%y-%m-</span><span class="si">%d</span><span class="s2"> %H:%M:%S.</span><span class="si">%f</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="n">errors</span><span class="o">=</span><span class="s2">&quot;coerce&quot;</span><span class="p">,</span>
+                <span class="n">utc</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;latitude&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;LATITUDE&quot;</span><span class="p">]</span>
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;longitude&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;LONGITUDE&quot;</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="s2">&quot;VOLTAGE&quot;</span> <span class="ow">in</span> <span class="n">rdf</span><span class="p">:</span>
+            <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;voltage_battery_volts&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;VOLTAGE&quot;</span><span class="p">]</span>
+
+    <span class="k">except</span><span class="p">:</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Problem with raw data file </span><span class="si">{</span><span class="n">raw_data_file</span><span class="si">}</span><span class="s2">, check formatting&quot;</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">sdf</span></div>
+
+
+
+<div class="viewcode-block" id="navidatum">
+<a class="viewcode-back" href="../api.html#track_readers.navidatum">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">navidatum</span><span class="p">(</span><span class="n">raw_data_file</span><span class="p">,</span> <span class="n">log</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Convert raw data from Skywave DMR800L format to standardized dataframe.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    raw_data_file : string</span>
+<span class="sd">        Path to raw data CSV file.</span>
+<span class="sd">    log : logger</span>
+<span class="sd">        A logger instance.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    sdf : Pandas DataFrame</span>
+<span class="sd">        Standardized Pandas dataframe ready for processing.</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    Raw Data Columns:</span>
+
+<span class="sd">    - Date (02/08/2012 21:01)</span>
+<span class="sd">    - Latitude</span>
+<span class="sd">    - Longitude</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># set up the logger to output nowhere if None</span>
+    <span class="k">if</span> <span class="n">log</span> <span class="o">==</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">log</span> <span class="o">=</span> <span class="n">nolog</span><span class="p">()</span>
+
+    <span class="c1"># read in the raw data frame - rdf</span>
+    <span class="n">rdf</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">raw_data_file</span><span class="p">,</span> <span class="n">index_col</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">skipinitialspace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="c1"># create an empty standard data frame - sdf - filled with NAs</span>
+    <span class="n">sdf</span> <span class="o">=</span> <span class="n">create_sdf</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">rdf</span><span class="p">))</span>
+
+    <span class="c1"># Unique beacon identifier</span>
+    <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;platform_id&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">raw_data_file</span><span class="p">)</span><span class="o">.</span><span class="n">stem</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;timestamp&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_datetime</span><span class="p">(</span>
+            <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;Date&quot;</span><span class="p">],</span> <span class="nb">format</span><span class="o">=</span><span class="s2">&quot;</span><span class="si">%d</span><span class="s2">/%m/%Y %H:%M&quot;</span><span class="p">,</span> <span class="n">utc</span><span class="o">=</span><span class="kc">True</span>
+        <span class="p">)</span>
+
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;latitude&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;Latitude&quot;</span><span class="p">]</span>
+        <span class="n">sdf</span><span class="p">[</span><span class="s2">&quot;longitude&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdf</span><span class="p">[</span><span class="s2">&quot;Longitude&quot;</span><span class="p">]</span>
+
+    <span class="k">except</span><span class="p">:</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Problem with raw data file </span><span class="si">{</span><span class="n">raw_data_file</span><span class="si">}</span><span class="s2">, check formatting&quot;</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">sdf</span></div>
+
+
+
+<span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">def fn_template(raw_data_file, log=None):</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    Convert raw data from &lt;PROVIDER/MODEL&gt; format to standardized dataframe.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    raw_data_file : string</span>
+<span class="sd">        Path to raw data CSV file.</span>
+<span class="sd">    log : logger</span>
+<span class="sd">        A logger instance.</span>
+<span class="sd">        </span>
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    sdf : Pandas DataFrame</span>
+<span class="sd">        Standardized Pandas dataframe ready for processing.</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    &lt;INSERT HERE&gt;</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    # set up the logger to output nowhere if None</span>
+<span class="sd">    if log == None:</span>
+<span class="sd">        log = nolog()</span>
+<span class="sd">        </span>
+<span class="sd">    # read in the raw data frame - rdf</span>
+<span class="sd">    rdf = pd.read_csv(raw_data_file,  index_col=False, skipinitialspace=True)</span>
+
+<span class="sd">    # create an empty standard data frame - sdf - filled with NAs</span>
+<span class="sd">    sdf = create_sdf(len(rdf))</span>
+
+<span class="sd">    # Unique beacon identifier</span>
+<span class="sd">    sdf[&quot;platform_id&quot;] = Path(raw_data_file).stem</span>
+
+<span class="sd">    try:</span>
+<span class="sd">        1 + 1  # placeholder - remove to use template</span>
+<span class="sd">        # &lt;INSERT HERE&gt;</span>
+
+<span class="sd">    except:</span>
+<span class="sd">        log.error(f&quot;Problem with raw data file {raw_data_file}, check formatting&quot;)</span>
+<span class="sd">        sys.exit(1)</span>
+
+<span class="sd">    return sdf</span>
+<span class="sd">&#39;&#39;&#39;</span>
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">Iceberg Beacon Track Database (IBTD) Tools</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../README.html">Iceberg Beacon Track Database (IBTD) Tools</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api.html">Scripts</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api.html#api-reference">API Reference</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2025, WIRL.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>
