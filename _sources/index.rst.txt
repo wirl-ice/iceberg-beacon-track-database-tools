@@ -6,12 +6,9 @@
 Iceberg Beacon Track Database (IBTD) Tools documentation
 ========================================================
 
-
-
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
 
-   README.md
    api
 
