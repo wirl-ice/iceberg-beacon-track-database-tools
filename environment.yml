@@ -8,6 +8,8 @@ dependencies:
   - cartopy
   - openpyxl
   - odfpy
+  - sphinx
+  - myst-parser
 
   
   
