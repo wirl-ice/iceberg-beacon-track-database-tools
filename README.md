@@ -119,7 +119,7 @@ All tracks are converted to a standard format with the following columns, where 
 | `platform_speed_wrt_ground`  | Speed from previous to current track position                                                                 | ms-1                      | CF         | https://cfconventions.org/Data/cf-standard-names/current/build/cf-standard-name-table.html#platform_speed_wrt_ground | float     |
 | `platform_course`            | Azimuth relative to true north from previous to current track position                                        | degrees                   | CF         | https://cfconventions.org/Data/cf-standard-names/current/build/cf-standard-name-table.html#platform_course           | float     |
 
-## **Dependencies**
+## Dependencies
 
 * python 3
 * pandas, numpy, geopandas>=1.0, matplotlib, seaborn, cartopy, openpyxl, odfpy
@@ -143,4 +143,4 @@ This software is licenced under GNU General Public License v3 See `LICENSE` file
 
 ## References
 
-- For detailed documentation and usage, see...(sphinx to come..)
+- For detailed documentation and usage, see https://wirl-ice.github.io/iceberg-beacon-track-database-tools/
