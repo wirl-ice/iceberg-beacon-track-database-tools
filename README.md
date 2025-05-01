@@ -14,11 +14,11 @@ Drift location, direction and speed along with other environmental data from tra
 
 The Database itself can be accessed here: 
 
-[Garbo A, Rajewicz, J, Mueller D, Tivy A, Copland L, Turnbull I, Desjardins L, Barber D, Peterson I, Prinsenberg S, Dalton A, Briggs R, Crawford A, Lamontagne P, Roth, JC, King T, Hicks M, Spring W, Conner S, Hill C. (2025) Iceberg Beacon Track Database [version 1.0]. Canadian Cryospheric Information Network (CCIN), Waterloo, Canada. doi:10.21963/13340.](https://doi.org/10.21963/13340)
+[Garbo A, Rajewicz, J, Mueller D, Tivy A, Copland L, Turnbull I, Desjardins L, Barber D, Peterson I, Prinsenberg S, Dalton A, Briggs R, Crawford A, Lamontagne P, Roth, JC, King T, Hicks M, Spring W, Conner S, Hill C. (2025) Iceberg Beacon Track Database (IBTD) [version 1.0]. Canadian Cryospheric Information Network (CCIN), Waterloo, Canada. doi:10.21963/13340.](https://doi.org/10.21963/13340)
 
 More details on the IBTD can be found in the Database documentation: 
 
-[Mueller D, Rajewicz, J, Garbo A, Tivy A (2025) Iceberg Beacon Track Database [version 1.0] Documentation. Water and Ice Research Lab, Department of Geography and Environmental Studies, Carleton University, Ottawa. 32 pp. doi:10.22215/wirl/2025.1](https://doi.org/10.22215/wirl/2025.1)
+[Mueller D, Rajewicz, J, Garbo A, Tivy A (2025) Iceberg Beacon Track Database (IBTD) [version 1.0] Documentation. Water and Ice Research Lab, Department of Geography and Environmental Studies, Carleton University, Ottawa. 40 pp. doi:10.22215/wirl/2025.1](https://doi.org/10.22215/wirl/2025.1)
 
 ## Overview
 
