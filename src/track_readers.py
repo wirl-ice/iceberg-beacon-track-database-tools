@@ -1239,7 +1239,6 @@ def metocean(raw_data_file, log=None):
 
     Notes
     -----
-
     Raw Data Columns:
 
     - Asset Name / Asset.Name

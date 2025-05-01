@@ -254,20 +254,19 @@ def plot_trim(track, path_output=".", dpi=300, interactive=False, log=None):
     Create a timeseries graph of data from the beacon to assist in finding trim_start and trim_end.
 
     There are 3 panels:
-        1) Temperature (of the air, surface or internal, depending on what is available), the
-        air pressure, if available.
 
-        2) 5 and 3 day rolling mean and standard deviation of temperature.
+    * Temperature (of the air, surface or internal, depending on what is available), the
+      air pressure, if available.
+    * 5 and 3 day rolling mean and standard deviation of temperature.
+    * Battery voltage along with pitch and roll, if available.
 
-        3) Battery voltage along with pitch and roll, if available.
-
-    When beacons fall off their target into the water, the standard deviation of temperature should
-            decrease. Temperature should approach water temperature at the same time
-            (typically decreasing).  The rolling average and std are optimized for
-            determining trim_end, not trim_start (the window is left-aligned). When beacons
-            are deployed, they may still be acclimatizing to ambient conditions. In this
-            scenario, the rolling mean and std are less helpful because their windows are
-            positioned on the left to capture a sudden change as it occurs.
+    When beacons fall off their target into the water, the standard deviation of temperature
+    should decrease. Temperature should approach water temperature at the same time
+    (typically decreasing).  The rolling average and std are optimized for
+    determining trim_end, not trim_start (the window is left-aligned). When beacons
+    are deployed, they may still be acclimatizing to ambient conditions. In this
+    scenario, the rolling mean and std are less helpful because their windows are
+    positioned on the left to capture a sudden change as it occurs.
 
     Parameters
     ----------
