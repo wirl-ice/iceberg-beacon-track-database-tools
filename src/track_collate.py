@@ -248,6 +248,12 @@ def database_stats(ibtd_df, metadata, modeldata, run_name, outdir, log):
     )
     log.info(f"Data span from {ibtd_df.timestamp.min()} to {ibtd_df.timestamp.max()}")
 
+    # geographical extent
+    log.info(
+        f"Data span from Lat: {ibtd_df.latitude.min():.3f} to {ibtd_df.latitude.max():.3f}"
+        f"and from Lon: {ibtd_df.longitude.min():.3f} to {ibtd_df.longitude.max():.3f}"
+    )
+
     # number of groups and projects
     log.info(
         f"A total of {len(metadata.df.data_contributor.unique()):,} groups from government, "
