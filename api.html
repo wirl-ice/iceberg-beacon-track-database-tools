@@ -1180,22 +1180,20 @@ orange dot at trim_end.</p>
 <dt class="sig sig-object py" id="track_fig.plot_trim">
 <span class="sig-prename descclassname"><span class="pre">track_fig.</span></span><span class="sig-name descname"><span class="pre">plot_trim</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">track</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">path_output</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'.'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dpi</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">300</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interactive</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/track_fig.html#plot_trim"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#track_fig.plot_trim" title="Link to this definition">¶</a></dt>
 <dd><p>Create a timeseries graph of data from the beacon to assist in finding trim_start and trim_end.</p>
-<dl class="simple">
-<dt>There are 3 panels:</dt><dd><p>1) Temperature (of the air, surface or internal, depending on what is available), the
-air pressure, if available.</p>
-<ol class="arabic simple" start="2">
+<p>There are 3 panels:</p>
+<ul class="simple">
+<li><p>Temperature (of the air, surface or internal, depending on what is available), the
+air pressure, if available.</p></li>
 <li><p>5 and 3 day rolling mean and standard deviation of temperature.</p></li>
 <li><p>Battery voltage along with pitch and roll, if available.</p></li>
-</ol>
-</dd>
-<dt>When beacons fall off their target into the water, the standard deviation of temperature should</dt><dd><p>decrease. Temperature should approach water temperature at the same time
+</ul>
+<p>When beacons fall off their target into the water, the standard deviation of temperature
+should decrease. Temperature should approach water temperature at the same time
 (typically decreasing).  The rolling average and std are optimized for
 determining trim_end, not trim_start (the window is left-aligned). When beacons
 are deployed, they may still be acclimatizing to ambient conditions. In this
 scenario, the rolling mean and std are less helpful because their windows are
 positioned on the left to capture a sudden change as it occurs.</p>
-</dd>
-</dl>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><dl class="simple">

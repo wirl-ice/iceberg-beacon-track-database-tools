@@ -295,20 +295,19 @@
 <span class="sd">    Create a timeseries graph of data from the beacon to assist in finding trim_start and trim_end.</span>
 
 <span class="sd">    There are 3 panels:</span>
-<span class="sd">        1) Temperature (of the air, surface or internal, depending on what is available), the</span>
-<span class="sd">        air pressure, if available.</span>
 
-<span class="sd">        2) 5 and 3 day rolling mean and standard deviation of temperature.</span>
+<span class="sd">    * Temperature (of the air, surface or internal, depending on what is available), the</span>
+<span class="sd">      air pressure, if available.</span>
+<span class="sd">    * 5 and 3 day rolling mean and standard deviation of temperature.</span>
+<span class="sd">    * Battery voltage along with pitch and roll, if available.</span>
 
-<span class="sd">        3) Battery voltage along with pitch and roll, if available.</span>
-
-<span class="sd">    When beacons fall off their target into the water, the standard deviation of temperature should</span>
-<span class="sd">            decrease. Temperature should approach water temperature at the same time</span>
-<span class="sd">            (typically decreasing).  The rolling average and std are optimized for</span>
-<span class="sd">            determining trim_end, not trim_start (the window is left-aligned). When beacons</span>
-<span class="sd">            are deployed, they may still be acclimatizing to ambient conditions. In this</span>
-<span class="sd">            scenario, the rolling mean and std are less helpful because their windows are</span>
-<span class="sd">            positioned on the left to capture a sudden change as it occurs.</span>
+<span class="sd">    When beacons fall off their target into the water, the standard deviation of temperature</span>
+<span class="sd">    should decrease. Temperature should approach water temperature at the same time</span>
+<span class="sd">    (typically decreasing).  The rolling average and std are optimized for</span>
+<span class="sd">    determining trim_end, not trim_start (the window is left-aligned). When beacons</span>
+<span class="sd">    are deployed, they may still be acclimatizing to ambient conditions. In this</span>
+<span class="sd">    scenario, the rolling mean and std are less helpful because their windows are</span>
+<span class="sd">    positioned on the left to capture a sudden change as it occurs.</span>
 
 <span class="sd">    Parameters</span>
 <span class="sd">    ----------</span>
