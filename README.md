@@ -1,3 +1,4 @@
+[![DOI](https://zenodo.org/badge/254221220.svg)](https://doi.org/10.5281/zenodo.15319161)
 # Iceberg Beacon Track Database (IBTD) Tools
 
 This repository provides the core Python scripts and modules for processing, standardizing, visualizing, and collating iceberg beacon track data into the Iceberg Beacon Track Database (IBTD). The processing workflow is designed to read-in various raw data formats from multiple beacon types/telemetry providers, standardize them, perform quality control, and output processed data files and visualizations.  
@@ -135,7 +136,7 @@ Dependencies can be installed using conda and the environment.yml file as follow
 
 This software was developed at the Water and Ice Research Lab at Carleton University by Derek Mueller and Adam Garbo with contributions from Jill Rajewicz and Anna Crawford. For questions, contributions, or bug reports, please contact Derek Mueller (derek.mueller@carleton.ca).
 
-Mueller D, Garbo A (2025) Iceberg Beacon Track Database (IBTD) Tools.  (more soon)
+Mueller D, Garbo A (2025) Iceberg Beacon Track Database (IBTD) Tools (v1.0.0) [Computer software]. Zenodo. [https://doi.org/10.5281/zenodo.15319161](https://doi.org/10.5281/zenodo.15319161)
 
 ## Licence
 
