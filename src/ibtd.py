@@ -101,6 +101,29 @@ def json_serialize(value):
         return bool(value)
 
 
+def json_nan2none(obj):
+    """
+    Replace dictionary nan values with none so they will be valid for json export.
+
+    Parameters
+    ----------
+    obj : dictionary
+        A dictionary or value within a dictionary to evaluate as nan (must be a float)
+
+    Returns
+    -------
+    obj: dictionary
+        A dictionary with nan replaced with None.
+
+    """
+    if isinstance(obj, dict):
+        return {k: json_nan2none(v) for k, v in obj.items()}
+    elif isinstance(obj, float) and np.isnan(obj):
+        return None
+    else:
+        return obj
+
+
 class Specs:
     """
     Class that holds info/specifications for all beacon models.
@@ -1582,6 +1605,10 @@ class Track:
         track_meta_df = track_meta_df[new_columns]
 
         if meta_export == "json" or meta_export == "both":
+            # overwrite the dictionary with NaN now represented by None, so json will
+            # represent them as null
+            track_meta_dict = json_nan2none(track_meta_dict)
+
             track_meta_json = json.dumps(
                 track_meta_dict, indent=4, default=json_serialize
             )
