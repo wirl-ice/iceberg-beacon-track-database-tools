@@ -1610,10 +1610,14 @@ class Track:
             track_meta_dict = json_nan2none(track_meta_dict)
 
             track_meta_json = json.dumps(
-                track_meta_dict, indent=4, default=json_serialize
+                track_meta_dict,
+                indent=4,
+                default=json_serialize,
+                ensure_ascii=False,
+                allow_nan=False,
             )
             with open(
-                f"{Path(path_output)/self.platform_id}_meta.json", "w"
+                f"{Path(path_output)/self.platform_id}_meta.json", "w", encoding="utf-8"
             ) as file_export:
                 file_export.write(track_meta_json)
 
@@ -1622,6 +1626,7 @@ class Track:
                 f"{Path(path_output)/self.platform_id}_meta.csv",
                 index=False,
                 na_rep="NA",
+                encoding="utf-8",
             )
 
         return track_meta_df

@@ -660,7 +660,10 @@ def main():
 
     # output the metadata
     alltrack_meta.to_csv(
-        os.path.join(outdir, f"{run_name}_track_metadata.csv"), index=False, na_rep="NA"
+        os.path.join(outdir, f"{run_name}_track_metadata.csv"),
+        index=False,
+        na_rep="NA",
+        encoding="utf-8",
     )
 
     # combine data for the stats
