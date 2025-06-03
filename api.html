@@ -987,6 +987,26 @@ at the start and end of the track.</p>
 </dd></dl>
 
 <dl class="py function">
+<dt class="sig sig-object py" id="ibtd.json_nan2none">
+<span class="sig-prename descclassname"><span class="pre">ibtd.</span></span><span class="sig-name descname"><span class="pre">json_nan2none</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">obj</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ibtd.html#json_nan2none"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ibtd.json_nan2none" title="Link to this definition">¶</a></dt>
+<dd><p>Replace dictionary nan values with none so they will be valid for json export.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>obj</strong><span class="classifier">dictionary</span></dt><dd><p>A dictionary or value within a dictionary to evaluate as nan (must be a float)</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>obj: dictionary</dt><dd><p>A dictionary with nan replaced with None.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
 <dt class="sig sig-object py" id="ibtd.json_serialize">
 <span class="sig-prename descclassname"><span class="pre">ibtd.</span></span><span class="sig-name descname"><span class="pre">json_serialize</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ibtd.html#json_serialize"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ibtd.json_serialize" title="Link to this definition">¶</a></dt>
 <dd><p>Check to see if the value is a type that json can’t serialize and, if so, convert it.</p>

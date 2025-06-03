@@ -140,6 +140,32 @@
 
 
 
+<div class="viewcode-block" id="json_nan2none">
+<a class="viewcode-back" href="../api.html#ibtd.json_nan2none">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">json_nan2none</span><span class="p">(</span><span class="n">obj</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Replace dictionary nan values with none so they will be valid for json export.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    obj : dictionary</span>
+<span class="sd">        A dictionary or value within a dictionary to evaluate as nan (must be a float)</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    obj: dictionary</span>
+<span class="sd">        A dictionary with nan replaced with None.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">json_nan2none</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">obj</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="nb">float</span><span class="p">)</span> <span class="ow">and</span> <span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">obj</span><span class="p">):</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">obj</span></div>
+
+
+
 <div class="viewcode-block" id="Specs">
 <a class="viewcode-back" href="../api.html#ibtd.Specs">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">Specs</span><span class="p">:</span>
@@ -1664,11 +1690,19 @@
         <span class="n">track_meta_df</span> <span class="o">=</span> <span class="n">track_meta_df</span><span class="p">[</span><span class="n">new_columns</span><span class="p">]</span>
 
         <span class="k">if</span> <span class="n">meta_export</span> <span class="o">==</span> <span class="s2">&quot;json&quot;</span> <span class="ow">or</span> <span class="n">meta_export</span> <span class="o">==</span> <span class="s2">&quot;both&quot;</span><span class="p">:</span>
+            <span class="c1"># overwrite the dictionary with NaN now represented by None, so json will</span>
+            <span class="c1"># represent them as null</span>
+            <span class="n">track_meta_dict</span> <span class="o">=</span> <span class="n">json_nan2none</span><span class="p">(</span><span class="n">track_meta_dict</span><span class="p">)</span>
+
             <span class="n">track_meta_json</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span>
-                <span class="n">track_meta_dict</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="n">json_serialize</span>
+                <span class="n">track_meta_dict</span><span class="p">,</span>
+                <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+                <span class="n">default</span><span class="o">=</span><span class="n">json_serialize</span><span class="p">,</span>
+                <span class="n">ensure_ascii</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                <span class="n">allow_nan</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
             <span class="p">)</span>
             <span class="k">with</span> <span class="nb">open</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">Path</span><span class="p">(</span><span class="n">path_output</span><span class="p">)</span><span class="o">/</span><span class="bp">self</span><span class="o">.</span><span class="n">platform_id</span><span class="si">}</span><span class="s2">_meta.json&quot;</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">Path</span><span class="p">(</span><span class="n">path_output</span><span class="p">)</span><span class="o">/</span><span class="bp">self</span><span class="o">.</span><span class="n">platform_id</span><span class="si">}</span><span class="s2">_meta.json&quot;</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span>
             <span class="p">)</span> <span class="k">as</span> <span class="n">file_export</span><span class="p">:</span>
                 <span class="n">file_export</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">track_meta_json</span><span class="p">)</span>
 
@@ -1677,6 +1711,7 @@
                 <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">Path</span><span class="p">(</span><span class="n">path_output</span><span class="p">)</span><span class="o">/</span><span class="bp">self</span><span class="o">.</span><span class="n">platform_id</span><span class="si">}</span><span class="s2">_meta.csv&quot;</span><span class="p">,</span>
                 <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
                 <span class="n">na_rep</span><span class="o">=</span><span class="s2">&quot;NA&quot;</span><span class="p">,</span>
+                <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">,</span>
             <span class="p">)</span>
 
         <span class="k">return</span> <span class="n">track_meta_df</span></div>
