@@ -1,4 +1,4 @@
-[![DOI](https://zenodo.org/badge/254221220.svg)](https://doi.org/10.5281/zenodo.15319161)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.16867014.svg)](https://doi.org/10.5281/zenodo.16867014)
 # Iceberg Beacon Track Database (IBTD) Tools
 
 This repository provides the core Python scripts and modules for processing, standardizing, visualizing, and collating iceberg beacon track data into the Iceberg Beacon Track Database (IBTD). The processing workflow is designed to read-in various raw data formats from multiple beacon types/telemetry providers, standardize them, perform quality control, and output processed data files and visualizations.  
